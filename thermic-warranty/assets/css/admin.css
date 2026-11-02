@@ -1,0 +1,20 @@
+.tw-wrap .tw-cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.tw-wrap .tw-stat { background: #fff; border: 1px solid #dcdcde; border-left: 4px solid #2271b1; border-radius: 4px; padding: 12px 16px; min-width: 150px; color: #50575e; }
+.tw-wrap .tw-stat span { display: block; font-size: 26px; font-weight: 600; color: #1d2327; }
+.tw-wrap .tw-stat--ok { border-left-color: #00a32a; }
+.tw-wrap .tw-stat--warn { border-left-color: #dba617; }
+.tw-wrap .tw-stat--bad { border-left-color: #d63638; }
+.tw-wrap .tw-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin: 16px 0; }
+.tw-wrap .tw-panel { background: #fff; border: 1px solid #dcdcde; border-radius: 4px; padding: 4px 16px 12px; }
+.tw-wrap .tw-kv th { width: 160px; padding: 6px 10px 6px 0; }
+.tw-wrap .tw-kv td { padding: 6px 0; }
+.tw-wrap .tw-filters { margin: 12px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tw-wrap .tw-inline-form { margin: 12px 0; }
+.tw-wrap h2 { margin-top: 28px; }
+.tw-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: #f0f0f1; vertical-align: middle; }
+.tw-badge--active, .tw-badge--available { background: #edfaef; color: #00752a; }
+.tw-badge--registered { background: #e7f0fb; color: #135e96; }
+.tw-badge--locked, .tw-badge--void { background: #fcf0f1; color: #b32d2e; }
+.tw-badge--expired { background: #f0f0f1; color: #50575e; }
+.tw-danger, .button.tw-danger { color: #b32d2e !important; }
+.tw-warn { color: #996800; }

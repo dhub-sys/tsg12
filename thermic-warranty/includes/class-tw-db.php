@@ -1,0 +1,192 @@
+<?php
+if (!defined('ABSPATH')) exit;
+
+/**
+ * Database schema and table names.
+ *
+ * serials        – the serial numbers we import (one row per physical product)
+ * warranties     – one activated warranty per serial (customer data lives here)
+ * consents       – every consent given/withdrawn, with terms version, IP and time (GDPR proof)
+ * otps           – email verification codes (registration and portal login), stored hashed
+ * services       – Service visits recorded by the company, one per 3-year milestone
+ * notifications  – every reminder sent; the unique key makes the daily run idempotent
+ * events         – audit trail per warranty / serial
+ */
+final class TW_DB {
+    const DB_VERSION = '1.0.0';
+    const DB_VERSION_OPTION = 'tw_db_version';
+
+    public static function table($name) {
+        global $wpdb;
+        return $wpdb->prefix . 'tw_' . $name;
+    }
+
+    public static function activate() {
+        self::install();
+        TW_Settings::ensure_defaults();
+        TW_Util::protect_upload_dir();
+        TW_Cron::schedule();
+    }
+
+    public static function maybe_upgrade() {
+        if (get_option(self::DB_VERSION_OPTION) !== self::DB_VERSION) {
+            self::install();
+            TW_Settings::ensure_defaults();
+        }
+    }
+
+    public static function install() {
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        $c = $wpdb->get_charset_collate();
+        $t = function ($n) { return self::table($n); };
+
+        dbDelta("CREATE TABLE {$t('serials')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  serial_no varchar(64) NOT NULL,
+  product_code varchar(100) NOT NULL DEFAULT '',
+  product_name varchar(255) NOT NULL DEFAULT '',
+  status varchar(20) NOT NULL DEFAULT 'available',
+  import_batch varchar(64) NOT NULL DEFAULT '',
+  notes text NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY serial_no (serial_no),
+  KEY status (status)
+) $c;");
+
+        dbDelta("CREATE TABLE {$t('warranties')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  warranty_code varchar(32) NOT NULL,
+  serial_id bigint(20) unsigned NOT NULL,
+  customer_name varchar(200) NOT NULL DEFAULT '',
+  email varchar(190) NOT NULL DEFAULT '',
+  phone_landline varchar(40) NOT NULL DEFAULT '',
+  phone_mobile varchar(40) NOT NULL DEFAULT '',
+  address varchar(255) NOT NULL DEFAULT '',
+  postcode varchar(20) NOT NULL DEFAULT '',
+  city varchar(120) NOT NULL DEFAULT '',
+  partner_vat varchar(20) NOT NULL DEFAULT '',
+  partner_email varchar(190) NOT NULL DEFAULT '',
+  invoice_number varchar(100) NOT NULL DEFAULT '',
+  invoice_file varchar(255) NOT NULL DEFAULT '',
+  invoice_original_name varchar(255) NOT NULL DEFAULT '',
+  purchase_date date NOT NULL,
+  warranty_end date NOT NULL,
+  status varchar(20) NOT NULL DEFAULT 'active',
+  lock_reason varchar(255) NOT NULL DEFAULT '',
+  locked_at datetime NULL,
+  marketing_opt_in tinyint(1) NOT NULL DEFAULT 0,
+  anonymized_at datetime NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY warranty_code (warranty_code),
+  UNIQUE KEY serial_id (serial_id),
+  KEY email (email),
+  KEY status (status),
+  KEY warranty_end (warranty_end),
+  KEY partner_vat (partner_vat)
+) $c;");
+
+        dbDelta("CREATE TABLE {$t('consents')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  warranty_id bigint(20) unsigned NOT NULL,
+  consent_type varchar(30) NOT NULL,
+  granted tinyint(1) NOT NULL DEFAULT 0,
+  terms_version int(11) NOT NULL DEFAULT 0,
+  terms_hash char(64) NOT NULL DEFAULT '',
+  label_text text NULL,
+  source varchar(30) NOT NULL DEFAULT 'registration',
+  ip varchar(64) NOT NULL DEFAULT '',
+  user_agent varchar(255) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY warranty_id (warranty_id)
+) $c;");
+
+        dbDelta("CREATE TABLE {$t('otps')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  purpose varchar(20) NOT NULL,
+  email varchar(190) NOT NULL,
+  serial_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  code_hash char(64) NOT NULL,
+  token_hash char(64) NOT NULL DEFAULT '',
+  attempts int(11) NOT NULL DEFAULT 0,
+  expires_at datetime NOT NULL,
+  verified_at datetime NULL,
+  used_at datetime NULL,
+  ip varchar(64) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY email (email),
+  KEY token_hash (token_hash)
+) $c;");
+
+        dbDelta("CREATE TABLE {$t('services')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  warranty_id bigint(20) unsigned NOT NULL,
+  milestone_no int(11) NOT NULL,
+  performed_date date NOT NULL,
+  performed_by varchar(20) NOT NULL DEFAULT 'partner',
+  technician varchar(200) NOT NULL DEFAULT '',
+  genuine_parts tinyint(1) NOT NULL DEFAULT 1,
+  notes text NULL,
+  created_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY warranty_milestone (warranty_id,milestone_no)
+) $c;");
+
+        dbDelta("CREATE TABLE {$t('notifications')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  warranty_id bigint(20) unsigned NOT NULL,
+  milestone_key varchar(30) NOT NULL,
+  offset_days int(11) NOT NULL,
+  channel varchar(10) NOT NULL,
+  recipient varchar(190) NOT NULL DEFAULT '',
+  status varchar(20) NOT NULL DEFAULT 'sent',
+  error text NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY once_per_step (warranty_id,milestone_key,offset_days,channel),
+  KEY created_at (created_at)
+) $c;");
+
+        dbDelta("CREATE TABLE {$t('events')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  warranty_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  serial_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  actor varchar(100) NOT NULL DEFAULT '',
+  action varchar(50) NOT NULL,
+  details text NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY warranty_id (warranty_id),
+  KEY serial_id (serial_id)
+) $c;");
+
+        update_option(self::DB_VERSION_OPTION, self::DB_VERSION);
+    }
+
+    /** Current time in the site's timezone, MySQL format. */
+    public static function now() {
+        return current_time('mysql');
+    }
+
+    public static function log_event($action, $details = '', $warranty_id = 0, $serial_id = 0, $actor = null) {
+        global $wpdb;
+        if ($actor === null) {
+            $u = wp_get_current_user();
+            $actor = ($u && $u->ID) ? 'admin:' . $u->user_login : 'system';
+        }
+        $wpdb->insert(self::table('events'), [
+            'warranty_id' => (int) $warranty_id,
+            'serial_id' => (int) $serial_id,
+            'actor' => $actor,
+            'action' => $action,
+            'details' => is_string($details) ? $details : wp_json_encode($details, JSON_UNESCAPED_UNICODE),
+            'created_at' => self::now(),
+        ]);
+    }
+}
