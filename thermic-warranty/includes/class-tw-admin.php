@@ -18,7 +18,7 @@ final class TW_Admin {
     /** Actions accepted by the app router (POST, or GET for downloads). */
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
-            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure'];
+            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -444,6 +444,8 @@ final class TW_Admin {
             <div class="tw-columns">
                 <div class="tw-panel">
                     <h2>Εισαγωγή από αρχείο (Excel / CSV)</h2>
+                    <p><a class="button" href="<?php echo esc_url(wp_nonce_url(add_query_arg('action', 'tw_template', self::url('serials')), 'tw_template')); ?>">⬇ Λήψη προτύπου Excel</a>
+                        <span class="description">Συμπληρώστε το πρότυπο και ανεβάστε το εδώ.</span></p>
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_import'); ?><input type="hidden" name="action" value="tw_import">
                         <p><input type="file" name="file" accept=".xlsx,.csv,.txt" required></p>
@@ -856,6 +858,25 @@ final class TW_Admin {
         ]);
         set_transient('tw_import_result_' . get_current_user_id(), $res, 600);
         self::back('tw-serials', ['batch' => $res['inserted'] ? $res['batch'] : null]);
+    }
+
+    public static function handle_template() {
+        if (!current_user_can(self::cap())) wp_die('', 403);
+        check_admin_referer('tw_template');
+        $file = TW_Importer::template_xlsx();
+        nocache_headers();
+        if ($file) {
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="protypo-seiriakon.xlsx"');
+            header('Content-Length: ' . filesize($file));
+            readfile($file);
+            @unlink($file);
+        } else { // no ZipArchive on the server: CSV that Excel opens the same way
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="protypo-seiriakon.csv"');
+            echo "\xEF\xBB\xBF" . implode(';', TW_Importer::TEMPLATE_HEADERS) . "\r\n";
+        }
+        exit;
     }
 
     public static function handle_add_serial() {

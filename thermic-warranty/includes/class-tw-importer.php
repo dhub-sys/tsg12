@@ -19,6 +19,82 @@ final class TW_Importer {
         'notes' => ['notes', 'note', 'σημειώσεις', 'σημειωσεις', 'παρατηρήσεις', 'παρατηρησεις'],
     ];
 
+    const TEMPLATE_HEADERS = ['serial', 'product_code', 'product_name', 'notes'];
+
+    /**
+     * Builds the import template: sheet 1 has only the header row (columns formatted as text so
+     * serials keep leading zeros), sheet 2 has instructions. Sheet 1 is what the importer reads.
+     * @return string|false temp file path, or false without ZipArchive
+     */
+    public static function template_xlsx() {
+        if (!class_exists('ZipArchive')) return false;
+        $x = function ($v) { return htmlspecialchars($v, ENT_XML1 | ENT_QUOTES, 'UTF-8'); };
+        $cell = function ($ref, $text, $style) use ($x) {
+            return '<c r="' . $ref . '" t="inlineStr" s="' . $style . '"><is><t xml:space="preserve">' . $x($text) . '</t></is></c>';
+        };
+        $head = '';
+        foreach (self::TEMPLATE_HEADERS as $i => $h) $head .= $cell(chr(65 + $i) . '1', $h, 1);
+        $sheet1 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+            . '<cols><col min="1" max="1" width="26" style="2" customWidth="1"/><col min="2" max="2" width="18" style="2" customWidth="1"/>'
+            . '<col min="3" max="3" width="40" style="2" customWidth="1"/><col min="4" max="4" width="40" style="2" customWidth="1"/></cols>'
+            . '<sheetData><row r="1">' . $head . '</row></sheetData></worksheet>';
+        $lines = [
+            ['Οδηγίες εισαγωγής σειριακών αριθμών', 1],
+            ['', 0],
+            ['Συμπληρώστε το φύλλο «Σειριακοί», μία γραμμή ανά προϊόν. Μην αλλάξετε την πρώτη γραμμή (επικεφαλίδες).', 0],
+            ['serial: ο σειριακός αριθμός όπως στην ετικέτα (υποχρεωτικό). Γράμματα, αριθμοί και - / . _ , 3–64 χαρακτήρες.', 0],
+            ['product_code: ο κωδικός του προϊόντος (προαιρετικό).', 0],
+            ['product_name: η περιγραφή που θα βλέπει ο πελάτης, π.χ. «Λέβητας 24kW» (προαιρετικό).', 0],
+            ['notes: εσωτερικές σημειώσεις, δεν εμφανίζονται στον πελάτη (προαιρετικό).', 0],
+            ['Οι στήλες είναι μορφοποιημένες ως κείμενο, ώστε να μη χάνονται μηδενικά στην αρχή των σειριακών.', 0],
+            ['Σειριακοί που υπάρχουν ήδη στο σύστημα παραλείπονται και δεν αλλάζουν.', 0],
+            ['Το φύλλο «Οδηγίες» δεν εισάγεται· μπορείτε να το αφήσετε ή να το διαγράψετε.', 0],
+        ];
+        $rows = '';
+        foreach ($lines as $n => $l) $rows .= '<row r="' . ($n + 1) . '">' . ($l[0] === '' ? '' : $cell('A' . ($n + 1), $l[0], $l[1])) . '</row>';
+        $sheet2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="110" customWidth="1"/></cols>'
+            . '<sheetData>' . $rows . '</sheetData></worksheet>';
+        $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
+            . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
+            . '<fill><patternFill patternType="solid"><fgColor rgb="FFC8102E"/><bgColor indexed="64"/></patternFill></fill></fills>'
+            . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+            . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+            . '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+            . '<xf numFmtId="49" fontId="1" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>'
+            . '<xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>'
+            . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+        $files = [
+            '[Content_Types].xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+                . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                . '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+            '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+            'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                . '<sheets><sheet name="Σειριακοί" sheetId="1" r:id="rId1"/><sheet name="Οδηγίες" sheetId="2" r:id="rId2"/></sheets></workbook>',
+            'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+                . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>'
+                . '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+            'xl/worksheets/sheet1.xml' => $sheet1,
+            'xl/worksheets/sheet2.xml' => $sheet2,
+            'xl/styles.xml' => $styles,
+        ];
+        $path = tempnam(get_temp_dir(), 'tw-tpl');
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) return false;
+        foreach ($files as $name => $content) $zip->addFromString($name, $content);
+        $zip->close();
+        return $path;
+    }
+
     /** @return array[]|WP_Error rows of cells */
     public static function read_file($path, $original_name) {
         $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
