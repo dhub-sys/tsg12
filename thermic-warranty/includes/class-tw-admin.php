@@ -2,37 +2,53 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Company back office: dashboard, warranties, serials (single + bulk import), notifications log, settings.
+ * Company back office, rendered inside the standalone admin app (see TW_App):
+ * dashboard, warranties, serials (single + bulk import), notifications log, team, settings.
+ * Forms post back to the app URL with an `action` field; TW_App::route_admin() dispatches to handle_*().
  */
 final class TW_Admin {
     const PER_PAGE = 50;
 
+    const CAP = 'tw_manage';
+
     public static function cap() {
-        return apply_filters('tw_capability', 'manage_options');
+        return apply_filters('tw_capability', self::CAP);
     }
 
-    public static function init() {
-        add_action('admin_menu', [__CLASS__, 'menu']);
-        add_action('admin_enqueue_scripts', function ($hook) {
-            if (strpos((string) $hook, 'tw-') !== false) {
-                wp_enqueue_style('tw-admin', TW_URL . 'assets/css/admin.css', [], TW_VERSION);
-            }
-        });
-        $actions = ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
-            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view'];
-        foreach ($actions as $a) {
-            add_action('admin_post_tw_' . $a, [__CLASS__, 'handle_' . $a]);
+    /** Actions accepted by the app router (POST, or GET for downloads). */
+    public static function actions() {
+        return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
+            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure'];
+    }
+
+    /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
+    public static function screens() {
+        $screens = [
+            'dashboard' => ['Επισκόπηση', '◧', 'page_dashboard'],
+            'warranties' => ['Εγγυήσεις & πελάτες', '🛡', 'page_warranties'],
+            'serials' => ['Σειριακοί αριθμοί', '#', 'page_serials'],
+            'notifications' => ['Ειδοποιήσεις', '✉', 'page_notifications'],
+        ];
+        if (current_user_can('manage_options') || current_user_can('tw_manage_team')) {
+            $screens['team'] = ['Ομάδα', '👥', 'page_team'];
         }
+        $screens['settings'] = ['Ρυθμίσεις', '⚙', 'page_settings'];
+        return $screens;
     }
 
-    public static function menu() {
-        $cap = self::cap();
-        add_menu_page('Εγγυήσεις', 'Εγγυήσεις', $cap, 'tw-dashboard', [__CLASS__, 'page_dashboard'], 'dashicons-shield', 56);
-        add_submenu_page('tw-dashboard', 'Επισκόπηση', 'Επισκόπηση', $cap, 'tw-dashboard', [__CLASS__, 'page_dashboard']);
-        add_submenu_page('tw-dashboard', 'Εγγυήσεις & πελάτες', 'Εγγυήσεις & πελάτες', $cap, 'tw-warranties', [__CLASS__, 'page_warranties']);
-        add_submenu_page('tw-dashboard', 'Σειριακοί αριθμοί', 'Σειριακοί αριθμοί', $cap, 'tw-serials', [__CLASS__, 'page_serials']);
-        add_submenu_page('tw-dashboard', 'Ειδοποιήσεις', 'Ειδοποιήσεις', $cap, 'tw-notifications', [__CLASS__, 'page_notifications']);
-        add_submenu_page('tw-dashboard', 'Ρυθμίσεις', 'Ρυθμίσεις', $cap, 'tw-settings', [__CLASS__, 'page_settings']);
+    /** wp-admin only gets a launcher that opens the standalone app. */
+    public static function init() {
+        add_action('admin_menu', function () {
+            $hook = add_menu_page('Εγγυήσεις', 'Εγγυήσεις ↗', self::cap(), 'tw-app', '__return_null', 'dashicons-shield', 56);
+            add_action('load-' . $hook, function () {
+                wp_safe_redirect(TW_App::admin_url());
+                exit;
+            });
+        });
+    }
+
+    public static function url($screen = 'dashboard', array $args = []) {
+        return TW_App::admin_url($screen, $args);
     }
 
     // ------------------------------------------------------------------ helpers
@@ -43,8 +59,16 @@ final class TW_Admin {
     }
 
     private static function back($page, array $args = []) {
-        wp_safe_redirect(add_query_arg($args, admin_url('admin.php?page=' . $page)));
+        wp_safe_redirect(self::url(preg_replace('/^tw-/', '', $page), array_filter($args, function ($v) { return $v !== null; })));
         exit;
+    }
+
+    /** Hidden inputs so GET filter forms stay inside the app. */
+    private static function get_form_fields($screen) {
+        foreach (TW_App::admin_base_query() as $k => $v) {
+            echo '<input type="hidden" name="' . esc_attr($k) . '" value="' . esc_attr($v) . '">';
+        }
+        echo '<input type="hidden" name="screen" value="' . esc_attr($screen) . '">';
     }
 
     private static function post($k) {
@@ -79,7 +103,7 @@ final class TW_Admin {
     }
 
     private static function warranty_link($id, $text) {
-        return '<a href="' . esc_url(admin_url('admin.php?page=tw-warranties&view=' . (int) $id)) . '">' . esc_html($text) . '</a>';
+        return '<a href="' . esc_url(self::url('warranties', ['view' => (int) $id])) . '">' . esc_html($text) . '</a>';
     }
 
     // ------------------------------------------------------------------ dashboard
@@ -189,14 +213,14 @@ final class TW_Admin {
         $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM (" . $base . ") x");
         $rows = $wpdb->get_results($base . ' ORDER BY w.created_at DESC LIMIT ' . self::PER_PAGE . ' OFFSET ' . (($paged - 1) * self::PER_PAGE));
         $labels = TW_Util::status_labels();
-        $export = wp_nonce_url(add_query_arg(array_merge(['action' => 'tw_export', 'type' => 'warranties'], array_filter($args)), admin_url('admin-post.php')), 'tw_export');
+        $export = wp_nonce_url(add_query_arg(array_merge(['action' => 'tw_export', 'type' => 'warranties'], array_filter($args)), self::url('warranties')), 'tw_export');
         ?>
         <div class="wrap tw-wrap">
             <h1 class="wp-heading-inline">Εγγυήσεις &amp; πελάτες</h1>
             <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή CSV (με τα τρέχοντα φίλτρα)</a>
             <?php self::notice(); ?>
             <form method="get" class="tw-filters">
-                <input type="hidden" name="page" value="tw-warranties">
+                <?php self::get_form_fields('warranties'); ?>
                 <input type="search" name="s" value="<?php echo esc_attr($args['s']); ?>" placeholder="S/N, κωδικός, όνομα, email, τηλέφωνο, ΑΦΜ…" size="40">
                 <select name="status"><option value="">Όλες οι καταστάσεις</option>
                     <?php foreach ($labels as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($args['status'], $k, false), esc_html($l)); ?>
@@ -233,12 +257,12 @@ final class TW_Admin {
         $consents = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('consents') . " WHERE warranty_id = %d ORDER BY id", $id));
         $notes = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('notifications') . " WHERE warranty_id = %d ORDER BY id DESC", $id));
         $events = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('events') . " WHERE warranty_id = %d ORDER BY id DESC", $id));
-        $post = admin_url('admin-post.php');
+        $post = self::url();
         $ms_labels = ['done' => 'Πραγματοποιήθηκε', 'due' => 'Εκκρεμεί', 'missed' => 'Δεν πραγματοποιήθηκε', 'upcoming' => 'Προσεχώς', 'before_registration' => 'Πριν από την ενεργοποίηση', 'expired' => 'Έληξε'];
         $consent_labels = ['terms' => 'Όροι εγγύησης', 'data_accuracy' => 'Ορθότητα στοιχείων', 'marketing' => 'Εμπορικές ενημερώσεις'];
         ?>
         <div class="wrap tw-wrap">
-            <p><a href="<?php echo esc_url(admin_url('admin.php?page=tw-warranties')); ?>">&larr; Όλες οι εγγυήσεις</a></p>
+            <p><a href="<?php echo esc_url(self::url('warranties')); ?>">&larr; Όλες οι εγγυήσεις</a></p>
             <h1>Εγγύηση <?php echo esc_html($w->warranty_code); ?> <?php echo self::status_badge($w->status, $labels); ?></h1>
             <?php self::notice(); ?>
             <?php if ($w->status === 'locked') : ?><div class="notice notice-error inline"><p><strong>Οριστικά κλειδωμένη</strong> στις <?php echo esc_html(TW_Util::datetime_label($w->locked_at)); ?>: <?php echo esc_html($w->lock_reason); ?></p></div><?php endif; ?>
@@ -400,7 +424,7 @@ final class TW_Admin {
         $rows = $wpdb->get_results("SELECT s.*, s.serial_no AS serial, w.id wid, w.warranty_code FROM $t s LEFT JOIN $wt w ON w.serial_id = s.id WHERE $wsql"
             . ' ORDER BY s.id DESC LIMIT ' . self::PER_PAGE . ' OFFSET ' . (($paged - 1) * self::PER_PAGE));
         $labels = TW_Util::serial_status_labels();
-        $post = admin_url('admin-post.php');
+        $post = self::url();
         $result = get_transient('tw_import_result_' . get_current_user_id());
         if ($result) delete_transient('tw_import_result_' . get_current_user_id());
         $export = wp_nonce_url(add_query_arg(array_filter(['action' => 'tw_export', 'type' => 'serials', 's' => $s, 'status' => $status, 'batch' => $batch]), $post), 'tw_export');
@@ -442,7 +466,7 @@ final class TW_Admin {
             </div>
 
             <form method="get" class="tw-filters">
-                <input type="hidden" name="page" value="tw-serials">
+                <?php self::get_form_fields('serials'); ?>
                 <input type="search" name="s" value="<?php echo esc_attr($s); ?>" placeholder="Σειριακός ή προϊόν">
                 <select name="status"><option value="">Όλοι</option><?php foreach ($labels as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($status, $k, false), esc_html($l)); ?></select>
                 <input type="text" name="batch" value="<?php echo esc_attr($batch); ?>" placeholder="Παρτίδα εισαγωγής">
@@ -455,7 +479,7 @@ final class TW_Admin {
                 <tr><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
                     <td><?php echo self::status_badge($r->status, $labels); ?></td>
                     <td><?php echo $r->wid ? self::warranty_link($r->wid, $r->warranty_code) : '—'; ?></td>
-                    <td><a href="<?php echo esc_url(admin_url('admin.php?page=tw-serials&batch=' . rawurlencode($r->import_batch))); ?>"><?php echo esc_html($r->import_batch); ?></a></td>
+                    <td><a href="<?php echo esc_url(self::url('serials', ['batch' => $r->import_batch])); ?>"><?php echo esc_html($r->import_batch); ?></a></td>
                     <td><?php echo esc_html(TW_Util::datetime_label($r->created_at)); ?></td>
                     <td><?php if ($r->status !== 'registered') : $to = $r->status === 'void' ? 'available' : 'void'; ?>
                         <form method="post" action="<?php echo esc_url($post); ?>"><?php wp_nonce_field('tw_serial_status'); ?>
@@ -483,12 +507,12 @@ final class TW_Admin {
         <div class="wrap tw-wrap">
             <h1>Ειδοποιήσεις</h1>
             <?php self::notice(); ?>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="tw-inline-form">
+            <form method="post" action="<?php echo esc_url(self::url('notifications')); ?>" class="tw-inline-form">
                 <?php wp_nonce_field('tw_run_now'); ?><input type="hidden" name="action" value="tw_run_now">
                 <button class="button button-primary">Εκτέλεση ελέγχου ειδοποιήσεων τώρα</button>
                 <span class="description">Η εκτέλεση γίνεται αυτόματα κάθε μέρα. Δεν στέλνει ποτέ το ίδιο μήνυμα δύο φορές.</span>
             </form>
-            <p><a href="<?php echo esc_url(admin_url('admin.php?page=tw-notifications')); ?>">Όλες</a> | <a href="<?php echo esc_url(admin_url('admin.php?page=tw-notifications&status=failed')); ?>">Αποτυχημένες</a></p>
+            <p><a href="<?php echo esc_url(self::url('notifications')); ?>">Όλες</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'failed'])); ?>">Αποτυχημένες</a></p>
             <?php self::pagination($total, $paged); self::notifications_table($rows, true); self::pagination($total, $paged); ?>
         </div>
         <?php
@@ -500,9 +524,9 @@ final class TW_Admin {
         $s = TW_Settings::all();
         $terms = TW_Settings::current_terms();
         $tpl = TW_Settings::template_defaults();
-        $post = admin_url('admin-post.php');
+        $post = self::url();
         $tab = self::q('tab') ?: 'general';
-        $tabs = ['general' => 'Γενικά', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'sms' => 'SMS', 'privacy' => 'GDPR'];
+        $tabs = ['general' => 'Γενικά', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'sms' => 'SMS', 'privacy' => 'GDPR'];
         $field = function ($key, $label, $type = 'text', $desc = '', $attrs = '') use ($s) {
             echo '<tr><th><label for="tw-' . esc_attr($key) . '">' . esc_html($label) . '</label></th><td>';
             if ($type === 'checkbox') {
@@ -521,7 +545,7 @@ final class TW_Admin {
             <h1>Ρυθμίσεις εγγυήσεων</h1>
             <?php self::notice(); ?>
             <nav class="nav-tab-wrapper">
-                <?php foreach ($tabs as $k => $l) printf('<a class="nav-tab%s" href="%s">%s</a>', $tab === $k ? ' nav-tab-active' : '', esc_url(admin_url('admin.php?page=tw-settings&tab=' . $k)), esc_html($l)); ?>
+                <?php foreach ($tabs as $k => $l) printf('<a class="nav-tab%s" href="%s">%s</a>', $tab === $k ? ' nav-tab-active' : '', esc_url(self::url('settings', ['tab' => $k])), esc_html($l)); ?>
             </nav>
             <form method="post" action="<?php echo esc_url($post); ?>">
                 <?php wp_nonce_field('tw_save_settings'); ?>
@@ -530,14 +554,20 @@ final class TW_Admin {
                 <?php if ($tab === 'general') :
                     $field('company_name', 'Επωνυμία');
                     $field('company_contact', 'Στοιχεία επικοινωνίας για Service', 'text', 'Εμφανίζεται στα μηνύματα: «…ή απευθείας στη Thermic: <em>αυτό το κείμενο</em>».');
-                    $field('register_url', 'Σελίδα ενεργοποίησης', 'url', 'Η σελίδα με το shortcode <code>[thermic_warranty_register]</code>.');
-                    $field('portal_url', 'Σελίδα «Οι εγγυήσεις μου»', 'url', 'Η σελίδα με το shortcode <code>[thermic_warranty_portal]</code>. Μπαίνει στα email.');
+                    $field('register_url', 'Σελίδα ενεργοποίησης (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url()) . '</code>. Συμπληρώστε μόνο αν βάλατε το shortcode <code>[thermic_warranty_register]</code> σε δική σας σελίδα του site.');
+                    $field('portal_url', 'Σελίδα «Οι εγγυήσεις μου» (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url('my')) . '</code>. Συμπληρώστε μόνο αν χρησιμοποιείτε το shortcode <code>[thermic_warranty_portal]</code>. Μπαίνει στα email.');
                     $field('email_from_name', 'Όνομα αποστολέα email');
                     $field('email_from_address', 'Email αποστολέα', 'email', 'Προτείνεται SMTP plugin (π.χ. WP Mail SMTP) με SPF/DKIM για τον τομέα, ώστε τα μηνύματα να μην πηγαίνουν στα ανεπιθύμητα.');
                     $field('admin_emails', 'Email εταιρείας για ειδοποιήσεις', 'text', 'Ένα ή περισσότερα, χωρισμένα με κόμμα.');
                     $field('admin_digest', 'Ημερήσια σύνοψη', 'checkbox', 'Αποστολή σύνοψης στην εταιρεία κάθε μέρα που υπάρχουν ειδοποιήσεις, λήξεις ή κλειδώματα.');
                     $field('invoice_required', 'Αρχείο παραστατικού', 'checkbox', 'Υποχρεωτική επισύναψη αρχείου (PDF/JPG/PNG).');
                     $field('invoice_max_mb', 'Μέγιστο μέγεθος αρχείου (MB)', 'number', '', 'min="1" max="50"');
+                elseif ($tab === 'app') :
+                    $field('admin_slug', 'Διεύθυνση διαχειριστικού', 'text', 'Το διαχειριστικό ανοίγει στο <code>' . esc_html(home_url('/')) . '<strong>' . esc_html($s['admin_slug']) . '</strong>/</code>.', 'pattern="[a-z0-9\\-]+"');
+                    $field('public_slug', 'Διεύθυνση σελίδων πελατών', 'text', 'Ενεργοποίηση: <code>' . esc_html(TW_App::public_url()) . '</code> – Οι εγγυήσεις μου: <code>' . esc_html(TW_App::public_url('my')) . '</code>', 'pattern="[a-z0-9\\-]+"');
+                    $field('logo_url', 'Λογότυπο (URL εικόνας)', 'url', 'Εμφανίζεται στις σελίδες πελατών, στο διαχειριστικό και στη σύνδεση.');
+                    $field('brand_color', 'Χρώμα εταιρείας', 'text', 'Hex, π.χ. #c8102e', 'pattern="#[0-9a-fA-F]{6}"');
+                    $field('staff_2fa', 'Διπλή επαλήθευση ομάδας', 'checkbox', 'Μετά τον κωδικό πρόσβασης, η ομάδα λαμβάνει κωδικό μίας χρήσης στο email (συνιστάται).');
                 elseif ($tab === 'schedule') :
                     $field('warranty_years', 'Διάρκεια εγγύησης (έτη)', 'number', 'Από την ημερομηνία αγοράς.', 'min="1" max="50"');
                     $field('service_interval_years', 'Service ανά (έτη)', 'number', '0 = χωρίς περιοδικό Service. Με 12 έτη και 3: Service στα 3, 6 και 9 έτη, λήξη στα 12.', 'min="0" max="50"');
@@ -580,11 +610,12 @@ final class TW_Admin {
                     $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Σύνδεσμος στη φόρμα ενεργοποίησης. Κενό = η Πολιτική Απορρήτου του WordPress. Προτεινόμενο κείμενο υπάρχει στις Ρυθμίσεις → Απόρρητο.');
                     $field('retention_months_after_end', 'Αυτόματη ανωνυμοποίηση (μήνες)', 'number', 'Μήνες μετά τη λήξη ή το κλείδωμα για αυτόματη ανωνυμοποίηση των προσωπικών στοιχείων. Το ιστορικό του προϊόντος μένει. 0 = απενεργοποιημένο. Ορίστε το σε συνεννόηση με τον νομικό σύμβουλο / DPO.', 'min="0"');
                     ?>
-                    <tr><th>Αιτήματα πελατών</th><td><p class="description">Τα αιτήματα εξαγωγής / διαγραφής από την πύλη εμφανίζονται στα Εργαλεία → <a href="<?php echo esc_url(admin_url('erase-personal-data.php')); ?>">Διαγραφή προσωπικών δεδομένων</a> και <a href="<?php echo esc_url(admin_url('export-personal-data.php')); ?>">Εξαγωγή</a>. Ενεργές εγγυήσεις διατηρούνται (ανάκληση εμπορικής συγκατάθεσης)· όσες έχουν λήξει ή κλειδωθεί ανωνυμοποιούνται.</p></td></tr>
+                    <tr><th>Αιτήματα διαγραφής</th><td><p class="description">Τα αιτήματα από την πύλη πελατών εμφανίζονται παρακάτω αφού ο πελάτης τα επιβεβαιώσει από το email του. Ενεργές εγγυήσεις διατηρούνται (ανάκληση εμπορικής συγκατάθεσης)· όσες έχουν λήξει ή κλειδωθεί ανωνυμοποιούνται.</p></td></tr>
                 <?php endif; ?>
                 </table>
-                <?php submit_button('Αποθήκευση'); ?>
+                <p class="submit"><button type="submit" class="button button-primary" id="submit">Αποθήκευση</button></p>
             </form>
+            <?php if ($tab === 'privacy') self::erasure_requests(); ?>
             <?php if (in_array($tab, ['messages', 'sms', 'general'], true)) : ?>
                 <h2>Δοκιμαστική αποστολή</h2>
                 <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
@@ -599,6 +630,121 @@ final class TW_Admin {
         <?php
     }
 
+    // ------------------------------------------------------------------ team
+
+    public static function page_team() {
+        if (!current_user_can('manage_options') && !current_user_can('tw_manage_team')) { echo '<p>Δεν έχετε πρόσβαση.</p>'; return; }
+        $users = get_users(['role__in' => ['administrator', TW_App::ROLE], 'orderby' => 'display_name']);
+        $post = self::url('team');
+        ?>
+        <div class="wrap tw-wrap">
+            <h1>Ομάδα</h1>
+            <?php self::notice(); ?>
+            <p class="description">Τα μέλη της ομάδας συνδέονται στο <code><?php echo esc_html(TW_App::admin_url()); ?></code> με email και κωδικό<?php echo TW_Settings::get('staff_2fa') ? ', και επιβεβαιώνουν με κωδικό μίας χρήσης στο email' : ''; ?>. Δεν έχουν πρόσβαση στο διαχειριστικό του WordPress.</p>
+            <table class="widefat striped"><thead><tr><th>Όνομα</th><th>Email</th><th>Ρόλος</th><th>Τελευταία σύνδεση</th><th></th></tr></thead><tbody>
+            <?php foreach ($users as $u) : $is_admin = user_can($u, 'manage_options'); $last = get_user_meta($u->ID, 'tw_last_login', true); ?>
+                <tr><td><?php echo esc_html($u->display_name); ?></td><td><?php echo esc_html($u->user_email); ?></td>
+                    <td><?php echo $is_admin ? 'Διαχειριστής WordPress' : (user_can($u, 'tw_manage_team') ? 'Υπεύθυνος εγγυήσεων (διαχείριση ομάδας)' : 'Διαχειριστής εγγυήσεων'); ?></td>
+                    <td><?php echo $last ? esc_html(TW_Util::datetime_label($last)) : '—'; ?></td>
+                    <td><?php if (!$is_admin && $u->ID !== get_current_user_id()) : ?>
+                        <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('Αφαίρεση πρόσβασης;')"><?php wp_nonce_field('tw_team_remove'); ?>
+                            <input type="hidden" name="action" value="tw_team_remove"><input type="hidden" name="user_id" value="<?php echo (int) $u->ID; ?>">
+                            <button class="button-link tw-danger">Αφαίρεση πρόσβασης</button></form>
+                    <?php endif; ?></td></tr>
+            <?php endforeach; ?>
+            </tbody></table>
+            <div class="tw-panel" style="max-width:640px;margin-top:20px">
+                <h2>Νέο μέλος</h2>
+                <form method="post" action="<?php echo esc_url($post); ?>">
+                    <?php wp_nonce_field('tw_team_add'); ?><input type="hidden" name="action" value="tw_team_add">
+                    <p><label>Ονοματεπώνυμο<br><input type="text" name="name" class="regular-text" required></label></p>
+                    <p><label>Email<br><input type="email" name="email" class="regular-text" required></label></p>
+                    <p><label><input type="checkbox" name="manage_team" value="1"> Μπορεί να διαχειρίζεται και την ομάδα</label></p>
+                    <p><button class="button button-primary">Προσθήκη &amp; αποστολή πρόσκλησης</button></p>
+                    <p class="description">Το μέλος λαμβάνει email με τον σύνδεσμο του διαχειριστικού και ορίζει μόνο του κωδικό από την επιλογή «Πρώτη σύνδεση / ξέχασα τον κωδικό».</p>
+                </form>
+            </div>
+        </div>
+        <?php
+    }
+
+    public static function handle_team_add() {
+        self::guard('tw_team_add');
+        if (!current_user_can('manage_options') && !current_user_can('tw_manage_team')) wp_die('', 403);
+        $email = strtolower(sanitize_email(self::post('email')));
+        $name = sanitize_text_field(self::post('name'));
+        if (!is_email($email)) { self::flash('Μη έγκυρο email.', 'error'); self::back('tw-team'); }
+        $user = get_user_by('email', $email);
+        if (!$user) {
+            $login = sanitize_user(current(explode('@', $email)), true) ?: 'tw-user';
+            $base = $login; $i = 1;
+            while (username_exists($login)) $login = $base . (++$i);
+            $id = wp_insert_user(['user_login' => $login, 'user_email' => $email, 'display_name' => $name, 'first_name' => $name,
+                'user_pass' => wp_generate_password(32, true, true), 'role' => TW_App::ROLE]);
+            if (is_wp_error($id)) { self::flash($id->get_error_message(), 'error'); self::back('tw-team'); }
+            $user = get_user_by('id', $id);
+        } elseif (!user_can($user, 'manage_options')) {
+            $user->add_role(TW_App::ROLE);
+        }
+        if (!empty($_POST['manage_team'])) $user->add_cap('tw_manage_team'); else $user->remove_cap('tw_manage_team');
+        $s = TW_Settings::all();
+        TW_Messenger::send_email($email, sprintf('Πρόσβαση στο διαχειριστικό εγγυήσεων – %s', $s['company_name']),
+            sprintf("Γεια σας %s,\n\nσας δόθηκε πρόσβαση στο διαχειριστικό εγγυήσεων της %s:\n%s\n\nΓια την πρώτη σύνδεση επιλέξτε «Πρώτη σύνδεση / ξέχασα τον κωδικό», βάλτε το email σας (%s) και ορίστε κωδικό.",
+                $name ?: $user->display_name, $s['company_name'], TW_App::admin_url(), $email));
+        TW_DB::log_event('team_added', ['user' => $email]);
+        self::flash(sprintf('Το μέλος %s προστέθηκε και ενημερώθηκε με email.', esc_html($email)));
+        self::back('tw-team');
+    }
+
+    public static function handle_team_remove() {
+        self::guard('tw_team_remove');
+        if (!current_user_can('manage_options') && !current_user_can('tw_manage_team')) wp_die('', 403);
+        $user = get_user_by('id', (int) self::post('user_id'));
+        if ($user && !user_can($user, 'manage_options') && $user->ID !== get_current_user_id()) {
+            $user->remove_role(TW_App::ROLE);
+            $user->remove_cap('tw_manage_team');
+            $user->remove_cap(self::CAP);
+            WP_Session_Tokens::get_instance($user->ID)->destroy_all();
+            TW_DB::log_event('team_removed', ['user' => $user->user_email]);
+            self::flash('Η πρόσβαση αφαιρέθηκε.');
+        }
+        self::back('tw-team');
+    }
+
+    // ------------------------------------------------------------------ GDPR erasure requests (WordPress user_request posts)
+
+    private static function erasure_requests() {
+        $reqs = get_posts(['post_type' => 'user_request', 'post_name__in' => ['remove_personal_data'], 'post_status' => ['request-pending', 'request-confirmed', 'request-completed'], 'numberposts' => 50, 'orderby' => 'date', 'order' => 'DESC']);
+        $st = ['request-pending' => 'Αναμένει επιβεβαίωση από τον πελάτη', 'request-confirmed' => 'Επιβεβαιωμένο – προς εκτέλεση', 'request-completed' => 'Ολοκληρώθηκε'];
+        echo '<h2>Αιτήματα διαγραφής</h2><table class="widefat striped"><thead><tr><th>Ημ/νία</th><th>Email</th><th>Κατάσταση</th><th></th></tr></thead><tbody>';
+        if (!$reqs) echo '<tr><td colspan="4">Κανένα αίτημα.</td></tr>';
+        foreach ($reqs as $r) {
+            echo '<tr><td>' . esc_html(TW_Util::datetime_label($r->post_date)) . '</td><td>' . esc_html($r->post_title) . '</td><td>' . esc_html($st[$r->post_status] ?? $r->post_status) . '</td><td>';
+            if ($r->post_status === 'request-confirmed') {
+                echo '<form method="post" action="' . esc_url(self::url('settings', ['tab' => 'privacy'])) . '" onsubmit="return confirm(\'Εκτέλεση διαγραφής για ' . esc_attr($r->post_title) . ';\')">';
+                wp_nonce_field('tw_process_erasure');
+                echo '<input type="hidden" name="action" value="tw_process_erasure"><input type="hidden" name="request_id" value="' . (int) $r->ID . '"><button class="button">Εκτέλεση</button></form>';
+            }
+            echo '</td></tr>';
+        }
+        echo '</tbody></table>';
+    }
+
+    public static function handle_process_erasure() {
+        self::guard('tw_process_erasure');
+        $r = get_post((int) self::post('request_id'));
+        if (!$r || $r->post_type !== 'user_request' || $r->post_status !== 'request-confirmed') {
+            self::flash('Το αίτημα δεν βρέθηκε ή δεν έχει επιβεβαιωθεί.', 'error');
+            self::back('tw-settings', ['tab' => 'privacy']);
+        }
+        $res = TW_Privacy::eraser($r->post_title);
+        wp_update_post(['ID' => $r->ID, 'post_status' => 'request-completed']);
+        update_post_meta($r->ID, '_wp_user_request_completed_timestamp', time());
+        TW_DB::log_event('erasure_processed', ['email' => TW_Util::mask_email($r->post_title), 'removed' => $res['items_removed'], 'retained' => $res['items_retained']]);
+        self::flash('Ολοκληρώθηκε. ' . esc_html(implode(' ', $res['messages']) ?: 'Τα στοιχεία ανωνυμοποιήθηκαν.'));
+        self::back('tw-settings', ['tab' => 'privacy']);
+    }
+
     // ------------------------------------------------------------------ handlers
 
     public static function handle_save_settings() {
@@ -608,18 +754,21 @@ final class TW_Admin {
         $defaults = TW_Settings::defaults();
         $checkboxes = [
             'general' => ['admin_digest', 'invoice_required'],
+            'app' => ['staff_2fa'],
             'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner'],
             'sms' => ['sms_enabled'],
         ];
         $numbers = ['warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
         $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label'];
-        $urls = ['portal_url', 'register_url', 'privacy_url', 'sms_url'];
+        $urls = ['portal_url', 'register_url', 'privacy_url', 'sms_url', 'logo_url'];
         $values = [];
         foreach ($in as $k => $v) {
             if (!array_key_exists($k, $defaults) || $k === 'templates') continue;
             if (in_array($k, $numbers, true)) $values[$k] = max(0, (int) $v);
             elseif (in_array($k, $urls, true)) $values[$k] = esc_url_raw(trim($v));
             elseif (in_array($k, $multiline, true)) $values[$k] = sanitize_textarea_field($v);
+            elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
+            elseif ($k === 'brand_color') $values[$k] = sanitize_hex_color($v) ?: $defaults[$k];
             elseif ($k === 'reminder_offsets') $values[$k] = implode(',', array_filter(array_map('trim', explode(',', $v)), function ($p) { return preg_match('/^[+-]?\d+$/', $p); }));
             else $values[$k] = sanitize_text_field($v);
         }
@@ -656,6 +805,22 @@ final class TW_Admin {
                     break;
                 }
             }
+        }
+        $old = TW_Settings::all();
+        if ((isset($values['admin_slug']) && $values['admin_slug'] !== $old['admin_slug']) || (isset($values['public_slug']) && $values['public_slug'] !== $old['public_slug'])) {
+            if (($values['admin_slug'] ?? $old['admin_slug']) === ($values['public_slug'] ?? $old['public_slug'])) {
+                self::flash('Οι δύο διευθύνσεις πρέπει να είναι διαφορετικές.', 'error');
+                self::back('tw-settings', ['tab' => $tab]);
+            }
+            update_option('tw_flush_rewrite', 1, false);
+            TW_Settings::update($values);
+            // The admin URL itself may have changed: go to the new one.
+            set_transient('tw_notice_' . get_current_user_id(), ['text' => $msg . ' Η διεύθυνση άλλαξε.', 'type' => 'success'], 120);
+            TW_App::register_rewrites();
+            flush_rewrite_rules(false);
+            delete_option('tw_flush_rewrite');
+            wp_safe_redirect(TW_App::admin_url('settings', ['tab' => $tab]));
+            exit;
         }
         TW_Settings::update($values);
         self::flash($msg);

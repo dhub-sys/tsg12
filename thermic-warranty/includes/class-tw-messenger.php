@@ -20,7 +20,7 @@ final class TW_Messenger {
         $vars = [
             'company_name' => $s['company_name'],
             'company_contact' => $s['company_contact'],
-            'portal_url' => $s['portal_url'] ?: home_url('/'),
+            'portal_url' => $s['portal_url'] ?: TW_App::public_url('my'),
             'customer_name' => $w->customer_name,
             'email' => $w->email,
             'serial' => $w->serial,

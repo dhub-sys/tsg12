@@ -130,7 +130,7 @@ final class TW_Cron {
 
         if ($digest && $s['admin_digest']) {
             $body = "Ειδοποιήσεις εγγυήσεων " . TW_Util::date_label($today) . ":\n\n- " . implode("\n- ", $digest)
-                . "\n\nΔιαχείριση: " . admin_url('admin.php?page=tw-warranties');
+                . "\n\nΔιαχείριση: " . TW_App::admin_url('warranties');
             foreach (TW_Messenger::admin_recipients() as $to) {
                 TW_Messenger::send_email($to, sprintf('[Εγγυήσεις] %d ειδοποιήσεις – %s', count($digest), TW_Util::date_label($today)), $body);
             }

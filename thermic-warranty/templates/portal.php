@@ -1,6 +1,6 @@
 <?php
 if (!defined('ABSPATH')) exit;
-$register_url = (string) TW_Settings::get('register_url');
+$register_url = (string) TW_Settings::get('register_url') ?: TW_App::public_url();
 ?>
 <div class="tw-app tw-portal" data-tw="portal">
     <noscript><p class="tw-alert tw-alert--error">Για την πύλη εγγυήσεων απαιτείται JavaScript.</p></noscript>

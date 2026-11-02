@@ -36,6 +36,7 @@ final class TW_Frontend {
 
     public static function register_assets() {
         wp_register_style('tw-front', TW_URL . 'assets/css/frontend.css', [], TW_VERSION);
+        wp_add_inline_style('tw-front', ':root{--tw-brand:' . (sanitize_hex_color((string) TW_Settings::get('brand_color')) ?: '#c8102e') . '}.tw-app{--tw-accent:var(--tw-brand)}');
         wp_register_script('tw-front', TW_URL . 'assets/js/frontend.js', [], TW_VERSION, true);
         wp_localize_script('tw-front', 'TW', [
             'ajax' => admin_url('admin-ajax.php'),
@@ -238,7 +239,7 @@ final class TW_Frontend {
             'warranty_end' => TW_Util::date_label($w->warranty_end),
             'next_service' => $next ? TW_Util::date_label($next['due']) : '',
             'email' => TW_Util::mask_email($w->email),
-            'portal_url' => (string) TW_Settings::get('portal_url'),
+            'portal_url' => (string) TW_Settings::get('portal_url') ?: TW_App::public_url('my'),
         ]);
     }
 

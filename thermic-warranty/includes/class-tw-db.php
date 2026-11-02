@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.0.0';
+    const DB_VERSION = '1.1.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -26,12 +26,15 @@ final class TW_DB {
         TW_Settings::ensure_defaults();
         TW_Util::protect_upload_dir();
         TW_Cron::schedule();
+        TW_App::install();
     }
 
     public static function maybe_upgrade() {
         if (get_option(self::DB_VERSION_OPTION) !== self::DB_VERSION) {
             self::install();
             TW_Settings::ensure_defaults();
+            // Roles + rewrite rules once WordPress is fully loaded.
+            add_action('init', ['TW_App', 'install'], 100);
         }
     }
 
