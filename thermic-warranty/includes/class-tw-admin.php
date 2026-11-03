@@ -161,7 +161,7 @@ final class TW_Admin {
             'marketing_granted' => 'Συγκατάθεση για ενημερώσεις', 'marketing_withdrawn' => 'Ανάκληση συγκατάθεσης για ενημερώσεις',
             'service_submitted' => 'Υποβολή Service από τον πελάτη', 'service_recorded' => 'Καταχώρηση Service από την εταιρεία', 'service_approved' => 'Service: ελέγχθηκε',
             'service_rejected' => 'Service: απορρίφθηκε', 'service_deleted' => 'Διαγραφή καταχώρησης Service', 'receipt_downloaded' => 'Προβολή απόδειξης Service',
-            'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
+            'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'card_printed' => 'Εκτύπωση καρτέλας', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
             'status_void' => 'Κατάσταση: Ακυρωμένη', 'status_locked' => 'Κατάσταση: Κλειδωμένη', 'customer_corrected' => 'Διόρθωση στοιχείων πελάτη', 'anonymized' => 'Ανωνυμοποίηση στοιχείων',
             'email_undeliverable' => 'Το email δεν παραδόθηκε', 'sms_undeliverable' => 'Το SMS δεν παραδόθηκε', 'fallback_sent' => 'Αποστολή από εναλλακτικό κανάλι',
             'erasure_requested' => 'Αίτημα διαγραφής από τον πελάτη', 'erasure_processed' => 'Εκτέλεση αιτήματος διαγραφής',
@@ -422,7 +422,7 @@ final class TW_Admin {
         <div class="wrap tw-wrap">
             <p><a href="<?php echo esc_url(self::url('warranties')); ?>">&larr; Όλες οι εγγυήσεις</a></p>
             <h1>Εγγύηση <?php echo esc_html($w->warranty_code); ?> <?php echo self::status_badge($w->status, $labels); ?>
-                <button type="button" class="page-title-action tw-no-print" onclick="window.print()"><?php echo self::icon('printer'); ?>Εκτύπωση καρτέλας</button></h1>
+                <a class="page-title-action tw-no-print" href="<?php echo esc_url(self::url('warranties', ['view' => $w->id, 'print' => 1])); ?>" target="_blank" rel="noopener"><?php echo self::icon('printer'); ?>Εκτύπωση καρτέλας</a></h1>
             <?php self::notice(); ?>
             <?php foreach (self::contact_problems($w) as $problem) : ?>
                 <div class="notice notice-warning inline"><p>⚠ <?php echo esc_html($problem); ?></p></div>
@@ -797,7 +797,7 @@ final class TW_Admin {
             <nav class="nav-tab-wrapper">
                 <?php foreach ($tabs as $k => $l) printf('<a class="nav-tab%s" href="%s">%s</a>', $tab === $k ? ' nav-tab-active' : '', esc_url(self::url('settings', ['tab' => $k])), esc_html($l)); ?>
             </nav>
-            <form method="post" action="<?php echo esc_url($post); ?>">
+            <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('tw_save_settings'); ?>
                 <input type="hidden" name="action" value="tw_save_settings"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
                 <table class="form-table">
@@ -824,7 +824,15 @@ final class TW_Admin {
                 elseif ($tab === 'app') :
                     $field('admin_slug', 'Διεύθυνση διαχειριστικού', 'text', 'Το διαχειριστικό ανοίγει στο <code>' . esc_html(home_url('/')) . '<strong>' . esc_html($s['admin_slug']) . '</strong>/</code>.', 'pattern="[a-z0-9\\-]+"');
                     $field('public_slug', 'Διεύθυνση σελίδων πελατών', 'text', 'Ενεργοποίηση: <code>' . esc_html(TW_App::public_url()) . '</code> – Οι εγγυήσεις μου: <code>' . esc_html(TW_App::public_url('my')) . '</code>', 'pattern="[a-z0-9\\-]+"');
-                    $field('logo_url', 'Λογότυπο (URL εικόνας)', 'url', 'Εμφανίζεται στις σελίδες πελατών, στο διαχειριστικό και στη σύνδεση.');
+                    ?>
+                    <tr><th>Λογότυπο</th><td>
+                        <?php if ($s['logo_url']) : ?><p class="tw-logo-preview"><img src="<?php echo esc_url($s['logo_url']); ?>" alt=""></p><?php endif; ?>
+                        <p><input type="file" name="logo_file" accept="image/png,image/jpeg,image/webp"></p>
+                        <p class="description">PNG, JPG ή WEBP, ιδανικά με διάφανο φόντο (PNG), έως 2 MB. Εμφανίζεται στο μενού, στη σύνδεση, στις σελίδες πελατών και στην εκτύπωση καρτέλας.</p>
+                        <p><label>ή διεύθυνση εικόνας (URL)<input type="url" name="s[logo_url]" value="<?php echo esc_attr($s['logo_url']); ?>" class="regular-text"></label></p>
+                        <?php if ($s['logo_url']) : ?><p><label><input type="checkbox" name="logo_remove" value="1"> Αφαίρεση λογοτύπου</label></p><?php endif; ?>
+                    </td></tr>
+                    <?php
                     [$c1, $c2] = TW_App::colors(); ?>
                     <tr><th>Χρώματα</th><td>
                         <div class="tw-colors">
@@ -867,6 +875,27 @@ final class TW_Admin {
                                     var p = document.querySelector('[data-tw-color="' + d[0] + '"]'); p.value = d[1]; p.parentNode.querySelector('.tw-color-hex').value = d[1]; apply(d[0], d[1]);
                                 });
                             });
+                        })();
+                        </script>
+                    </td></tr>
+                    <?php
+                    ?>
+                    <tr><th>Εκτύπωση καρτέλας (PDF)</th><td>
+                        <p class="description" style="margin-top:0">Υδατογράφημα (watermark) σε κάθε σελίδα της εκτυπωμένης καρτέλας εγγύησης.</p>
+                        <p><select name="s[pdf_watermark]" id="tw-wm-type">
+                            <?php foreach (['text' => 'Κείμενο', 'logo' => 'Λογότυπο', 'none' => 'Χωρίς υδατογράφημα'] as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($s['pdf_watermark'], $k, false), esc_html($l)); ?>
+                        </select>
+                        <input type="text" name="s[pdf_watermark_text]" value="<?php echo esc_attr($s['pdf_watermark_text']); ?>" placeholder="<?php echo esc_attr($s['company_name']); ?>" class="regular-text" id="tw-wm-text"></p>
+                        <p class="tw-range"><label for="tw-wm-op">Διαφάνεια</label>
+                            <input type="range" min="0" max="40" step="1" name="s[pdf_watermark_opacity]" id="tw-wm-op" value="<?php echo (int) $s['pdf_watermark_opacity']; ?>">
+                            <output id="tw-wm-out"><?php echo (int) $s['pdf_watermark_opacity']; ?>%</output></p>
+                        <div class="tw-wm-preview"><span id="tw-wm-sample" style="opacity:<?php echo esc_attr((string) ((int) $s['pdf_watermark_opacity'] / 100)); ?>"><?php echo esc_html($s['pdf_watermark_text'] ?: $s['company_name']); ?></span></div>
+                        <p class="description">Κενό κείμενο = η επωνυμία. Το «Λογότυπο» χρησιμοποιεί την εικόνα του πεδίου «Λογότυπο». Προτείνεται 4–10%.</p>
+                        <script>
+                        (function () {
+                            var r = document.getElementById('tw-wm-op'), o = document.getElementById('tw-wm-out'), smp = document.getElementById('tw-wm-sample'), t = document.getElementById('tw-wm-text'), ty = document.getElementById('tw-wm-type');
+                            function upd() { o.textContent = r.value + '%'; smp.style.opacity = r.value / 100; smp.textContent = t.value || t.placeholder; t.style.display = ty.value === 'text' ? '' : 'none'; smp.parentNode.style.display = ty.value === 'none' ? 'none' : ''; }
+                            [r, t, ty].forEach(function (e) { e.addEventListener('input', upd); e.addEventListener('change', upd); }); upd();
                         })();
                         </script>
                     </td></tr>
@@ -1323,6 +1352,31 @@ final class TW_Admin {
 
     // ------------------------------------------------------------------ documentation
 
+    /** Public logo image (not in the private folder: it is shown on public pages and in emails). @return string|WP_Error URL */
+    private static function store_logo(array $file) {
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || (int) $file['error'] !== UPLOAD_ERR_OK) return new WP_Error('logo', 'Το λογότυπο δεν ανέβηκε σωστά.');
+        if ((int) $file['size'] > 2 * 1048576) return new WP_Error('logo', 'Το λογότυπο ξεπερνά τα 2 MB.');
+        $check = wp_check_filetype_and_ext($file['tmp_name'], $file['name'], ['png' => 'image/png', 'jpg|jpeg' => 'image/jpeg', 'webp' => 'image/webp']);
+        if (empty($check['ext']) || empty($check['type'])) return new WP_Error('logo', 'Επιτρέπονται μόνο εικόνες PNG, JPG ή WEBP.');
+        $u = wp_upload_dir();
+        $dir = trailingslashit($u['basedir']) . 'thermic-warranty-brand';
+        if (!is_dir($dir)) wp_mkdir_p($dir);
+        $name = 'logo-' . bin2hex(random_bytes(4)) . '.' . $check['ext'];
+        if (!@move_uploaded_file($file['tmp_name'], $dir . '/' . $name)) return new WP_Error('logo', 'Αδυναμία αποθήκευσης του λογοτύπου.');
+        @chmod($dir . '/' . $name, 0644);
+        TW_DB::log_event('logo_uploaded', ['file' => $name]);
+        return trailingslashit($u['baseurl']) . 'thermic-warranty-brand/' . $name;
+    }
+
+    /** Print / PDF document of a warranty card (own page, no console chrome). */
+    public static function render_print($id) {
+        $w = TW_Warranty::get($id);
+        if (!$w) wp_die('Η εγγύηση δεν βρέθηκε.');
+        $s = TW_Settings::all();
+        TW_DB::log_event('card_printed', '', $w->id, $w->serial_id);
+        include TW_DIR . 'templates/print-warranty.php';
+    }
+
     public static function page_help() {
         $s = TW_Settings::all();
         include TW_DIR . 'templates/help.php';
@@ -1469,6 +1523,8 @@ final class TW_Admin {
             elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
             elseif ($k === 'invoice_mode') $values[$k] = in_array($v, ['required', 'optional', 'off'], true) ? $v : 'required';
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
+            elseif ($k === 'pdf_watermark') $values[$k] = in_array($v, ['text', 'logo', 'none'], true) ? $v : 'text';
+            elseif ($k === 'pdf_watermark_opacity') $values[$k] = max(0, min(100, (int) $v));
             elseif ($k === 'brand_color' || $k === 'brand_color_2') $values[$k] = sanitize_hex_color($v) ?: $defaults[$k];
             elseif ($k === 'reminder_offsets') $values[$k] = implode(',', array_filter(array_map('trim', explode(',', $v)), function ($p) { return preg_match('/^[+-]?\d+$/', $p); }));
             else $values[$k] = sanitize_text_field($v);
@@ -1490,6 +1546,15 @@ final class TW_Admin {
             $values['templates'] = $tpl;
         }
         $msg = 'Οι ρυθμίσεις αποθηκεύτηκαν.';
+        if ($tab === 'app') {
+            if (!empty($_POST['logo_remove'])) $values['logo_url'] = '';
+            if (!empty($_FILES['logo_file']['name'])) {
+                $logo = self::store_logo($_FILES['logo_file']);
+                if (is_wp_error($logo)) { self::flash(esc_html($logo->get_error_message()), 'error'); self::back('tw-settings', ['tab' => $tab]); }
+                $values['logo_url'] = $logo;
+                $msg .= ' Το λογότυπο ανέβηκε.';
+            }
+        }
         if ($tab === 'brevo') {
             $newkey = trim(self::post('brevo_api_key_new'));
             if ($newkey !== '') $values['brevo_api_key'] = sanitize_text_field($newkey);

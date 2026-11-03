@@ -43,6 +43,10 @@ final class TW_Settings {
             'logo_url' => '',
             'brand_color' => '#c8102e',
             'brand_color_2' => '#0f1320',
+            // Printed warranty card: watermark none | text | logo, its text and opacity (0–100 %).
+            'pdf_watermark' => 'text',
+            'pdf_watermark_text' => '',
+            'pdf_watermark_opacity' => 6,
             'staff_2fa' => 1,
             'portal_url' => '',
             'register_url' => '',

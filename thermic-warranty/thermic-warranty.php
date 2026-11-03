@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Thermic Warranty
  * Description: Αυτόνομη πλατφόρμα (standalone app) ηλεκτρονικής ενεργοποίησης και διαχείριση εγγυήσεων με σειριακούς αριθμούς: εγγραφή με επαλήθευση email, πύλη πελάτη, ειδοποιήσεις Service/λήξης μέσω email και SMS, διαχειριστικό με μαζική εισαγωγή από Excel/CSV και καταγραφή συγκαταθέσεων (GDPR).
- * Version: 1.10.0
+ * Version: 1.11.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Plugin URI: https://www.dazzlink.gr
@@ -12,7 +12,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('TW_VERSION', '1.10.0');
+define('TW_VERSION', '1.11.0');
 define('TW_FILE', __FILE__);
 define('TW_DIR', plugin_dir_path(__FILE__));
 define('TW_URL', plugin_dir_url(__FILE__));

@@ -133,6 +133,10 @@ final class TW_App {
         }
 
         TW_Admin::maybe_open_exact();
+        if (($_GET['screen'] ?? '') === 'warranties' && !empty($_GET['view']) && isset($_GET['print'])) {
+            TW_Admin::render_print((int) $_GET['view']);
+            return;
+        }
         $screens = TW_Admin::screens();
         $screen = isset($_GET['screen']) ? sanitize_key(wp_unslash($_GET['screen'])) : 'dashboard';
         if (!isset($screens[$screen])) $screen = 'dashboard';
