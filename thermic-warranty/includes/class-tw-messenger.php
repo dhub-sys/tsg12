@@ -59,7 +59,7 @@ final class TW_Messenger {
         $body = nl2br(make_clickable(esc_html($body_text)));
         // Codes on their own line are shown large.
         $body = preg_replace('/(^|<br \/>\s*)([A-Z0-9]{6}|TW-[A-Z0-9\-]+)(\s*<br \/>|$)/', '$1<strong style="font-size:22px;letter-spacing:3px">$2</strong>$3', $body);
-        return '<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2933">'
+        return '<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:Geom,Segoe UI,Arial,Helvetica,sans-serif;color:#1f2933">'
             . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">'
             . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:8px">'
             . '<tr><td style="padding:20px 28px;border-bottom:3px solid #c8102e;font-size:20px;font-weight:bold">' . $company . '</td></tr>'

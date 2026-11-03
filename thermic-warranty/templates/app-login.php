@@ -15,6 +15,7 @@ $fields = function () {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>Σύνδεση – Εγγυήσεις <?php echo esc_html($s['company_name']); ?></title>
+    <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/app-admin.css')); ?>">
     <?php echo TW_App::brand_style(); // phpcs:ignore ?>
 </head>

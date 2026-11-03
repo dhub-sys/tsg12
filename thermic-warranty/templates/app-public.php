@@ -14,6 +14,7 @@ $config = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title><?php echo esc_html(($screen === 'my' ? 'Οι εγγυήσεις μου' : 'Ενεργοποίηση εγγύησης') . ' – ' . $s['company_name']); ?></title>
+    <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/frontend.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/app-public.css')); ?>">
     <?php echo TW_App::brand_style(); // phpcs:ignore ?>

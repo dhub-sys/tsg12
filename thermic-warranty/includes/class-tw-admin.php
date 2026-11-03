@@ -25,17 +25,36 @@ final class TW_Admin {
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
     public static function screens() {
         $screens = [
-            'dashboard' => ['Επισκόπηση', '◧', 'page_dashboard'],
-            'warranties' => ['Εγγυήσεις & πελάτες', '🛡', 'page_warranties'],
-            'serials' => ['Σειριακοί αριθμοί', '#', 'page_serials'],
-            'notifications' => ['Ειδοποιήσεις', '✉', 'page_notifications'],
+            'dashboard' => ['Επισκόπηση', 'dashboard', 'page_dashboard'],
+            'warranties' => ['Εγγυήσεις & πελάτες', 'shield', 'page_warranties'],
+            'serials' => ['Σειριακοί αριθμοί', 'barcode', 'page_serials'],
+            'notifications' => ['Ειδοποιήσεις', 'bell', 'page_notifications'],
         ];
         if (self::can_admin()) {
-            $screens['team'] = ['Ομάδα', '👥', 'page_team'];
-            $screens['backups'] = ['Αντίγραφα ασφαλείας', '⛁', 'page_backups'];
+            $screens['team'] = ['Ομάδα', 'users', 'page_team'];
+            $screens['backups'] = ['Αντίγραφα ασφαλείας', 'database', 'page_backups'];
         }
-        $screens['settings'] = ['Ρυθμίσεις', '⚙', 'page_settings'];
+        $screens['settings'] = ['Ρυθμίσεις', 'settings', 'page_settings'];
         return $screens;
+    }
+
+    /**
+     * Line icons for the console (24×24, 1.75 stroke, currentColor), drawn after the Lucide icon set (ISC licence).
+     */
+    public static function icon($name) {
+        $paths = [
+            'dashboard' => '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+            'shield' => '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+            'barcode' => '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7v10"/><path d="M12 7v10"/><path d="M17 7v10"/>',
+            'bell' => '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+            'users' => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+            'database' => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+            'settings' => '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+            'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+            'menu' => '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+        ];
+        if (!isset($paths[$name])) return '';
+        return '<svg class="tw-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $paths[$name] . '</svg>';
     }
 
     /** Platform administrators: WordPress admins and team members with team management rights. */
@@ -295,7 +314,7 @@ final class TW_Admin {
         ?>
         <div class="wrap tw-wrap">
             <h1 class="wp-heading-inline">Εγγυήσεις &amp; πελάτες</h1>
-            <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή CSV (με τα τρέχοντα φίλτρα)</a>
+            <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή Excel (με τα τρέχοντα φίλτρα)</a>
             <?php self::notice(); ?>
             <form method="get" class="tw-filters">
                 <?php self::get_form_fields('warranties'); ?>
@@ -570,7 +589,7 @@ final class TW_Admin {
         ?>
         <div class="wrap tw-wrap">
             <h1 class="wp-heading-inline">Σειριακοί αριθμοί</h1>
-            <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή CSV</a>
+            <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή Excel</a>
             <?php self::notice(); ?>
             <?php if ($result) : ?>
                 <div class="notice notice-info"><p><strong>Αποτέλεσμα εισαγωγής <?php echo esc_html($result['batch']); ?>:</strong>
@@ -588,9 +607,9 @@ final class TW_Admin {
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_import'); ?><input type="hidden" name="action" value="tw_import">
                         <p><input type="file" name="file" accept=".xlsx,.csv,.txt" required></p>
-                        <p class="description">Πρώτο φύλλο του .xlsx ή αρχείο .csv. Στήλες: <code>serial</code> (υποχρεωτική), <code>product_code</code>, <code>product_name</code>, <code>notes</code> – δεκτές και ελληνικές επικεφαλίδες (Σειριακός, Κωδικός, Περιγραφή, Σημειώσεις). Χωρίς γραμμή επικεφαλίδων, οι στήλες διαβάζονται με αυτή τη σειρά. Υπάρχοντες σειριακοί δεν αλλάζουν.</p>
+                        <p class="description">Πρώτο φύλλο του .xlsx ή αρχείο .csv. Στήλες: <code>serial</code> (υποχρεωτική), <code>product_code</code>, <code>product_name</code>, <code>notes</code> – δεκτές και ελληνικές επικεφαλίδες (Σειριακός αριθμός, Κωδικός προϊόντος, Όνομα προϊόντος, Σημειώσεις). Χωρίς γραμμή επικεφαλίδων, οι στήλες διαβάζονται με αυτή τη σειρά. Υπάρχοντες σειριακοί δεν αλλάζουν.</p>
                         <p><label>Προεπιλεγμένος κωδικός προϊόντος (για κενά κελιά) <input type="text" name="default_code"></label></p>
-                        <p><label>Προεπιλεγμένη περιγραφή προϊόντος <input type="text" name="default_name" class="regular-text"></label></p>
+                        <p><label>Προεπιλεγμένο όνομα προϊόντος (για κενά κελιά) <input type="text" name="default_name" class="regular-text"></label></p>
                         <p><button class="button button-primary">Εισαγωγή</button></p>
                     </form>
                 </div>
@@ -600,7 +619,7 @@ final class TW_Admin {
                         <?php wp_nonce_field('tw_add_serial'); ?><input type="hidden" name="action" value="tw_add_serial">
                         <p><label>Σειριακοί (ένας ανά γραμμή)<br><textarea name="serials" rows="5" class="large-text code" required></textarea></label></p>
                         <p><label>Κωδικός προϊόντος <input type="text" name="product_code"></label></p>
-                        <p><label>Περιγραφή προϊόντος <input type="text" name="product_name" class="regular-text"></label></p>
+                        <p><label>Όνομα προϊόντος <input type="text" name="product_name" class="regular-text"></label></p>
                         <p><button class="button button-primary">Προσθήκη</button></p>
                     </form>
                 </div>
@@ -614,7 +633,7 @@ final class TW_Admin {
                 <button class="button">Φίλτρο</button>
             </form>
             <?php self::pagination($total, $paged); ?>
-            <table class="widefat striped"><thead><tr><th>Σειριακός</th><th>Κωδικός</th><th>Προϊόν</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
+            <table class="widefat striped"><thead><tr><th>Σειριακός</th><th>Κωδικός προϊόντος</th><th>Όνομα προϊόντος</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
             <?php if (!$rows) echo '<tr><td colspan="8">Δεν βρέθηκαν σειριακοί.</td></tr>'; ?>
             <?php foreach ($rows as $r) : ?>
                 <tr><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
@@ -783,7 +802,7 @@ final class TW_Admin {
                     $field('sms_headers', 'Headers', 'textarea', 'Ένα ανά γραμμή, π.χ. <code>Authorization: Bearer …</code>.');
                     $field('sms_body', 'Σώμα αιτήματος', 'textarea', 'Για POST. Πεδία: <code>{to} {to_no_plus} {text} {sender}</code>. Για JSON οι τιμές μπαίνουν με σωστό escaping.');
                 elseif ($tab === 'privacy') :
-                    $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Σύνδεσμος στη φόρμα ενεργοποίησης. Κενό = η Πολιτική Απορρήτου του WordPress. Προτεινόμενο κείμενο υπάρχει στις Ρυθμίσεις → Απόρρητο.');
+                    $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Σύνδεσμος στη φόρμα ενεργοποίησης. Κενό = η Πολιτική Απορρήτου της ιστοσελίδας.');
                     $field('retention_months_after_end', 'Αυτόματη ανωνυμοποίηση (μήνες)', 'number', 'Μήνες μετά τη λήξη ή το κλείδωμα για αυτόματη ανωνυμοποίηση των προσωπικών στοιχείων. Το ιστορικό του προϊόντος μένει. 0 = απενεργοποιημένο. Ορίστε το σε συνεννόηση με τον νομικό σύμβουλο / DPO.', 'min="0"');
                     ?>
                     <tr><th>Αιτήματα διαγραφής</th><td><p class="description">Τα αιτήματα από την πύλη πελατών εμφανίζονται παρακάτω αφού ο πελάτης τα επιβεβαιώσει από το email του. Ενεργές εγγυήσεις διατηρούνται (ανάκληση εμπορικής συγκατάθεσης)· όσες έχουν λήξει ή κλειδωθεί ανωνυμοποιούνται.</p></td></tr>
@@ -830,7 +849,7 @@ final class TW_Admin {
         <div class="wrap tw-wrap">
             <h1>Αντίγραφα ασφαλείας</h1>
             <?php self::notice(); ?>
-            <p class="description">Κάθε αντίγραφο περιέχει όλα τα δεδομένα της πλατφόρμας: σειριακούς, εγγυήσεις και πελάτες, υποβολές Service, συγκαταθέσεις, ιστορικό ειδοποιήσεων, ρυθμίσεις και όρους, καθώς και τα αρχεία (παραστατικά, αποδείξεις). Δεν περιλαμβάνει τα κλειδιά πρόσβασης (Brevo) ούτε το υπόλοιπο WordPress (σελίδες, χρήστες, theme), που καλύπτονται από το backup της φιλοξενίας.</p>
+            <p class="description">Κάθε αντίγραφο περιέχει όλα τα δεδομένα της πλατφόρμας: σειριακούς, εγγυήσεις και πελάτες, υποβολές Service, συγκαταθέσεις, ιστορικό ειδοποιήσεων, ρυθμίσεις και όρους, καθώς και τα αρχεία (παραστατικά, αποδείξεις). Δεν περιλαμβάνει τα κλειδιά πρόσβασης (Brevo) ούτε την υπόλοιπη ιστοσελίδα (σελίδες, χρήστες, εμφάνιση), που καλύπτονται από το backup της φιλοξενίας.</p>
 
             <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
                 <?php wp_nonce_field('tw_backup_create'); ?><input type="hidden" name="action" value="tw_backup_create">
@@ -941,7 +960,7 @@ final class TW_Admin {
                         <tr data-remote="<?php echo esc_attr($k); ?>"><th>Ρύθμιση <?php echo esc_html($o[0]); ?></th><td>
                             <p class="description"><?php echo esc_html($o[1]); ?></p>
                             <p>Redirect URI: <code style="word-break:break-all"><?php echo esc_html(TW_Backup_Remote::redirect_uri()); ?></code></p>
-                            <?php if (!get_option('permalink_structure')) : ?><p class="tw-danger">Χρειάζονται «φιλικά» permalinks (Ρυθμίσεις WordPress → Μόνιμοι σύνδεσμοι) για τη σύνδεση.</p><?php endif; ?>
+                            <?php if (!get_option('permalink_structure')) : ?><p class="tw-danger">Χρειάζονται «φιλικά» permalinks (ρυθμίσεις της ιστοσελίδας → Μόνιμοι σύνδεσμοι) για τη σύνδεση.</p><?php endif; ?>
                         </td></tr>
                         <tr data-remote="<?php echo esc_attr($k); ?>"><th><?php echo esc_html($o[4]); ?></th><td><input type="text" name="<?php echo esc_attr($o[2]); ?>" value="<?php echo esc_attr($s[$o[2]]); ?>" class="regular-text" autocomplete="off"></td></tr>
                         <tr data-remote="<?php echo esc_attr($k); ?>"><th><?php echo esc_html($o[5]); ?></th><td><input type="password" name="<?php echo esc_attr($o[3]); ?>" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($secret_ph($o[3])); ?>"></td></tr>
@@ -1180,11 +1199,11 @@ final class TW_Admin {
         <div class="wrap tw-wrap">
             <h1>Ομάδα</h1>
             <?php self::notice(); ?>
-            <p class="description">Τα μέλη της ομάδας συνδέονται στο <code><?php echo esc_html(TW_App::admin_url()); ?></code> με email και κωδικό<?php echo TW_Settings::get('staff_2fa') ? ', και επιβεβαιώνουν με κωδικό μίας χρήσης στο email' : ''; ?>. Δεν έχουν πρόσβαση στο διαχειριστικό του WordPress.</p>
+            <p class="description">Τα μέλη της ομάδας συνδέονται στο <code><?php echo esc_html(TW_App::admin_url()); ?></code> με email και κωδικό<?php echo TW_Settings::get('staff_2fa') ? ', και επιβεβαιώνουν με κωδικό μίας χρήσης στο email' : ''; ?>. Έχουν δικαιώματα στην Πλατφόρμα Διαχείρισης Εγγυήσεων της <?php echo esc_html(TW_Settings::get('company_name')); ?>, δεν έχουν πρόσβαση στη διαχείριση της Ιστοσελίδας.</p>
             <table class="widefat striped"><thead><tr><th>Όνομα</th><th>Email</th><th>Ρόλος</th><th>Τελευταία σύνδεση</th><th></th></tr></thead><tbody>
             <?php foreach ($users as $u) : $is_admin = user_can($u, 'manage_options'); $last = get_user_meta($u->ID, 'tw_last_login', true); ?>
                 <tr><td><?php echo esc_html($u->display_name); ?></td><td><?php echo esc_html($u->user_email); ?></td>
-                    <td><?php echo $is_admin ? 'Διαχειριστής WordPress' : (user_can($u, 'tw_manage_team') ? 'Υπεύθυνος εγγυήσεων (διαχείριση ομάδας)' : 'Διαχειριστής εγγυήσεων'); ?></td>
+                    <td><?php echo $is_admin ? 'Διαχειριστής' : (user_can($u, 'tw_manage_team') ? 'Υπεύθυνος εγγυήσεων (διαχείριση ομάδας)' : 'Διαχειριστής εγγυήσεων'); ?></td>
                     <td><?php echo $last ? esc_html(TW_Util::datetime_label($last)) : '—'; ?></td>
                     <td><?php if (!$is_admin && $u->ID !== get_current_user_id()) : ?>
                         <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('Αφαίρεση πρόσβασης;')"><?php wp_nonce_field('tw_team_remove'); ?>
@@ -1635,32 +1654,45 @@ final class TW_Admin {
         global $wpdb;
         if (!current_user_can(self::cap())) wp_die('', 403);
         check_admin_referer('tw_export');
+        @set_time_limit(0);
         $type = self::q('type');
-        nocache_headers();
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . ($type === 'serials' ? 'serials' : 'warranties') . '-' . current_time('Ymd-His') . '.csv"');
-        $out = fopen('php://output', 'w');
-        fwrite($out, "\xEF\xBB\xBF"); // Excel opens UTF-8 Greek correctly with a BOM
+        $stamp = current_time('Ymd-His');
         if ($type === 'serials') {
             $t = TW_DB::table('serials');
             $where = ['1=1']; $p = [];
             if (self::q('s') !== '') { $l = '%' . $wpdb->esc_like(self::q('s')) . '%'; $where[] = '(serial_no LIKE %s OR product_name LIKE %s OR product_code LIKE %s)'; array_push($p, $l, $l, $l); }
             if (self::q('status') !== '') { $where[] = 'status = %s'; $p[] = self::q('status'); }
             if (self::q('batch') !== '') { $where[] = 'import_batch = %s'; $p[] = self::q('batch'); }
-            $sql = "SELECT serial_no, product_code, product_name, status, import_batch, created_at FROM $t WHERE " . implode(' AND ', $where) . ' ORDER BY id';
-            fputcsv($out, ['serial', 'product_code', 'product_name', 'status', 'import_batch', 'created_at'], ';');
-            foreach ($wpdb->get_results($p ? $wpdb->prepare($sql, $p) : $sql, ARRAY_N) as $r) fputcsv($out, $r, ';');
-        } else {
-            $where = self::warranty_filters(['s' => self::q('s'), 'status' => self::q('status'), 'expiring' => (int) self::q('expiring'), 'from' => self::q('from'), 'to' => self::q('to')]);
-            $cols = ['warranty_code', 'serial', 'product_code', 'product_name', 'status', 'customer_name', 'email', 'phone_mobile', 'phone_landline', 'address', 'postcode', 'city',
-                'partner_vat', 'partner_email', 'invoice_number', 'purchase_date', 'warranty_end', 'marketing_opt_in', 'lock_reason', 'created_at'];
-            fputcsv($out, $cols, ';');
-            foreach ($wpdb->get_results(TW_Warranty::select_sql() . " WHERE $where ORDER BY w.id", ARRAY_A) as $r) {
-                fputcsv($out, array_map(function ($c) use ($r) { return $r[$c] ?? ''; }, $cols), ';');
-            }
-            TW_DB::log_event('warranties_exported', ['filters' => array_filter($_GET)]);
+            $labels = TW_Util::serial_status_labels();
+            // The headers are also accepted by the import, so an export can be edited and re-imported.
+            $x = new TW_Xlsx(['Σειριακός αριθμός', 'Κωδικός προϊόντος', 'Όνομα προϊόντος', 'Κατάσταση', 'Παρτίδα εισαγωγής', 'Καταχώρηση']);
+            $last = 0;
+            do {
+                $sql = "SELECT id, serial_no, product_code, product_name, status, import_batch, created_at FROM $t WHERE " . implode(' AND ', $where) . ' AND id > %d ORDER BY id LIMIT 2000';
+                $rows = $wpdb->get_results($wpdb->prepare($sql, array_merge($p, [$last])));
+                foreach ($rows as $r) {
+                    $x->add([$r->serial_no, $r->product_code, $r->product_name, $labels[$r->status] ?? $r->status, $r->import_batch, TW_Util::datetime_label($r->created_at)]);
+                    $last = (int) $r->id;
+                }
+            } while (count($rows) === 2000);
+            TW_DB::log_event('serials_exported', ['filters' => array_filter($_GET)]);
+            $x->download('seiriakoi-' . $stamp . '.xlsx', 'Σειριακοί');
         }
-        fclose($out);
-        exit;
+        $where = self::warranty_filters(['s' => self::q('s'), 'status' => self::q('status'), 'expiring' => (int) self::q('expiring'), 'from' => self::q('from'), 'to' => self::q('to')]);
+        $labels = TW_Util::status_labels();
+        $x = new TW_Xlsx(['Κωδικός εγγύησης', 'Σειριακός αριθμός', 'Κωδικός προϊόντος', 'Όνομα προϊόντος', 'Κατάσταση', 'Ονοματεπώνυμο', 'Email', 'Κινητό', 'Σταθερό',
+            'Διεύθυνση', 'Τ.Κ.', 'Πόλη', 'ΑΦΜ συνεργάτη', 'Email συνεργάτη', 'Αριθμός παραστατικού', 'Ημερομηνία αγοράς', 'Λήξη εγγύησης', 'Ενημερώσεις & προσφορές', 'Λόγος κλειδώματος', 'Ενεργοποίηση']);
+        $last = 0;
+        do {
+            $rows = $wpdb->get_results($wpdb->prepare(TW_Warranty::select_sql() . " WHERE $where AND w.id > %d ORDER BY w.id LIMIT 2000", $last));
+            foreach ($rows as $r) {
+                $x->add([$r->warranty_code, $r->serial, $r->product_code, $r->product_name, $labels[$r->status] ?? $r->status, $r->customer_name, $r->email, $r->phone_mobile, $r->phone_landline,
+                    $r->address, $r->postcode, $r->city, $r->partner_vat, $r->partner_email, $r->invoice_number, TW_Util::date_label($r->purchase_date), TW_Util::date_label($r->warranty_end),
+                    $r->marketing_opt_in ? 'Ναι' : 'Όχι', $r->lock_reason, TW_Util::datetime_label($r->created_at)]);
+                $last = (int) $r->id;
+            }
+        } while (count($rows) === 2000);
+        TW_DB::log_event('warranties_exported', ['filters' => array_filter($_GET)]);
+        $x->download('engyiseis-' . $stamp . '.xlsx', 'Εγγυήσεις');
     }
 }

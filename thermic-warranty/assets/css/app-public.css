@@ -3,7 +3,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body.tw-public {
-    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font: 16px/1.55 'Geom', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: #1d2330; background: #f4f6f8; min-height: 100vh; display: flex; flex-direction: column;
 }
 .tw-pub-inner { max-width: 960px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -30,3 +30,5 @@ body.tw-public {
     .tw-pub-main .tw-app { padding: 18px 14px; border-radius: 10px; }
     .tw-pub-foot .tw-pub-inner { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
+
+button, input, select, textarea { font-family: inherit; }

@@ -20,6 +20,7 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>Αντίγραφο στοιχείων – <?php echo esc_html($s['company_name']); ?></title>
+    <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/app-copy.css')); ?>">
     <?php echo TW_App::brand_style(); // phpcs:ignore ?>
 </head>
