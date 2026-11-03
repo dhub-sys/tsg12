@@ -809,6 +809,11 @@ final class TW_Admin {
 
     // ------------------------------------------------------------------ backups
 
+    private static function days_label($days) {
+        if ($days >= 2) return (int) floor($days) . ' ημέρες';
+        return $days >= 1 ? '1 ημέρα' : 'λιγότερο από 1 ημέρα';
+    }
+
     private static function size_label($bytes) {
         if ($bytes >= 1048576) return number_format_i18n($bytes / 1048576, 1) . ' MB';
         return number_format_i18n(max(1, $bytes / 1024), 0) . ' KB';
@@ -830,7 +835,9 @@ final class TW_Admin {
             <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
                 <?php wp_nonce_field('tw_backup_create'); ?><input type="hidden" name="action" value="tw_backup_create">
                 <button class="button button-primary">⛁ Δημιουργία αντιγράφου τώρα</button>
-                <span class="description">Αυτόματο ημερήσιο αντίγραφο: <?php echo $s['backup_daily'] ? 'ενεργό – επόμενο ' . esc_html($next ? wp_date('d/m/Y H:i', $next) : '—') . ', διατηρούνται τα τελευταία ' . (int) $s['backup_keep'] : '<strong>ανενεργό</strong>'; ?>.</span>
+                <span class="description">Αυτόματα αντίγραφα: <?php echo $s['backup_daily']
+                    ? esc_html(sprintf('%d την ημέρα (%s) – επόμενο %s – στον server κρατούνται τα τελευταία %d (≈ %s)', TW_Backup::per_day(), implode(', ', TW_Backup::times()), $next ? wp_date('d/m/Y H:i', $next) : '—', (int) $s['backup_keep'], self::days_label((int) $s['backup_keep'] / TW_Backup::per_day())))
+                    : '<strong>ανενεργά</strong>'; ?>.</span>
             </form>
 
             <table class="widefat striped"><thead><tr><th>Ημερομηνία</th><th>Τύπος</th><th>Μέγεθος</th><th>Περιεχόμενο</th><th>Κρυπτογράφηση</th><th>Εκτός server</th><th></th></tr></thead><tbody>
@@ -873,8 +880,22 @@ final class TW_Admin {
                     <h2>Ρυθμίσεις</h2>
                     <form method="post" action="<?php echo esc_url($post); ?>">
                         <?php wp_nonce_field('tw_backup_settings'); ?><input type="hidden" name="action" value="tw_backup_settings">
-                        <p><label><input type="checkbox" name="backup_daily" value="1" <?php checked((int) $s['backup_daily'], 1); ?>> Αυτόματο αντίγραφο κάθε μέρα (03:30)</label></p>
-                        <p><label>Διατήρηση των τελευταίων <input type="number" name="backup_keep" value="<?php echo (int) $s['backup_keep']; ?>" min="1" max="365" class="small-text"> αυτόματων αντιγράφων</label></p>
+                        <p><label><input type="checkbox" name="backup_daily" value="1" <?php checked((int) $s['backup_daily'], 1); ?>> Αυτόματα αντίγραφα</label></p>
+                        <p><label>Πόσα την ημέρα <select name="backup_per_day" id="tw-per-day">
+                            <?php foreach (array_keys(TW_Backup::PER_DAY) as $n) printf('<option value="%d"%s>%d</option>', $n, selected(TW_Backup::per_day(), $n, false), $n); ?>
+                        </select></label>
+                        <label>πρώτο στις <input type="time" name="backup_time" value="<?php echo esc_attr(preg_match('/^\d{2}:\d{2}$/', $s['backup_time']) ? $s['backup_time'] : '03:30'); ?>" required></label></p>
+                        <p class="description">Τα υπόλοιπα γίνονται σε ίσα διαστήματα μέσα στο 24ωρο, π.χ. 2 την ημέρα με πρώτο στις 03:30 → 03:30 και 15:30. Προτιμήστε ώρες με λίγη κίνηση στο site.</p>
+                        <p><label>Διατήρηση <strong>στον server</strong> των τελευταίων <input type="number" name="backup_keep" id="tw-keep" value="<?php echo (int) $s['backup_keep']; ?>" min="1" max="365" class="small-text"> αυτόματων αντιγράφων</label>
+                            <span class="description" id="tw-keep-days"></span></p>
+                        <p class="description">Τα παλαιότερα αυτόματα αντίγραφα σβήνονται από τον server. Τα χειροκίνητα και όσα γίνονται «πριν από επαναφορά» δεν σβήνονται αυτόματα. Για την υπηρεσία εκτός server (OneDrive κ.λπ.) ισχύει η ξεχωριστή ρύθμιση «Διατήρηση εκεί».</p>
+                        <script>
+                        (function () {
+                            var pd = document.getElementById('tw-per-day'), k = document.getElementById('tw-keep'), out = document.getElementById('tw-keep-days');
+                            function upd() { var d = (parseInt(k.value, 10) || 0) / (parseInt(pd.value, 10) || 1); out.textContent = '≈ ' + (d >= 2 ? Math.floor(d) + ' ημέρες' : (d >= 1 ? '1 ημέρα' : 'λιγότερο από 1 ημέρα')); }
+                            pd.addEventListener('change', upd); k.addEventListener('input', upd); upd();
+                        })();
+                        </script>
                         <p><label>Κωδικός κρυπτογράφησης (AES-256)<br><input type="password" name="backup_password" class="regular-text" autocomplete="new-password" placeholder="<?php echo $s['backup_password'] ? 'Ορισμένος – αφήστε κενό για να μείνει' : 'Χωρίς κρυπτογράφηση'; ?>"></label></p>
                         <?php if ($s['backup_password']) : ?><p><label><input type="checkbox" name="backup_password_clear" value="1"> Κατάργηση κρυπτογράφησης</label></p><?php endif; ?>
                         <p class="description">Συνιστάται: το αρχείο περιέχει προσωπικά δεδομένα πελατών. Φυλάξτε τον κωδικό σε ασφαλές μέρος – χωρίς αυτόν το αντίγραφο δεν ανοίγει. Ισχύει για τα νέα αντίγραφα.</p>
@@ -1089,12 +1110,19 @@ final class TW_Admin {
 
     public static function handle_backup_settings() {
         self::backup_guard('tw_backup_settings');
-        $values = ['backup_daily' => empty($_POST['backup_daily']) ? 0 : 1, 'backup_keep' => max(1, min(365, (int) self::post('backup_keep')))];
+        $time = self::post('backup_time');
+        $values = [
+            'backup_daily' => empty($_POST['backup_daily']) ? 0 : 1,
+            'backup_keep' => max(1, min(365, (int) self::post('backup_keep'))),
+            'backup_per_day' => isset(TW_Backup::PER_DAY[(int) self::post('backup_per_day')]) ? (int) self::post('backup_per_day') : 1,
+            'backup_time' => preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) ? $time : '03:30',
+        ];
         $pw = (string) wp_unslash($_POST['backup_password'] ?? '');
         if ($pw !== '') $values['backup_password'] = $pw;
         if (!empty($_POST['backup_password_clear'])) $values['backup_password'] = '';
         TW_Settings::update($values);
-        TW_DB::log_event('backup_settings', ['daily' => $values['backup_daily'], 'keep' => $values['backup_keep'], 'encrypted' => (string) TW_Settings::get('backup_password') !== '']);
+        TW_Backup::reschedule();
+        TW_DB::log_event('backup_settings', ['auto' => $values['backup_daily'], 'per_day' => $values['backup_per_day'], 'time' => $values['backup_time'], 'keep' => $values['backup_keep'], 'encrypted' => (string) TW_Settings::get('backup_password') !== '']);
         self::flash('Οι ρυθμίσεις αντιγράφων αποθηκεύτηκαν.');
         self::back('tw-backups');
     }

@@ -59,6 +59,8 @@ final class TW_Settings {
             'fallback_channel' => 1,
             'backup_daily' => 1,
             'backup_keep' => 14,
+            'backup_per_day' => 1,
+            'backup_time' => '03:30',
             'backup_password' => '',
             // Off-site copies: none | gdrive | onedrive | dropbox | ftp
             'backup_remote' => 'none',

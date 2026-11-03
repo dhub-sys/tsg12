@@ -19,16 +19,61 @@ final class TW_Backup {
     /** Never written to a backup and never overwritten by a restore. */
     const SECRET_SETTINGS = ['brevo_api_key', 'brevo_webhook_token', 'backup_password', 'backup_gdrive_client_secret', 'backup_onedrive_client_secret', 'backup_dropbox_app_secret', 'backup_ftp_password'];
 
+    /** Automatic backups per day → hours between them. */
+    const PER_DAY = [1 => 24, 2 => 12, 3 => 8, 4 => 6, 6 => 4];
+
     public static function init() {
+        add_filter('cron_schedules', [__CLASS__, 'cron_schedules']);
         add_action(self::HOOK, [__CLASS__, 'run_scheduled']);
-        if (!wp_next_scheduled(self::HOOK)) self::schedule();
+        // (Re)schedule when missing or when the frequency setting changed.
+        if (!wp_next_scheduled(self::HOOK) || wp_get_schedule(self::HOOK) !== self::recurrence()) self::reschedule();
+    }
+
+    public static function cron_schedules($s) {
+        foreach (self::PER_DAY as $n => $h) {
+            if ($n > 1) $s['tw_backup_' . $h . 'h'] = ['interval' => $h * HOUR_IN_SECONDS, 'display' => sprintf('Κάθε %d ώρες (Thermic Warranty)', $h)];
+        }
+        return $s;
+    }
+
+    public static function per_day() {
+        $n = (int) TW_Settings::get('backup_per_day');
+        return isset(self::PER_DAY[$n]) ? $n : 1;
+    }
+
+    private static function recurrence() {
+        $h = self::PER_DAY[self::per_day()];
+        return $h === 24 ? 'daily' : 'tw_backup_' . $h . 'h';
+    }
+
+    /** Times of the day the automatic backup runs, e.g. ['03:30', '15:30']. */
+    public static function times() {
+        $t = (string) TW_Settings::get('backup_time');
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $t)) $t = '03:30';
+        [$hh, $mm] = array_map('intval', explode(':', $t));
+        $step = self::PER_DAY[self::per_day()];
+        $out = [];
+        for ($i = 0; $i < self::per_day(); $i++) $out[] = sprintf('%02d:%02d', ($hh + $i * $step) % 24, $mm);
+        sort($out);
+        return $out;
     }
 
     public static function schedule() {
         if (wp_next_scheduled(self::HOOK)) return;
-        $next = new DateTimeImmutable('today 03:30', wp_timezone());
-        if ($next->getTimestamp() <= time()) $next = $next->modify('+1 day');
-        wp_schedule_event($next->getTimestamp(), 'daily', self::HOOK);
+        $tz = wp_timezone();
+        $next = null;
+        foreach (self::times() as $t) { // the next of today's (or tomorrow's) slots
+            foreach (['today', 'tomorrow'] as $day) {
+                $c = new DateTimeImmutable("$day $t", $tz);
+                if ($c->getTimestamp() > time() && (!$next || $c < $next)) $next = $c;
+            }
+        }
+        wp_schedule_event($next->getTimestamp(), self::recurrence(), self::HOOK);
+    }
+
+    public static function reschedule() {
+        wp_clear_scheduled_hook(self::HOOK);
+        self::schedule();
     }
 
     public static function unschedule() {
