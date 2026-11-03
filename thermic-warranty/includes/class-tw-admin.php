@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -35,6 +35,7 @@ final class TW_Admin {
             $screens['backups'] = ['Αντίγραφα ασφαλείας', 'database', 'page_backups'];
         }
         $screens['settings'] = ['Ρυθμίσεις', 'settings', 'page_settings'];
+        $screens['help'] = ['Οδηγός χρήσης', 'book', 'page_help'];
         return $screens;
     }
 
@@ -52,6 +53,12 @@ final class TW_Admin {
             'settings' => '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
             'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
             'menu' => '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+            'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+            'printer' => '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+            'cloud' => '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
+            'plus' => '<path d="M5 12h14"/><path d="M12 5v14"/>',
+            'upload' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+            'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
         ];
         if (!isset($paths[$name])) return '';
         return '<svg class="tw-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $paths[$name] . '</svg>';
@@ -142,6 +149,58 @@ final class TW_Admin {
             }
         }
         return $out;
+    }
+
+    /** History in plain Greek instead of internal codes. */
+    public static function event_label($action) {
+        $map = [
+            'activated' => 'Ενεργοποίηση εγγύησης', 'otp_sent' => 'Αποστολή κωδικού επαλήθευσης', 'otp_email_failed' => 'Αποτυχία email κωδικού',
+            'activation_email_sent' => 'Email επιβεβαίωσης ενεργοποίησης', 'activation_email_failed' => 'Αποτυχία email επιβεβαίωσης', 'activation_email_resent' => 'Επαναποστολή email επιβεβαίωσης',
+            'activation_sms_sent' => 'SMS επιβεβαίωσης ενεργοποίησης', 'activation_sms_failed' => 'Αποτυχία SMS επιβεβαίωσης',
+            'portal_login' => 'Σύνδεση πελάτη στην πύλη', 'portal_data_export' => 'Λήψη δεδομένων (JSON) από τον πελάτη', 'portal_data_copy' => 'Αντίγραφο στοιχείων από τον πελάτη',
+            'marketing_granted' => 'Συγκατάθεση για ενημερώσεις', 'marketing_withdrawn' => 'Ανάκληση συγκατάθεσης για ενημερώσεις',
+            'service_submitted' => 'Υποβολή Service από τον πελάτη', 'service_recorded' => 'Καταχώρηση Service από την εταιρεία', 'service_approved' => 'Service: ελέγχθηκε',
+            'service_rejected' => 'Service: απορρίφθηκε', 'service_deleted' => 'Διαγραφή καταχώρησης Service', 'receipt_downloaded' => 'Προβολή απόδειξης Service',
+            'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
+            'status_void' => 'Κατάσταση: Ακυρωμένη', 'status_locked' => 'Κατάσταση: Κλειδωμένη', 'customer_corrected' => 'Διόρθωση στοιχείων πελάτη', 'anonymized' => 'Ανωνυμοποίηση στοιχείων',
+            'email_undeliverable' => 'Το email δεν παραδόθηκε', 'sms_undeliverable' => 'Το SMS δεν παραδόθηκε', 'fallback_sent' => 'Αποστολή από εναλλακτικό κανάλι',
+            'erasure_requested' => 'Αίτημα διαγραφής από τον πελάτη', 'erasure_processed' => 'Εκτέλεση αιτήματος διαγραφής',
+        ];
+        return $map[$action] ?? $action;
+    }
+
+    public static function actor_label($actor) {
+        if ($actor === 'system' || strpos($actor, 'system:') === 0) return 'Σύστημα';
+        if (strpos($actor, 'customer:') === 0) return 'Πελάτης (' . substr($actor, 9) . ')';
+        if (strpos($actor, 'admin:') === 0) {
+            $u = get_user_by('login', substr($actor, 6));
+            return $u ? $u->display_name : substr($actor, 6);
+        }
+        return $actor;
+    }
+
+    public static function event_details($details) {
+        $d = json_decode((string) $details, true);
+        if (!is_array($d)) return (string) $details;
+        $names = ['note' => 'Αιτιολογία', 'milestone' => 'Service', 'date' => 'Ημερομηνία', 'technician_vat' => 'ΑΦΜ τεχνικού', 'warranty_code' => 'Κωδικός',
+            'terms_version' => 'Όροι έκδοσης', 'email' => 'Email', 'by' => 'Από', 'genuine_parts' => 'Γνήσια ανταλλακτικά', 'to' => 'Παραλήπτης', 'reason' => 'Λόγος',
+            'step' => 'Βήμα', 'after_failed' => 'Μετά από αποτυχία', 'source' => 'Πηγή', 'customer_name' => 'Ονοματεπώνυμο', 'phone_mobile' => 'Κινητό',
+            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
+            'partner_email' => 'Email συνεργάτη', 'invoice_number' => 'Αριθμός παραστατικού'];
+        $out = [];
+        foreach ($d as $k => $v) {
+            if ($k === 'changes' && is_array($v)) {
+                foreach ($v as $field => $ch) $out[] = ($names[$field] ?? $field) . ': ' . (($ch['από'] ?? '') !== '' ? $ch['από'] : '—') . ' → ' . (($ch['σε'] ?? '') !== '' ? $ch['σε'] : '—');
+                continue;
+            }
+            if ($v === '' || $v === null) continue;
+            if ($k === 'genuine_parts') $v = $v ? 'ναι' : 'όχι';
+            if ($k === 'milestone') $v = (int) $v . 'ο';
+            if ($k === 'date' && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $v)) $v = TW_Util::date_label($v);
+            if ($k === 'by') $v = ['partner' => 'συνεργάτη', 'thermic' => 'εταιρεία', 'customer' => 'πελάτη'][$v] ?? $v;
+            $out[] = ($names[$k] ?? $k) . ': ' . (is_scalar($v) ? $v : wp_json_encode($v, JSON_UNESCAPED_UNICODE));
+        }
+        return implode(' · ', $out);
     }
 
     private static function select_row($key, $label, $current, array $options, $desc = '') {
@@ -363,7 +422,7 @@ final class TW_Admin {
         <div class="wrap tw-wrap">
             <p><a href="<?php echo esc_url(self::url('warranties')); ?>">&larr; Όλες οι εγγυήσεις</a></p>
             <h1>Εγγύηση <?php echo esc_html($w->warranty_code); ?> <?php echo self::status_badge($w->status, $labels); ?>
-                <button type="button" class="page-title-action tw-no-print" onclick="window.print()">🖨 Εκτύπωση καρτέλας</button></h1>
+                <button type="button" class="page-title-action tw-no-print" onclick="window.print()"><?php echo self::icon('printer'); ?>Εκτύπωση καρτέλας</button></h1>
             <?php self::notice(); ?>
             <?php foreach (self::contact_problems($w) as $problem) : ?>
                 <div class="notice notice-warning inline"><p>⚠ <?php echo esc_html($problem); ?></p></div>
@@ -479,7 +538,7 @@ final class TW_Admin {
                         <p><label>Ημερομηνία Service<br><input type="date" name="performed_date" required max="<?php echo esc_attr(TW_Schedule::today()); ?>"></label></p>
                         <p><label>Από<br><select name="performed_by"><option value="partner">Συνεργάτη</option><option value="thermic">Thermic</option></select></label></p>
                         <p><label>Τεχνικός / συνεργείο<br><input type="text" name="technician" class="regular-text"></label></p>
-                        <p><label>ΑΦΜ τεχνικού<br><input type="text" name="technician_vat" inputmode="numeric" maxlength="9" class="small-text" style="width:10em"></label></p>
+                        <p><label>ΑΦΜ τεχνικού<br><input type="text" name="technician_vat" inputmode="numeric" maxlength="9"></label></p>
                         <p><label>Αριθμός απόδειξης<br><input type="text" name="receipt_number" class="regular-text" maxlength="100"></label></p>
                         <p><label>Ημερομηνία παραστατικού<br><input type="date" name="receipt_date" max="<?php echo esc_attr(TW_Schedule::today()); ?>"></label></p>
                         <p><label>Αρχείο απόδειξης (προαιρετικό)<br><input type="file" name="receipt_file" accept=".pdf,.jpg,.jpeg,.png"></label></p>
@@ -515,6 +574,34 @@ final class TW_Admin {
                 </div>
             </div>
 
+            <?php if (!$w->anonymized_at) : ?>
+            <details class="tw-panel tw-edit tw-no-print">
+                <summary><h2 style="display:inline-block;margin:16px 0">Διόρθωση στοιχείων πελάτη</h2></summary>
+                <p class="description">Για λάθη στα στοιχεία (π.χ. λάθος email ή τηλέφωνο). Κάθε αλλαγή καταγράφεται στο ιστορικό με την παλιά και τη νέα τιμή.</p>
+                <form method="post" action="<?php echo esc_url($post); ?>">
+                    <?php wp_nonce_field('tw_edit_customer'); ?><input type="hidden" name="action" value="tw_edit_customer"><input type="hidden" name="id" value="<?php echo (int) $w->id; ?>">
+                    <div class="tw-columns" style="margin:0;gap:0 24px">
+                        <div>
+                            <p><label>Ονοματεπώνυμο<input type="text" name="customer_name" value="<?php echo esc_attr($w->customer_name); ?>" required></label></p>
+                            <p><label>Email<input type="email" name="email" value="<?php echo esc_attr($w->email); ?>" required></label></p>
+                            <p><label>Κινητό<input type="tel" name="phone_mobile" value="<?php echo esc_attr($w->phone_mobile); ?>" required></label></p>
+                            <p><label>Σταθερό<input type="tel" name="phone_landline" value="<?php echo esc_attr($w->phone_landline); ?>"></label></p>
+                        </div>
+                        <div>
+                            <p><label>Διεύθυνση<input type="text" name="address" value="<?php echo esc_attr($w->address); ?>"></label></p>
+                            <p><label>Τ.Κ.<input type="text" name="postcode" value="<?php echo esc_attr($w->postcode); ?>"></label></p>
+                            <p><label>Πόλη / Περιοχή<input type="text" name="city" value="<?php echo esc_attr($w->city); ?>"></label></p>
+                            <p><label>ΑΦΜ συνεργάτη<input type="text" name="partner_vat" value="<?php echo esc_attr($w->partner_vat); ?>"></label></p>
+                            <p><label>Email συνεργάτη<input type="email" name="partner_email" value="<?php echo esc_attr($w->partner_email); ?>"></label></p>
+                            <p><label>Αριθμός παραστατικού<input type="text" name="invoice_number" value="<?php echo esc_attr($w->invoice_number); ?>"></label></p>
+                        </div>
+                    </div>
+                    <p><label>Αιτιολογία (π.χ. «αίτημα πελάτη τηλεφωνικά»)<input type="text" name="note" required></label></p>
+                    <p><button class="button button-primary">Αποθήκευση αλλαγών</button></p>
+                </form>
+            </details>
+            <?php endif; ?>
+
             <h2>Συγκαταθέσεις (αποδεικτικό GDPR)</h2>
             <table class="widefat striped"><thead><tr><th>Ημ/νία</th><th>Τύπος</th><th>Απόφαση</th><th>Κείμενο που εμφανίστηκε</th><th>Έκδοση όρων</th><th>Πηγή</th><th>IP</th><th>Browser</th></tr></thead><tbody>
             <?php foreach ($consents as $c) : ?>
@@ -531,7 +618,7 @@ final class TW_Admin {
             <h2>Ιστορικό</h2>
             <table class="widefat striped"><thead><tr><th>Ημ/νία</th><th>Ενέργεια</th><th>Από</th><th>Λεπτομέρειες</th></tr></thead><tbody>
             <?php foreach ($events as $e) : ?>
-                <tr><td><?php echo esc_html(TW_Util::datetime_label($e->created_at)); ?></td><td><?php echo esc_html($e->action); ?></td><td><?php echo esc_html($e->actor); ?></td><td><small><?php echo esc_html($e->details); ?></small></td></tr>
+                <tr><td><?php echo esc_html(TW_Util::datetime_label($e->created_at)); ?></td><td><?php echo esc_html(self::event_label($e->action)); ?></td><td><?php echo esc_html(self::actor_label($e->actor)); ?></td><td><small><?php echo esc_html(self::event_details($e->details)); ?></small></td></tr>
             <?php endforeach; ?>
             </tbody></table>
         </div>
@@ -602,7 +689,7 @@ final class TW_Admin {
             <div class="tw-columns">
                 <div class="tw-panel">
                     <h2>Εισαγωγή από αρχείο (Excel / CSV)</h2>
-                    <p><a class="button" href="<?php echo esc_url(wp_nonce_url(add_query_arg('action', 'tw_template', self::url('serials')), 'tw_template')); ?>">⬇ Λήψη προτύπου Excel</a>
+                    <p><a class="button" href="<?php echo esc_url(wp_nonce_url(add_query_arg('action', 'tw_template', self::url('serials')), 'tw_template')); ?>"><?php echo self::icon('download'); ?>Λήψη προτύπου Excel</a>
                         <span class="description">Συμπληρώστε το πρότυπο και ανεβάστε το εδώ.</span></p>
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_import'); ?><input type="hidden" name="action" value="tw_import">
@@ -853,7 +940,7 @@ final class TW_Admin {
 
             <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
                 <?php wp_nonce_field('tw_backup_create'); ?><input type="hidden" name="action" value="tw_backup_create">
-                <button class="button button-primary">⛁ Δημιουργία αντιγράφου τώρα</button>
+                <button class="button button-primary"><?php echo self::icon('plus'); ?>Δημιουργία αντιγράφου τώρα</button>
                 <span class="description">Αυτόματα αντίγραφα: <?php echo $s['backup_daily']
                     ? esc_html(sprintf('%d την ημέρα (%s) – επόμενο %s – στον server κρατούνται τα τελευταία %d (≈ %s)', TW_Backup::per_day(), implode(', ', TW_Backup::times()), $next ? wp_date('d/m/Y H:i', $next) : '—', (int) $s['backup_keep'], self::days_label((int) $s['backup_keep'] / TW_Backup::per_day())))
                     : '<strong>ανενεργά</strong>'; ?>.</span>
@@ -870,7 +957,7 @@ final class TW_Admin {
                     <td class="tw-row-actions">
                         <?php if (TW_Backup_Remote::enabled() && $m && !empty($m['encrypted'])) : ?>
                         <form method="post" action="<?php echo esc_url($post); ?>"><?php wp_nonce_field('tw_backup_send'); ?><input type="hidden" name="action" value="tw_backup_send"><input type="hidden" name="file" value="<?php echo esc_attr($b['file']); ?>">
-                            <button class="button" title="Αποστολή στο <?php echo esc_attr(TW_Backup_Remote::label()); ?>">⇪ Αποστολή</button></form>
+                            <button class="button" title="Αποστολή στο <?php echo esc_attr(TW_Backup_Remote::label()); ?>"><?php echo self::icon('cloud'); ?>Αποστολή</button></form>
                         <?php endif; ?>
                         <a class="button" href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_backup_download', 'file' => $b['file']], $post), 'tw_backup_download')); ?>">Λήψη</a>
                         <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('ΕΠΑΝΑΦΟΡΑ: όλα τα τωρινά δεδομένα της πλατφόρμας θα αντικατασταθούν με αυτά του <?php echo esc_attr(TW_Util::datetime_label($b['time'])); ?>. Πριν από την επαναφορά θα κρατηθεί αντίγραφο της τωρινής κατάστασης. Συνέχεια;')">
@@ -900,7 +987,7 @@ final class TW_Admin {
                     <form method="post" action="<?php echo esc_url($post); ?>">
                         <?php wp_nonce_field('tw_backup_settings'); ?><input type="hidden" name="action" value="tw_backup_settings">
                         <p><label><input type="checkbox" name="backup_daily" value="1" <?php checked((int) $s['backup_daily'], 1); ?>> Αυτόματα αντίγραφα</label></p>
-                        <p><label>Πόσα την ημέρα <select name="backup_per_day" id="tw-per-day">
+                        <p><label>Πόσα την ημέρα <select name="backup_per_day" id="tw-per-day" class="tw-inline-select">
                             <?php foreach (array_keys(TW_Backup::PER_DAY) as $n) printf('<option value="%d"%s>%d</option>', $n, selected(TW_Backup::per_day(), $n, false), $n); ?>
                         </select></label>
                         <label>πρώτο στις <input type="time" name="backup_time" value="<?php echo esc_attr(preg_match('/^\d{2}:\d{2}$/', $s['backup_time']) ? $s['backup_time'] : '03:30'); ?>" required></label></p>
@@ -1187,6 +1274,13 @@ final class TW_Admin {
             }
         }
         self::back('tw-settings', ['tab' => 'brevo']);
+    }
+
+    // ------------------------------------------------------------------ documentation
+
+    public static function page_help() {
+        $s = TW_Settings::all();
+        include TW_DIR . 'templates/help.php';
     }
 
     // ------------------------------------------------------------------ team
@@ -1580,6 +1674,47 @@ final class TW_Admin {
             TW_Warranty::set_status($w, $status, $note);
             self::flash('Η κατάσταση άλλαξε.');
         }
+        self::back('tw-warranties', ['view' => $w->id]);
+    }
+
+    public static function handle_edit_customer() {
+        global $wpdb;
+        self::guard('tw_edit_customer');
+        $w = self::warranty_from_post();
+        if ($w->anonymized_at) self::back('tw-warranties', ['view' => $w->id]);
+        $note = sanitize_text_field(self::post('note'));
+        $new = [
+            'customer_name' => sanitize_text_field(self::post('customer_name')),
+            'email' => strtolower(sanitize_email(self::post('email'))),
+            'phone_mobile' => TW_Util::clean_phone(self::post('phone_mobile')),
+            'phone_landline' => TW_Util::clean_phone(self::post('phone_landline')),
+            'address' => sanitize_text_field(self::post('address')),
+            'postcode' => preg_replace('/\s+/', '', sanitize_text_field(self::post('postcode'))),
+            'city' => sanitize_text_field(self::post('city')),
+            'partner_vat' => preg_replace('/\D/', '', self::post('partner_vat')),
+            'partner_email' => strtolower(sanitize_email(self::post('partner_email'))),
+            'invoice_number' => sanitize_text_field(self::post('invoice_number')),
+        ];
+        $errors = [];
+        if ($note === '') $errors[] = 'συμπληρώστε αιτιολογία';
+        if (mb_strlen($new['customer_name']) < 3) $errors[] = 'ονοματεπώνυμο';
+        if (!is_email($new['email'])) $errors[] = 'email';
+        if (!TW_Util::valid_mobile($new['phone_mobile'])) $errors[] = 'κινητό';
+        if (self::post('phone_landline') !== '' && $new['phone_landline'] === '') $errors[] = 'σταθερό';
+        if ($new['partner_vat'] !== '' && !TW_Util::valid_afm($new['partner_vat'])) $errors[] = 'ΑΦΜ συνεργάτη';
+        if ($new['partner_email'] !== '' && !is_email($new['partner_email'])) $errors[] = 'email συνεργάτη';
+        if ($errors) {
+            self::flash('Δεν αποθηκεύτηκε – ελέγξτε: ' . esc_html(implode(', ', $errors)) . '.', 'error');
+            self::back('tw-warranties', ['view' => $w->id]);
+        }
+        $changes = [];
+        foreach ($new as $k => $v) {
+            if ((string) $w->$k !== (string) $v) $changes[$k] = ['από' => (string) $w->$k, 'σε' => (string) $v];
+        }
+        if (!$changes) { self::flash('Δεν υπήρξε καμία αλλαγή.', 'info'); self::back('tw-warranties', ['view' => $w->id]); }
+        $wpdb->update(TW_DB::table('warranties'), array_merge(array_intersect_key($new, $changes), ['updated_at' => TW_DB::now()]), ['id' => $w->id]);
+        TW_DB::log_event('customer_corrected', ['note' => $note, 'changes' => $changes], $w->id, $w->serial_id);
+        self::flash(sprintf('Αποθηκεύτηκαν %d αλλαγές.', count($changes)) . (isset($changes['email']) ? ' Το νέο email χρησιμοποιείται από τώρα για ειδοποιήσεις και για τη σύνδεση του πελάτη.' : ''));
         self::back('tw-warranties', ['view' => $w->id]);
     }
 

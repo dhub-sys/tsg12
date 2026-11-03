@@ -41,6 +41,31 @@
         form.classList.toggle('is-busy', on);
     }
 
+    // File inputs: Greek, styled picker with drag & drop (replaces the browser's "Choose file").
+    var UP = '<svg class="tw-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>';
+    function enhanceFiles(scope) {
+        scope.querySelectorAll('input[type=file]:not([data-tw-file])').forEach(function (inp) {
+            inp.setAttribute('data-tw-file', '1');
+            var box = document.createElement('label');
+            box.className = 'tw-file';
+            var empty = 'Δεν επιλέχθηκε αρχείο';
+            inp.parentNode.insertBefore(box, inp);
+            box.innerHTML = '<span class="tw-file-btn">' + UP + 'Επιλογή αρχείου</span><span class="tw-file-name">' + empty + '</span>';
+            box.appendChild(inp);
+            var name = box.querySelector('.tw-file-name');
+            function show() {
+                var f = inp.files && inp.files[0];
+                box.classList.toggle('has-file', !!f);
+                name.textContent = f ? f.name : empty;
+            }
+            inp.addEventListener('change', show);
+            ['dragenter', 'dragover'].forEach(function (ev) { box.addEventListener(ev, function (e) { e.preventDefault(); box.classList.add('is-drag'); }); });
+            ['dragleave', 'drop'].forEach(function (ev) { box.addEventListener(ev, function () { box.classList.remove('is-drag'); }); });
+            box.addEventListener('drop', function (e) { e.preventDefault(); if (e.dataTransfer.files.length) { inp.files = e.dataTransfer.files; show(); } });
+            if (inp.form) inp.form.addEventListener('reset', function () { setTimeout(show, 0); });
+        });
+    }
+
     function bind(root, data) {
         Object.keys(data).forEach(function (k) {
             root.querySelectorAll('[data-bind="' + k + '"]').forEach(function (el) {
@@ -54,6 +79,7 @@
 
     // ------------------------------------------------------------ registration
     function Register(root) {
+        enhanceFiles(root);
         var state = { serial: '', email: '', token: '' };
         var steps = root.querySelectorAll('.tw-step');
         var labels = root.querySelectorAll('.tw-steps li');
@@ -253,6 +279,7 @@
         });
 
         function wire() {
+            enhanceFiles(content);
             var out = content.querySelector('[data-action="logout"]');
             if (out) out.addEventListener('click', function () { post('logout', {}).then(load); });
 

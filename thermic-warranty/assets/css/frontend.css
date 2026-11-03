@@ -85,3 +85,13 @@
 .tw-ms--rejected td:last-child { color: var(--tw-bad); font-weight: 600; }
 
 .tw-app button, .tw-app input, .tw-app select, .tw-app textarea { font-family: inherit; }
+
+/* File picker (replaces the browser's "Choose file / No file chosen"). */
+.tw-file { position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px; border: 1.5px dashed var(--tw-border); border-radius: 8px; background: var(--tw-bg-soft); cursor: pointer; transition: border-color .15s, background .15s; }
+.tw-file:hover, .tw-file.is-drag { border-color: var(--tw-accent); background: color-mix(in srgb, var(--tw-accent) 7%, #fff); }
+.tw-app .tw-file input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: 0; }
+.tw-file-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; background: #fff; border: 1px solid var(--tw-border); font-weight: 600; font-size: 14px; pointer-events: none; }
+.tw-file-btn .tw-icon { width: 16px; height: 16px; }
+.tw-file-name { color: var(--tw-muted); font-size: 14px; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.tw-file.has-file .tw-file-name { color: inherit; font-weight: 500; }
+.tw-invalid .tw-file { border-color: var(--tw-bad); }
