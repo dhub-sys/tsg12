@@ -18,7 +18,7 @@ final class TW_Admin {
     /** Actions accepted by the app router (POST, or GET for downloads). */
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
-            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt'];
+            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -100,6 +100,22 @@ final class TW_Admin {
 
     private static function status_badge($status, $labels) {
         return '<span class="tw-badge tw-badge--' . esc_attr($status) . '">' . esc_html($labels[$status] ?? $status) . '</span>';
+    }
+
+    /** Latest delivery result per channel says the customer's email / mobile does not receive messages. */
+    public static function contact_problems($w) {
+        global $wpdb;
+        $out = [];
+        foreach (['email' => [$w->email, 'Το email του πελάτη (%s) απορρίπτει τα μηνύματα: %s. Ο πελάτης δεν λαμβάνει ειδοποιήσεις με email – επικοινωνήστε μαζί του για διόρθωση.'],
+                  'sms' => [$w->phone_mobile, 'Τα SMS προς το κινητό του πελάτη (%s) δεν παραδίδονται: %s.']] as $ch => $def) {
+            $last = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM " . TW_DB::table('notifications') . " WHERE warranty_id = %d AND channel = %s AND recipient = %s AND delivery_status NOT IN ('', 'sent') ORDER BY id DESC LIMIT 1",
+                $w->id, $ch, $def[0]));
+            if ($last && in_array($last->delivery_status, ['failed', 'complaint'], true)) {
+                $out[] = sprintf($def[1], $def[0], $last->delivery_detail ?: TW_Brevo::status_labels()[$last->delivery_status]);
+            }
+        }
+        return $out;
     }
 
     private static function select_row($key, $label, $current, array $options, $desc = '') {
@@ -323,6 +339,9 @@ final class TW_Admin {
             <h1>Εγγύηση <?php echo esc_html($w->warranty_code); ?> <?php echo self::status_badge($w->status, $labels); ?>
                 <button type="button" class="page-title-action tw-no-print" onclick="window.print()">🖨 Εκτύπωση καρτέλας</button></h1>
             <?php self::notice(); ?>
+            <?php foreach (self::contact_problems($w) as $problem) : ?>
+                <div class="notice notice-warning inline"><p>⚠ <?php echo esc_html($problem); ?></p></div>
+            <?php endforeach; ?>
             <div class="tw-validity tw-validity--<?php echo $validity['ok'] ? 'ok' : 'bad'; ?>">
                 <strong><?php echo $validity['ok'] ? '✔' : '✘'; ?> <?php echo esc_html($validity['title']); ?></strong>
                 <ul><?php foreach ($validity['lines'] as $l) echo '<li>' . esc_html($l) . '</li>'; ?></ul>
@@ -495,15 +514,24 @@ final class TW_Admin {
 
     private static function notifications_table($rows, $with_warranty) {
         $ch = ['email' => 'Email', 'sms' => 'SMS', 'partner' => 'Email συνεργάτη'];
-        $st = ['sent' => 'Στάλθηκε', 'failed' => 'Απέτυχε', 'pending' => 'Σε εξέλιξη', 'skipped' => 'Παραλείφθηκε'];
+        $st = ['sent' => 'Στάλθηκε', 'failed' => 'Απέτυχε η αποστολή', 'pending' => 'Σε εξέλιξη', 'skipped' => 'Παραλείφθηκε'];
+        $dl = TW_Brevo::status_labels();
+        $icon = ['sent' => '⋯', 'delivered' => '✔', 'deferred' => '⏳', 'failed' => '✘', 'complaint' => '⚠'];
         echo '<table class="widefat striped"><thead><tr><th>Ημ/νία</th>' . ($with_warranty ? '<th>Εγγύηση</th>' : '') . '<th>Βήμα</th><th>Κανάλι</th><th>Παραλήπτης</th><th>Αποτέλεσμα</th></tr></thead><tbody>';
         if (!$rows) echo '<tr><td colspan="6">Καμία.</td></tr>';
         foreach ($rows as $n) {
-            $m = $n->milestone_key === 'expiry' ? ['type' => 'expiry', 'no' => 0] : ['type' => 'service', 'no' => (int) str_replace('service_', '', $n->milestone_key)];
             echo '<tr><td>' . esc_html(TW_Util::datetime_label($n->created_at)) . '</td>';
             if ($with_warranty) echo '<td>' . self::warranty_link($n->warranty_id, $n->serial ?? ('#' . $n->warranty_id)) . '</td>';
-            echo '<td>' . esc_html(TW_Cron::step_label($m, (int) $n->offset_days)) . '</td><td>' . esc_html($ch[$n->channel] ?? $n->channel) . '</td><td>' . esc_html($n->recipient) . '</td>';
-            echo '<td>' . esc_html($st[$n->status] ?? $n->status) . ($n->error ? '<br><small class="tw-danger">' . esc_html($n->error) . '</small>' : '') . '</td></tr>';
+            echo '<td>' . esc_html(TW_Cron::row_label($n)) . '</td><td>' . esc_html($ch[$n->channel] ?? $n->channel) . '</td><td>' . esc_html($n->recipient) . '</td><td>';
+            if ($n->status === 'sent' && $n->delivery_status !== '') {
+                $cls = in_array($n->delivery_status, ['failed', 'complaint'], true) ? 'tw-danger' : ($n->delivery_status === 'delivered' ? 'tw-ok' : '');
+                echo '<span class="' . $cls . '">' . esc_html(($icon[$n->delivery_status] ?? '') . ' ' . ($dl[$n->delivery_status] ?? $n->delivery_status)) . '</span>';
+                if ($n->delivery_at && $n->delivery_status !== 'sent') echo ' <small>' . esc_html(TW_Util::datetime_label($n->delivery_at)) . '</small>';
+                if ($n->delivery_detail && $n->delivery_status !== 'delivered') echo '<br><small>' . esc_html($n->delivery_detail) . '</small>';
+            } else {
+                echo esc_html($st[$n->status] ?? $n->status) . ($n->error ? '<br><small class="tw-danger">' . esc_html($n->error) . '</small>' : '');
+            }
+            echo '</td></tr>';
         }
         echo '</tbody></table>';
     }
@@ -606,7 +634,9 @@ final class TW_Admin {
         $paged = max(1, (int) self::q('paged'));
         $n = TW_DB::table('notifications');
         $status = self::q('status');
-        $where = $status ? $wpdb->prepare('WHERE n.status = %s', $status) : '';
+        if ($status === 'undelivered') $where = "WHERE n.delivery_status IN ('failed','complaint')";
+        elseif ($status === 'delivered') $where = "WHERE n.delivery_status = 'delivered'";
+        else $where = $status ? $wpdb->prepare('WHERE n.status = %s', $status) : '';
         $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $n n $where");
         $rows = $wpdb->get_results("SELECT n.*, s.serial_no AS serial FROM $n n LEFT JOIN " . TW_DB::table('warranties') . " w ON w.id = n.warranty_id LEFT JOIN " . TW_DB::table('serials') . " s ON s.id = w.serial_id $where ORDER BY n.id DESC LIMIT " . self::PER_PAGE . ' OFFSET ' . (($paged - 1) * self::PER_PAGE));
         ?>
@@ -618,7 +648,8 @@ final class TW_Admin {
                 <button class="button button-primary">Εκτέλεση ελέγχου ειδοποιήσεων τώρα</button>
                 <span class="description">Η εκτέλεση γίνεται αυτόματα κάθε μέρα. Δεν στέλνει ποτέ το ίδιο μήνυμα δύο φορές.</span>
             </form>
-            <p><a href="<?php echo esc_url(self::url('notifications')); ?>">Όλες</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'failed'])); ?>">Αποτυχημένες</a></p>
+            <p><a href="<?php echo esc_url(self::url('notifications')); ?>">Όλες</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'failed'])); ?>">Απέτυχε η αποστολή</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'undelivered'])); ?>">Δεν παραδόθηκαν</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'delivered'])); ?>">Παραδόθηκαν</a></p>
+            <?php if (!TW_Brevo::email_enabled() && !TW_Brevo::sms_enabled()) : ?><p class="description">Η επιβεβαίωση παράδοσης («Παραδόθηκε / Δεν παραδόθηκε») λειτουργεί όταν η αποστολή γίνεται μέσω Brevo (Ρυθμίσεις → Brevo).</p><?php endif; ?>
             <?php self::pagination($total, $paged); self::notifications_table($rows, true); self::pagination($total, $paged); ?>
         </div>
         <?php
@@ -632,7 +663,7 @@ final class TW_Admin {
         $tpl = TW_Settings::template_defaults();
         $post = self::url();
         $tab = self::q('tab') ?: 'general';
-        $tabs = ['general' => 'Γενικά', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'sms' => 'SMS', 'privacy' => 'GDPR'];
+        $tabs = ['general' => 'Γενικά', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo (email & SMS)', 'sms' => 'Άλλος πάροχος SMS', 'privacy' => 'GDPR'];
         $field = function ($key, $label, $type = 'text', $desc = '', $attrs = '') use ($s) {
             echo '<tr><th><label for="tw-' . esc_attr($key) . '">' . esc_html($label) . '</label></th><td>';
             if ($type === 'checkbox') {
@@ -717,7 +748,27 @@ final class TW_Admin {
                             <?php endif; ?>
                         </td></tr>
                     <?php endforeach;
-                elseif ($tab === 'sms') :
+                elseif ($tab === 'brevo') : ?>
+                    <tr><td colspan="2"><p class="description">Με το Brevo τα email και τα SMS φεύγουν από τους servers του Brevo, και για κάθε μήνυμα καταγράφεται αν <strong>παραδόθηκε</strong> στον πελάτη. Το αποτέλεσμα φαίνεται στην καρτέλα κάθε εγγύησης και στις Ειδοποιήσεις.</p></td></tr>
+                    <tr><th><label for="tw-brevo_api_key">API key</label></th><td>
+                        <input type="password" id="tw-brevo_api_key" name="brevo_api_key_new" class="regular-text" autocomplete="off" placeholder="<?php echo $s['brevo_api_key'] ? esc_attr('Αποθηκευμένο: …' . substr($s['brevo_api_key'], -6)) : 'xkeysib-…'; ?>">
+                        <p class="description">Brevo → Settings → SMTP &amp; API → API Keys. Αφήστε κενό για να κρατήσετε το αποθηκευμένο.</p></td></tr>
+                    <?php
+                    $field('brevo_email', 'Email μέσω Brevo', 'checkbox', 'Όλα τα email της πλατφόρμας (υπενθυμίσεις, επιβεβαιώσεις, κωδικοί) στέλνονται μέσω Brevo.');
+                    $field('brevo_sender_email', 'Email αποστολέα', 'email', 'Διεύθυνση του domain σας, επιβεβαιωμένη στο Brevo (Senders & IP), π.χ. warranty@thermic.gr.');
+                    $field('brevo_sender_name', 'Όνομα αποστολέα', 'text');
+                    $field('brevo_reply_to', 'Απαντήσεις πελατών στο', 'email', 'Προαιρετικό, π.χ. service@thermic.gr.');
+                    $field('brevo_sms', 'SMS μέσω Brevo', 'checkbox', 'Τα SMS στέλνονται μέσω Brevo (χρειάζονται μονάδες SMS στον λογαριασμό).');
+                    $field('brevo_sms_sender', 'Αποστολέας SMS', 'text', 'Έως 11 λατινικοί χαρακτήρες, π.χ. THERMIC.', 'maxlength="11"');
+                    $field('fallback_channel', 'Εναλλακτικό κανάλι', 'checkbox', 'Αν μια υπενθύμιση δεν παραδοθεί με email, στέλνεται με SMS (και το αντίστροφο).');
+                    ?>
+                    <tr><th>Αναφορές παράδοσης (webhook)</th><td>
+                        <code style="word-break:break-all"><?php echo esc_html(TW_Brevo::webhook_url()); ?></code>
+                        <p class="description">Για τα SMS ρυθμίζεται αυτόματα με κάθε μήνυμα. Για τα email πατήστε «Ρύθμιση αναφορών email στο Brevo» παρακάτω, ή προσθέστε τη διεύθυνση χειροκίνητα στο Brevo → Transactional → Settings → Webhook (συμβάντα: Delivered, Hard bounce, Soft bounce, Blocked, Spam, Invalid, Deferred, Error).</p></td></tr>
+                    <?php
+                elseif ($tab === 'sms') : ?>
+                    <tr><td colspan="2"><p class="description">Μόνο αν δεν χρησιμοποιείτε το Brevo για τα SMS. Με άλλον πάροχο δεν υπάρχει επιβεβαίωση παράδοσης.</p></td></tr>
+                    <?php
                     $field('sms_enabled', 'SMS', 'checkbox', 'Αποστολή SMS μαζί με τα email (ενεργοποίηση, Service, λήξη).');
                     $field('sms_sender', 'Αποστολέας (Sender ID)', 'text', 'Έως 11 λατινικοί χαρακτήρες, εγκεκριμένο από τον πάροχο.');
                     $field('sms_url', 'URL του παρόχου', 'url', 'Το endpoint αποστολής του παρόχου σας (π.χ. Yuboto, Apifon, Routee, Twilio). Δεκτά πεδία: <code>{to} {to_no_plus} {text} {sender}</code>.');
@@ -734,7 +785,8 @@ final class TW_Admin {
                 <p class="submit"><button type="submit" class="button button-primary" id="submit">Αποθήκευση</button></p>
             </form>
             <?php if ($tab === 'privacy') self::erasure_requests(); ?>
-            <?php if (in_array($tab, ['messages', 'sms', 'general'], true)) : ?>
+            <?php if ($tab === 'brevo') self::brevo_tools(); ?>
+            <?php if (in_array($tab, ['messages', 'sms', 'general', 'brevo'], true)) : ?>
                 <h2>Δοκιμαστική αποστολή</h2>
                 <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
                     <?php wp_nonce_field('tw_test_message'); ?><input type="hidden" name="action" value="tw_test_message"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
@@ -746,6 +798,49 @@ final class TW_Admin {
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    // ------------------------------------------------------------------ Brevo tools
+
+    private static function brevo_tools() {
+        $post = self::url('settings', ['tab' => 'brevo']);
+        $log = get_option(TW_Brevo::LOG_OPTION, []);
+        ?>
+        <h2>Έλεγχος &amp; ρύθμιση</h2>
+        <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
+            <?php wp_nonce_field('tw_brevo_tool'); ?><input type="hidden" name="action" value="tw_brevo_tool">
+            <button class="button" name="tool" value="account">Έλεγχος σύνδεσης &amp; μονάδων SMS</button>
+            <button class="button" name="tool" value="webhook">Ρύθμιση αναφορών email στο Brevo</button>
+        </form>
+        <h2>Τελευταίες αναφορές από το Brevo</h2>
+        <p class="description">Χρήσιμο για έλεγχο μετά την ενεργοποίηση: εδώ φαίνεται ό,τι στέλνει το Brevo για τα μηνύματά σας.</p>
+        <table class="widefat striped"><thead><tr><th>Λήψη</th><th>Συμβάν</th><th>Παραλήπτης</th><th>Μήνυμα</th></tr></thead><tbody>
+        <?php if (!$log) echo '<tr><td colspan="4">Καμία αναφορά ακόμη.</td></tr>'; ?>
+        <?php foreach (array_slice((array) $log, 0, 30) as $l) : $d = (array) $l['data']; ?>
+            <tr><td><?php echo esc_html(TW_Util::datetime_label($l['at'])); ?></td>
+                <td><?php echo esc_html((string) ($d['event'] ?? ($d['msg_status'] ?? ($d['status'] ?? '?')))); ?><?php echo !empty($d['reason']) ? '<br><small>' . esc_html((string) $d['reason']) . '</small>' : ''; ?></td>
+                <td><?php echo esc_html((string) ($d['email'] ?? ($d['to'] ?? ($d['recipient'] ?? '')))); ?></td>
+                <td><small><?php echo esc_html((string) ($d['message-id'] ?? ($d['messageId'] ?? ''))); ?></small></td></tr>
+        <?php endforeach; ?>
+        </tbody></table>
+        <?php
+    }
+
+    public static function handle_brevo_tool() {
+        self::guard('tw_brevo_tool');
+        if (self::post('tool') === 'webhook') {
+            $r = TW_Brevo::ensure_email_webhook();
+            self::flash($r === true ? 'Οι αναφορές παράδοσης email ρυθμίστηκαν στο Brevo.' : 'Αποτυχία: ' . esc_html($r), $r === true ? 'success' : 'error');
+        } else {
+            $a = TW_Brevo::account();
+            if (is_wp_error($a)) {
+                self::flash('Αποτυχία σύνδεσης: ' . esc_html($a->get_error_message()), 'error');
+            } else {
+                self::flash(sprintf('Σύνδεση OK – λογαριασμός %s%s. Μονάδες SMS: %s.%s', esc_html($a['email']), $a['company'] ? ' (' . esc_html($a['company']) . ')' : '',
+                    $a['sms_credits'] === null ? '—' : esc_html((string) $a['sms_credits']), $a['email_plan'] ? ' Πακέτο: ' . esc_html($a['email_plan']) . '.' : ''));
+            }
+        }
+        self::back('tw-settings', ['tab' => 'brevo']);
     }
 
     // ------------------------------------------------------------------ team
@@ -873,6 +968,7 @@ final class TW_Admin {
         $checkboxes = [
             'general' => ['admin_digest'],
             'app' => ['staff_2fa'],
+            'brevo' => ['brevo_email', 'brevo_sms', 'fallback_channel'],
             'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner', 'service_notify_company'],
             'sms' => ['sms_enabled'],
         ];
@@ -909,6 +1005,14 @@ final class TW_Admin {
             $values['templates'] = $tpl;
         }
         $msg = 'Οι ρυθμίσεις αποθηκεύτηκαν.';
+        if ($tab === 'brevo') {
+            $newkey = trim(self::post('brevo_api_key_new'));
+            if ($newkey !== '') $values['brevo_api_key'] = sanitize_text_field($newkey);
+            unset($values['brevo_webhook_token']);
+            if (!empty($values['brevo_email']) && !is_email($values['brevo_sender_email'] ?? '')) {
+                $msg .= ' Προσοχή: συμπληρώστε email αποστολέα επιβεβαιωμένο στο Brevo.';
+            }
+        }
         if ($tab === 'terms' && isset($_POST['terms_text'])) {
             $before = (int) TW_Settings::current_terms()['version'];
             $v = TW_Settings::save_terms(sanitize_textarea_field(wp_unslash($_POST['terms_text'])));

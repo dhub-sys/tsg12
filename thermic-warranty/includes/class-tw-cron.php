@@ -30,7 +30,7 @@ final class TW_Cron {
     }
 
     /** Claims a step; false if it was already processed. */
-    private static function claim($wid, $key, $offset, $channel, $recipient) {
+    public static function claim($wid, $key, $offset, $channel, $recipient) {
         global $wpdb;
         $t = TW_DB::table('notifications');
         $exists = $wpdb->get_var($wpdb->prepare(
@@ -45,12 +45,51 @@ final class TW_Cron {
         return $ok ? (int) $wpdb->insert_id : false;
     }
 
-    private static function finish($id, $result) {
+    public static function finish($id, $result) {
         global $wpdb;
-        $wpdb->update(TW_DB::table('notifications'), [
+        $data = [
             'status' => $result === true ? 'sent' : ($result === null ? 'skipped' : 'failed'),
             'error' => is_string($result) ? $result : null,
-        ], ['id' => $id]);
+        ];
+        // Sent through Brevo: remember its id so the delivery report can update this row.
+        if ($result === true && TW_Messenger::$last_id) {
+            $data['provider_id'] = TW_Messenger::$last_id;
+            $data['delivery_status'] = 'sent';
+        }
+        $wpdb->update(TW_DB::table('notifications'), $data, ['id' => $id]);
+    }
+
+    /** Records a one-off message (e.g. the activation confirmation) in the notifications log. */
+    public static function log_message($warranty_id, $key, $channel, $recipient, $result) {
+        $id = self::claim($warranty_id, $key, 0, $channel, $recipient);
+        if ($id) self::finish($id, $result);
+    }
+
+    /**
+     * A reminder could not be delivered: send the same step through the other channel, once.
+     * Called by the Brevo delivery report handler.
+     */
+    public static function fallback($w, $row) {
+        if (!TW_Settings::get('fallback_channel') || $w->status === 'void' || $w->anonymized_at) return;
+        $m = null;
+        foreach (TW_Schedule::milestones($w->purchase_date, $w->warranty_end) as $x) {
+            if ($x['key'] === $row->milestone_key) $m = $x;
+        }
+        if (!$m) return; // not a reminder (e.g. activation)
+        $offset = (int) $row->offset_days;
+        $key = $m['type'] . '_' . TW_Schedule::stage($offset);
+        $vars = self::vars($w, $m, $offset, TW_Schedule::add_days($m['due'], $offset));
+        if ($row->channel === 'email') {
+            if (!TW_Messenger::sms_active() || !$w->phone_mobile || trim(TW_Settings::template($key)['sms']) === '') return;
+            $claim = self::claim($w->id, $m['key'], $offset, 'sms', $w->phone_mobile);
+            if ($claim) self::finish($claim, TW_Messenger::send_template_sms($w->phone_mobile, $key, $vars));
+        } elseif ($row->channel === 'sms') {
+            $claim = self::claim($w->id, $m['key'], $offset, 'email', $w->email);
+            if ($claim) self::finish($claim, TW_Messenger::send_template_email($w->email, $key, $vars));
+        } else {
+            return;
+        }
+        if (!empty($claim)) TW_DB::log_event('fallback_sent', ['step' => self::step_label($m, $offset), 'after_failed' => $row->channel], $w->id, $w->serial_id, 'system');
     }
 
     /**
@@ -131,6 +170,15 @@ final class TW_Cron {
             }
         }
 
+        // Messages that Brevo reported as not delivered since the last run.
+        $since = (string) (get_option('tw_last_run')['at'] ?? date('Y-m-d H:i:s', current_time('timestamp') - DAY_IN_SECONDS));
+        $bad = $wpdb->get_results($wpdb->prepare(
+            "SELECT n.*, s.serial_no FROM " . TW_DB::table('notifications') . " n JOIN " . TW_DB::table('warranties') . " w ON w.id = n.warranty_id JOIN " . TW_DB::table('serials') . " s ON s.id = w.serial_id
+             WHERE n.delivery_status IN ('failed','complaint') AND n.delivery_at >= %s ORDER BY n.id", $since));
+        foreach ($bad as $b) {
+            $digest[] = sprintf('ΔΕΝ ΠΑΡΑΔΟΘΗΚΕ (%s): %s – %s – %s%s', $b->channel === 'sms' ? 'SMS' : 'email', $b->serial_no, self::row_label($b), $b->recipient, $b->delivery_detail ? ' – ' . $b->delivery_detail : '');
+        }
+
         self::retention($today);
         TW_OTP::purge();
 
@@ -146,10 +194,18 @@ final class TW_Cron {
     }
 
     private static function send_sms_step($w, $m, $offset, $key, $vars) {
-        if (!TW_Settings::get('sms_enabled') || !$w->phone_mobile) return;
+        if (!TW_Messenger::sms_active() || !$w->phone_mobile) return;
         if (trim(TW_Settings::template($key)['sms']) === '') return;
         $claim = self::claim($w->id, $m['key'], $offset, 'sms', $w->phone_mobile);
         if ($claim) self::finish($claim, TW_Messenger::send_template_sms($w->phone_mobile, $key, $vars));
+    }
+
+    /** Label of a notifications row (reminder step or one-off message). */
+    public static function row_label($row) {
+        $one_off = ['activation' => 'Επιβεβαίωση ενεργοποίησης', 'service_rejected' => 'Απόρριψη υποβολής Service'];
+        if (isset($one_off[$row->milestone_key])) return $one_off[$row->milestone_key];
+        $m = $row->milestone_key === 'expiry' ? ['type' => 'expiry', 'no' => 0] : ['type' => 'service', 'no' => (int) str_replace('service_', '', $row->milestone_key)];
+        return self::step_label($m, (int) $row->offset_days);
     }
 
     public static function step_label($m, $offset) {
@@ -158,7 +214,7 @@ final class TW_Cron {
         return sprintf('%s %s%d ημ.', $what, $offset > 0 ? '+' : '', $offset);
     }
 
-    private static function vars($w, $m, $offset, $step_date) {
+    public static function vars($w, $m, $offset, $step_date) {
         $lock = (int) TW_Settings::get('lock_offset');
         $offsets = TW_Settings::reminder_offsets();
         $grace = $offsets ? max(0, max($offsets)) : 0;

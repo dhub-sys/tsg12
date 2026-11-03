@@ -227,8 +227,10 @@ final class TW_Frontend {
 
         $vars = TW_Messenger::warranty_vars($w);
         $sent = TW_Messenger::send_template_email($w->email, 'activation', $vars);
+        TW_Cron::log_message($w->id, 'activation', 'email', $w->email, $sent);
         TW_DB::log_event($sent === true ? 'activation_email_sent' : 'activation_email_failed', $sent === true ? '' : $sent, $w->id, $w->serial_id, 'system');
         $sms = TW_Messenger::send_template_sms($w->phone_mobile, 'activation', $vars);
+        if ($sms !== null) TW_Cron::log_message($w->id, 'activation', 'sms', $w->phone_mobile, $sms);
         if ($sms !== null) TW_DB::log_event($sms === true ? 'activation_sms_sent' : 'activation_sms_failed', $sms === true ? '' : $sms, $w->id, $w->serial_id, 'system');
         do_action('tw_warranty_activated', $w);
 

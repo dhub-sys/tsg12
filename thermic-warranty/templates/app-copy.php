@@ -122,13 +122,12 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
             <p class="tw-copy-muted">Σήμερα: ενημερώσεις και προσφορές <strong><?php echo $w->marketing_opt_in ? 'ΝΑΙ' : 'ΟΧΙ'; ?></strong>. Τα μηνύματα για το Service και την εγγύηση αποστέλλονται ανεξάρτητα από αυτή την επιλογή.</p>
 
             <h3>Μηνύματα που σας στάλθηκαν</h3>
-            <?php if (!$sent) : ?><p class="tw-copy-muted">Κανένα μήνυμα υπενθύμισης ακόμη.</p><?php else : ?>
+            <?php if (!$sent) : ?><p class="tw-copy-muted">Κανένα μήνυμα ακόμη.</p><?php else : ?>
             <table class="tw-copy-table">
                 <thead><tr><th>Ημ/νία</th><th>Θέμα</th><th>Μέσο</th></tr></thead>
                 <tbody>
-                <?php foreach ($sent as $n) :
-                    $m = $n->milestone_key === 'expiry' ? ['type' => 'expiry', 'no' => 0] : ['type' => 'service', 'no' => (int) str_replace('service_', '', $n->milestone_key)]; ?>
-                    <tr><td><?php echo esc_html(TW_Util::datetime_label($n->created_at)); ?></td><td><?php echo esc_html(TW_Cron::step_label($m, (int) $n->offset_days)); ?></td><td><?php echo esc_html($channel_labels[$n->channel] ?? $n->channel); ?></td></tr>
+                <?php foreach ($sent as $n) : ?>
+                    <tr><td><?php echo esc_html(TW_Util::datetime_label($n->created_at)); ?></td><td><?php echo esc_html(TW_Cron::row_label($n)); ?></td><td><?php echo esc_html($channel_labels[$n->channel] ?? $n->channel); ?><?php echo $n->delivery_status === 'delivered' ? ' – παραδόθηκε' : (in_array($n->delivery_status, ['failed', 'complaint'], true) ? ' – δεν παραδόθηκε' : ''); ?></td></tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>

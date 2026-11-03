@@ -5,6 +5,14 @@ if (!defined('ABSPATH')) exit;
  * Email (wp_mail, so any SMTP plugin applies) and SMS (configurable HTTP gateway or the tw_send_sms filter).
  */
 final class TW_Messenger {
+    /** Provider message id of the last email/SMS sent (Brevo), used to match delivery reports. */
+    public static $last_id = null;
+
+    /** SMS goes out through Brevo or through the generic gateway. */
+    public static function sms_active() {
+        return TW_Brevo::sms_enabled() || (bool) TW_Settings::get('sms_enabled');
+    }
+
 
     public static function render($text, array $vars) {
         $repl = [];
@@ -62,6 +70,10 @@ final class TW_Messenger {
 
     /** @return true|string true or error message */
     public static function send_email($to, $subject, $body_text) {
+        self::$last_id = null;
+        if (TW_Brevo::email_enabled()) {
+            return TW_Brevo::send_email($to, $subject, self::html_wrap($subject, $body_text), $body_text);
+        }
         $err = '';
         $catch = function ($e) use (&$err) { $err = $e->get_error_message(); };
         add_action('wp_mail_failed', $catch);
@@ -78,14 +90,16 @@ final class TW_Messenger {
     /** @return true|string|null null when SMS is disabled or the template is empty */
     public static function send_template_sms($phone, $key, array $vars) {
         $t = TW_Settings::template($key);
-        if (!TW_Settings::get('sms_enabled') || trim($t['sms']) === '') return null;
+        if (!self::sms_active() || trim($t['sms']) === '') return null;
         return self::send_sms($phone, self::render($t['sms'], $vars));
     }
 
     /** @return true|string */
     public static function send_sms($phone, $text) {
+        self::$last_id = null;
         $to = TW_Util::e164($phone);
         if ($to === '') return 'Μη έγκυρος αριθμός κινητού';
+        if (TW_Brevo::sms_enabled()) return TW_Brevo::send_sms($to, $text);
 
         // Custom integrations (e.g. a specific Greek SMS provider SDK) can take over here.
         $pre = apply_filters('tw_send_sms', null, $to, $text);

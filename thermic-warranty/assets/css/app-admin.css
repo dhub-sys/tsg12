@@ -179,3 +179,5 @@ body.tw-auth { min-height: 100vh; display: flex; align-items: center; justify-co
     .widefat { display: table !important; white-space: normal !important; }
     a { color: inherit; text-decoration: none; }
 }
+
+.tw-ok { color: var(--tw-ok); }
