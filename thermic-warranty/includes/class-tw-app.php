@@ -141,6 +141,17 @@ final class TW_App {
 
     private static function route_public() {
         $screen = get_query_var('tw_screen') === 'my' ? 'my' : 'register';
+        if ($screen === 'my' && isset($_GET['copy'])) {
+            // Printable copy of the customer's data: only for a signed-in customer (session cookie, SameSite=Strict).
+            $session = TW_Frontend::session();
+            if (!$session) {
+                wp_safe_redirect(self::public_url('my'));
+                exit;
+            }
+            TW_DB::log_event('portal_data_copy', '', 0, 0, 'customer:' . $session->email);
+            self::render('app-copy', ['email' => $session->email, 'warranties' => TW_Warranty::by_email($session->email)]);
+            return;
+        }
         self::render('app-public', ['screen' => $screen]);
     }
 

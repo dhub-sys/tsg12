@@ -291,7 +291,7 @@ final class TW_Frontend {
     }
 
     /** @return object|null the login row of the signed-in customer */
-    private static function session() {
+    public static function session() {
         $token = isset($_COOKIE[self::COOKIE]) ? (string) $_COOKIE[self::COOKIE] : '';
         return $token ? TW_OTP::token_row('login', $token) : null;
     }

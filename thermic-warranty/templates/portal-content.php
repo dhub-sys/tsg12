@@ -135,7 +135,8 @@ $s = TW_Settings::all();
 
 <section class="tw-card tw-privacy-box">
     <h4>Τα δεδομένα μου</h4>
-    <p>Μπορείτε να κατεβάσετε αντίγραφο των στοιχείων σας ή να υποβάλετε αίτημα διαγραφής.</p>
-    <button type="button" class="tw-btn tw-btn--ghost" data-action="export">Λήψη των δεδομένων μου (JSON)</button>
+    <p>Δείτε, εκτυπώστε ή αποθηκεύστε ως PDF όλα τα στοιχεία που έχουμε για εσάς και τις εγγυήσεις σας. Χρησιμεύει και ως βεβαίωση της εγγύησης.</p>
+    <a class="tw-btn" href="<?php echo esc_url(add_query_arg('copy', '1', TW_App::public_url('my'))); ?>" target="_blank" rel="noopener">📄 Αντίγραφο των στοιχείων μου</a>
     <button type="button" class="tw-btn tw-btn--ghost" data-action="erase">Αίτημα διαγραφής</button>
+    <p class="tw-hint"><button type="button" class="tw-link" data-action="export">Αντίγραφο σε μορφή για μεταφορά σε άλλο σύστημα (JSON)</button></p>
 </section>
