@@ -83,10 +83,24 @@ $s = TW_Settings::all();
                     <label>Ονοματεπώνυμο / επωνυμία τεχνικού</label>
                     <input type="text" name="technician" maxlength="200">
                 </div>
+                <?php if (TW_Settings::service_needs_fields()) : ?>
+                <div class="tw-grid">
+                    <div class="tw-field">
+                        <label>Αριθμός απόδειξης / παραστατικού <span class="tw-req">*</span></label>
+                        <input type="text" name="receipt_number" maxlength="100" required>
+                    </div>
+                    <div class="tw-field">
+                        <label>Ημερομηνία παραστατικού <span class="tw-req">*</span></label>
+                        <input type="date" name="receipt_date" required max="<?php echo esc_attr(TW_Schedule::today()); ?>">
+                    </div>
+                </div>
+                <?php endif; ?>
+                <?php if (TW_Settings::service_needs_file()) : ?>
                 <div class="tw-field">
                     <label>Απόδειξη Service (PDF, JPG ή PNG, έως <?php echo (int) $s['invoice_max_mb']; ?> MB) <span class="tw-req">*</span></label>
                     <input type="file" name="receipt_file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
                 </div>
+                <?php endif; ?>
                 <div class="tw-field">
                     <label>Σημειώσεις</label>
                     <input type="text" name="notes" maxlength="500">

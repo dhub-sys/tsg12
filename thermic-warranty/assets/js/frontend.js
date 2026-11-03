@@ -156,7 +156,7 @@
                     return;
                 }
             }
-            var file = f3.invoice_file.files[0];
+            var file = f3.invoice_file && f3.invoice_file.files[0];
             if (file && file.size > TW.maxMb * 1024 * 1024) {
                 alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f3, 'invoice_file'); return;
             }
@@ -276,7 +276,7 @@
                         var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
                         if (empty) { alertBox(root, 'Συμπληρώστε όλα τα υποχρεωτικά πεδία του Service.'); markField(f, el.name); return; }
                     }
-                    var file = f.receipt_file.files[0];
+                    var file = f.receipt_file && f.receipt_file.files[0];
                     if (file && file.size > TW.maxMb * 1024 * 1024) { alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f, 'receipt_file'); return; }
                     var fd = new FormData(f);
                     fd.set('genuine_parts', f.genuine_parts.checked ? '1' : '0');

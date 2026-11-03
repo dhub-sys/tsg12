@@ -41,7 +41,7 @@ final class TW_Frontend {
         wp_localize_script('tw-front', 'TW', [
             'ajax' => admin_url('admin-ajax.php'),
             'maxMb' => (int) TW_Settings::get('invoice_max_mb'),
-            'invoiceRequired' => (bool) TW_Settings::get('invoice_required'),
+            'invoiceMode' => TW_Settings::invoice_mode(),
         ]);
     }
 
@@ -196,10 +196,11 @@ final class TW_Frontend {
         }
 
         $invoice = ['file' => '', 'name' => ''];
-        if (!empty($_FILES['invoice_file']['name'])) {
+        $invoice_mode = TW_Settings::invoice_mode();
+        if ($invoice_mode !== 'off' && !empty($_FILES['invoice_file']['name'])) {
             $invoice = TW_Util::store_invoice($_FILES['invoice_file']);
             if (is_wp_error($invoice)) self::fail($invoice->get_error_message(), 'invoice_file');
-        } elseif (TW_Settings::get('invoice_required')) {
+        } elseif ($invoice_mode === 'required') {
             self::fail('Επισυνάψτε το παραστατικό αγοράς (PDF, JPG ή PNG).', 'invoice_file');
         }
 
@@ -362,10 +363,25 @@ final class TW_Frontend {
         }
         $vat = preg_replace('/\D/', '', self::input('technician_vat'));
         if (!TW_Util::valid_afm($vat)) self::fail('Ο ΑΦΜ τεχνικού δεν είναι έγκυρος.', 'technician_vat');
+        $receipt = ['file' => '', 'name' => '', 'number' => '', 'date' => null];
+        if (TW_Settings::service_needs_fields()) {
+            $receipt['number'] = sanitize_text_field(self::input('receipt_number'));
+            if ($receipt['number'] === '') self::fail('Συμπληρώστε τον αριθμό της απόδειξης.', 'receipt_number');
+            $rd = self::input('receipt_date');
+            $rdo = DateTimeImmutable::createFromFormat('!Y-m-d', $rd);
+            if (!$rdo || $rdo->format('Y-m-d') !== $rd) self::fail('Συμπληρώστε την ημερομηνία του παραστατικού.', 'receipt_date');
+            if ($rd > TW_Schedule::today()) self::fail('Η ημερομηνία του παραστατικού δεν μπορεί να είναι μελλοντική.', 'receipt_date');
+            if ($rd < $earliest) self::fail(sprintf('Η ημερομηνία του παραστατικού πρέπει να είναι από %s και μετά.', TW_Util::date_label($earliest)), 'receipt_date');
+            $receipt['date'] = $rd;
+        }
         if (self::input('genuine_parts') !== '1') self::fail('Επιβεβαιώστε ότι χρησιμοποιήθηκαν αυθεντικά ανταλλακτικά.', 'genuine_parts');
-        if (empty($_FILES['receipt_file']['name'])) self::fail('Επισυνάψτε την απόδειξη του Service (PDF, JPG ή PNG).', 'receipt_file');
-        $receipt = TW_Util::store_invoice($_FILES['receipt_file'], 'της απόδειξης');
-        if (is_wp_error($receipt)) self::fail($receipt->get_error_message(), 'receipt_file');
+        if (TW_Settings::service_needs_file()) {
+            if (empty($_FILES['receipt_file']['name'])) self::fail('Επισυνάψτε την απόδειξη του Service (PDF, JPG ή PNG).', 'receipt_file');
+            $file = TW_Util::store_invoice($_FILES['receipt_file'], 'της απόδειξης');
+            if (is_wp_error($file)) self::fail($file->get_error_message(), 'receipt_file');
+            $receipt['file'] = $file['file'];
+            $receipt['name'] = $file['name'];
+        }
 
         $row = TW_Warranty::submit_service($w, $no, $date, $vat, sanitize_text_field(self::input('technician')), $receipt, sanitize_textarea_field(self::input('notes')));
         $vars = TW_Warranty::service_vars($w, $row);

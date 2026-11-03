@@ -5,7 +5,7 @@ $privacy = $s['privacy_url'] ?: get_privacy_policy_url();
 $config = [
     'ajax' => admin_url('admin-ajax.php'),
     'maxMb' => (int) $s['invoice_max_mb'],
-    'invoiceRequired' => (bool) $s['invoice_required'],
+    'invoiceMode' => TW_Settings::invoice_mode(),
 ];
 ?><!doctype html>
 <html lang="el">

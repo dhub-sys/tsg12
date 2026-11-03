@@ -106,10 +106,12 @@ $terms = TW_Settings::current_terms();
                     <input id="tw-purchase" name="purchase_date" type="date" required max="<?php echo esc_attr(TW_Schedule::today()); ?>">
                 </div>
             </div>
+            <?php $invoice_mode = TW_Settings::invoice_mode(); if ($invoice_mode !== 'off') : ?>
             <div class="tw-field">
-                <label for="tw-invoice">Παραστατικό αγοράς (PDF, JPG ή PNG, έως <?php echo (int) $s['invoice_max_mb']; ?> MB)<?php if ($s['invoice_required']) : ?> <span class="tw-req">*</span><?php endif; ?></label>
-                <input id="tw-invoice" name="invoice_file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" <?php echo $s['invoice_required'] ? 'required' : ''; ?>>
+                <label for="tw-invoice">Αρχείο παραστατικού αγοράς (PDF, JPG ή PNG, έως <?php echo (int) $s['invoice_max_mb']; ?> MB)<?php echo $invoice_mode === 'required' ? ' <span class="tw-req">*</span>' : ' <em>(προαιρετικό)</em>'; ?></label>
+                <input id="tw-invoice" name="invoice_file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" <?php echo $invoice_mode === 'required' ? 'required' : ''; ?>>
             </div>
+            <?php endif; ?>
             <p class="tw-hint">Η εγγύηση διαρκεί <?php echo (int) $s['warranty_years']; ?> χρόνια από την ημερομηνία αγοράς<?php if ((int) $s['service_interval_years'] > 0) : ?>, με προβλεπόμενο Service ανά <?php echo (int) $s['service_interval_years']; ?> χρόνια<?php endif; ?>.</p>
         </fieldset>
 

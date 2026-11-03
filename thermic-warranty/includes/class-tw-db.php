@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.3.0';
+    const DB_VERSION = '1.4.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -145,6 +145,8 @@ final class TW_DB {
   genuine_parts tinyint(1) NOT NULL DEFAULT 1,
   receipt_file varchar(255) NOT NULL DEFAULT '',
   receipt_original_name varchar(255) NOT NULL DEFAULT '',
+  receipt_number varchar(100) NOT NULL DEFAULT '',
+  receipt_date date NULL,
   source varchar(20) NOT NULL DEFAULT 'admin',
   review_status varchar(20) NOT NULL DEFAULT 'approved',
   review_note varchar(255) NOT NULL DEFAULT '',

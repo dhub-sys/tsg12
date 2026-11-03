@@ -31,6 +31,7 @@ final class TW_Messenger {
             'warranty_end' => TW_Util::date_label($w->warranty_end),
             'partner_email' => $w->partner_email,
             'service_schedule' => TW_Schedule::service_schedule_text($w->purchase_date),
+            'service_proof' => TW_Settings::service_proof_text(),
         ];
         return array_merge($vars, $extra);
     }

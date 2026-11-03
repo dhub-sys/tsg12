@@ -102,6 +102,14 @@ final class TW_Admin {
         return '<span class="tw-badge tw-badge--' . esc_attr($status) . '">' . esc_html($labels[$status] ?? $status) . '</span>';
     }
 
+    private static function select_row($key, $label, $current, array $options, $desc = '') {
+        echo '<tr><th><label for="tw-' . esc_attr($key) . '">' . esc_html($label) . '</label></th><td><select id="tw-' . esc_attr($key) . '" name="s[' . esc_attr($key) . ']">';
+        foreach ($options as $v => $l) printf('<option value="%s"%s>%s</option>', esc_attr($v), selected($current, $v, false), esc_html($l));
+        echo '</select>';
+        if ($desc) echo '<p class="description">' . esc_html($desc) . '</p>';
+        echo '</td></tr>';
+    }
+
     private static function receipt_url($w, $sv) {
         return wp_nonce_url(add_query_arg(['action' => 'tw_receipt', 'id' => (int) $w->id, 'service_id' => (int) $sv->id], self::url()), 'tw_receipt');
     }
@@ -169,7 +177,8 @@ final class TW_Admin {
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($sv->created_at)); ?></td><td><?php echo self::warranty_link($pw->id, $pw->serial); ?></td>
                     <td><?php echo esc_html($pw->customer_name); ?></td><td><?php echo (int) $sv->milestone_no; ?>ο</td>
                     <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td><td><code><?php echo esc_html($sv->technician_vat); ?></code></td>
-                    <td><?php echo $sv->receipt_file ? '<a href="' . esc_url(self::receipt_url($pw, $sv)) . '" target="_blank">Προβολή</a>' : '—'; ?></td></tr>
+                    <td><?php echo esc_html($sv->receipt_number ? 'αρ. ' . $sv->receipt_number . ($sv->receipt_date ? ' / ' . TW_Util::date_label($sv->receipt_date) : '') : ''); ?>
+                        <?php echo $sv->receipt_file ? '<a href="' . esc_url(self::receipt_url($pw, $sv)) . '" target="_blank">Αρχείο</a>' : ''; ?><?php echo !$sv->receipt_number && !$sv->receipt_file ? '—' : ''; ?></td></tr>
             <?php endforeach; ?>
             </tbody></table>
 
@@ -358,6 +367,7 @@ final class TW_Admin {
                     <td><?php echo esc_html($ms_labels[$m['state']] ?? $m['state']); ?></td>
                     <td><?php if ($m['service']) : $sv = $m['service']; ?>
                         <?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?> · ΑΦΜ <?php echo esc_html($sv->technician_vat ?: '—'); ?>
+                        <?php echo $sv->receipt_number ? '· αρ. ' . esc_html($sv->receipt_number) : ''; ?>
                         <?php echo $sv->receipt_file ? '· <a href="' . esc_url(self::receipt_url($w, $sv)) . '" target="_blank">απόδειξη</a>' : ''; ?>
                     <?php endif; ?></td>
                     <td></td></tr>
@@ -374,7 +384,12 @@ final class TW_Admin {
                     <td><?php echo (int) $sv->milestone_no; ?>ο</td>
                     <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td>
                     <td><?php echo $sv->technician_vat ? 'ΑΦΜ <code>' . esc_html($sv->technician_vat) . '</code>' : '—'; ?><?php echo $sv->technician ? '<br>' . esc_html($sv->technician) : ''; ?><?php echo $sv->notes ? '<br><small>' . esc_html($sv->notes) . '</small>' : ''; ?></td>
-                    <td><?php echo $sv->receipt_file ? '<a href="' . esc_url(self::receipt_url($w, $sv)) . '" target="_blank">' . esc_html($sv->receipt_original_name ?: 'Προβολή') . '</a>' : '—'; ?></td>
+                    <td><?php
+                        $bits = [];
+                        if ($sv->receipt_number) $bits[] = 'Αρ. <strong>' . esc_html($sv->receipt_number) . '</strong>' . ($sv->receipt_date ? '<br>' . esc_html(TW_Util::date_label($sv->receipt_date)) : '');
+                        if ($sv->receipt_file) $bits[] = '<a href="' . esc_url(self::receipt_url($w, $sv)) . '" target="_blank">' . esc_html($sv->receipt_original_name ?: 'Αρχείο') . '</a>';
+                        echo $bits ? implode('<br>', $bits) : '—';
+                    ?></td>
                     <td><?php echo $sv->genuine_parts ? 'Ναι' : '<strong>Όχι</strong>'; ?></td>
                     <td><?php echo esc_html(['customer' => 'Πελάτης (πύλη)', 'admin' => 'Εταιρεία'][$sv->source] ?? $sv->source); ?></td>
                     <td><?php
@@ -420,7 +435,9 @@ final class TW_Admin {
                         <p><label>Από<br><select name="performed_by"><option value="partner">Συνεργάτη</option><option value="thermic">Thermic</option></select></label></p>
                         <p><label>Τεχνικός / συνεργείο<br><input type="text" name="technician" class="regular-text"></label></p>
                         <p><label>ΑΦΜ τεχνικού<br><input type="text" name="technician_vat" inputmode="numeric" maxlength="9" class="small-text" style="width:10em"></label></p>
-                        <p><label>Απόδειξη (προαιρετικό)<br><input type="file" name="receipt_file" accept=".pdf,.jpg,.jpeg,.png"></label></p>
+                        <p><label>Αριθμός απόδειξης<br><input type="text" name="receipt_number" class="regular-text" maxlength="100"></label></p>
+                        <p><label>Ημερομηνία παραστατικού<br><input type="date" name="receipt_date" max="<?php echo esc_attr(TW_Schedule::today()); ?>"></label></p>
+                        <p><label>Αρχείο απόδειξης (προαιρετικό)<br><input type="file" name="receipt_file" accept=".pdf,.jpg,.jpeg,.png"></label></p>
                         <p><label><input type="checkbox" name="genuine_parts" value="1" checked> Χρησιμοποιήθηκαν αυθεντικά ανταλλακτικά</label></p>
                         <p><label>Σημειώσεις<br><textarea name="notes" rows="2" class="large-text"></textarea></label></p>
                         <p><button class="button button-primary">Καταχώρηση Service</button></p>
@@ -649,7 +666,16 @@ final class TW_Admin {
                     $field('email_from_address', 'Email αποστολέα', 'email', 'Προτείνεται SMTP plugin (π.χ. WP Mail SMTP) με SPF/DKIM για τον τομέα, ώστε τα μηνύματα να μην πηγαίνουν στα ανεπιθύμητα.');
                     $field('admin_emails', 'Email εταιρείας για ειδοποιήσεις', 'text', 'Ένα ή περισσότερα, χωρισμένα με κόμμα.');
                     $field('admin_digest', 'Ημερήσια σύνοψη', 'checkbox', 'Αποστολή σύνοψης στην εταιρεία κάθε μέρα που υπάρχουν ειδοποιήσεις, λήξεις ή κλειδώματα.');
-                    $field('invoice_required', 'Αρχείο παραστατικού', 'checkbox', 'Υποχρεωτική επισύναψη αρχείου (PDF/JPG/PNG).');
+                    self::select_row('invoice_mode', 'Αρχείο παραστατικού αγοράς (ενεργοποίηση)', TW_Settings::invoice_mode(), [
+                        'required' => 'Υποχρεωτικό ανέβασμα αρχείου',
+                        'optional' => 'Προαιρετικό ανέβασμα αρχείου',
+                        'off' => 'Χωρίς αρχείο (μόνο αριθμός παραστατικού και ημερομηνία αγοράς)',
+                    ], 'Ο αριθμός παραστατικού και η ημερομηνία αγοράς ζητούνται πάντα.');
+                    self::select_row('service_proof_mode', 'Απόδειξη Service (υποβολή πελάτη)', TW_Settings::service_proof_mode(), [
+                        'upload' => 'Ανέβασμα αρχείου (φωτογραφία ή PDF)',
+                        'fields' => 'Αριθμός και ημερομηνία παραστατικού (χωρίς αρχείο)',
+                        'both' => 'Και τα δύο: αριθμός, ημερομηνία και αρχείο',
+                    ]);
                     $field('invoice_max_mb', 'Μέγιστο μέγεθος αρχείου (MB)', 'number', '', 'min="1" max="50"');
                 elseif ($tab === 'app') :
                     $field('admin_slug', 'Διεύθυνση διαχειριστικού', 'text', 'Το διαχειριστικό ανοίγει στο <code>' . esc_html(home_url('/')) . '<strong>' . esc_html($s['admin_slug']) . '</strong>/</code>.', 'pattern="[a-z0-9\\-]+"');
@@ -845,7 +871,7 @@ final class TW_Admin {
         $in = isset($_POST['s']) && is_array($_POST['s']) ? wp_unslash($_POST['s']) : [];
         $defaults = TW_Settings::defaults();
         $checkboxes = [
-            'general' => ['admin_digest', 'invoice_required'],
+            'general' => ['admin_digest'],
             'app' => ['staff_2fa'],
             'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner', 'service_notify_company'],
             'sms' => ['sms_enabled'],
@@ -860,6 +886,8 @@ final class TW_Admin {
             elseif (in_array($k, $urls, true)) $values[$k] = esc_url_raw(trim($v));
             elseif (in_array($k, $multiline, true)) $values[$k] = sanitize_textarea_field($v);
             elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
+            elseif ($k === 'invoice_mode') $values[$k] = in_array($v, ['required', 'optional', 'off'], true) ? $v : 'required';
+            elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
             elseif ($k === 'brand_color') $values[$k] = sanitize_hex_color($v) ?: $defaults[$k];
             elseif ($k === 'reminder_offsets') $values[$k] = implode(',', array_filter(array_map('trim', explode(',', $v)), function ($p) { return preg_match('/^[+-]?\d+$/', $p); }));
             else $values[$k] = sanitize_text_field($v);
@@ -1012,10 +1040,14 @@ final class TW_Admin {
         } elseif ($vat !== '' && !TW_Util::valid_afm($vat)) {
             self::flash('Ο ΑΦΜ τεχνικού δεν είναι έγκυρος.', 'error');
         } else {
-            $receipt = null;
+            $rd = self::post('receipt_date');
+            $receipt = ['file' => '', 'name' => '', 'number' => sanitize_text_field(self::post('receipt_number')),
+                'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $rd) ? $rd : null];
             if (!empty($_FILES['receipt_file']['name'])) {
-                $receipt = TW_Util::store_invoice($_FILES['receipt_file'], 'της απόδειξης');
-                if (is_wp_error($receipt)) { self::flash($receipt->get_error_message(), 'error'); self::back('tw-warranties', ['view' => $w->id]); }
+                $file = TW_Util::store_invoice($_FILES['receipt_file'], 'της απόδειξης');
+                if (is_wp_error($file)) { self::flash($file->get_error_message(), 'error'); self::back('tw-warranties', ['view' => $w->id]); }
+                $receipt['file'] = $file['file'];
+                $receipt['name'] = $file['name'];
             }
             TW_Warranty::record_service($w, $no, $date, self::post('performed_by') === 'thermic' ? 'thermic' : 'partner',
                 sanitize_text_field(self::post('technician')), !empty($_POST['genuine_parts']), sanitize_textarea_field(self::post('notes')), $vat, $receipt);

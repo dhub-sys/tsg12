@@ -161,7 +161,7 @@ final class TW_Warranty {
             $sv = $m['service'];
             if ($sv && self::service_counts($sv)) {
                 $lines[] = sprintf('%dο Service: καταχωρήθηκε %s – ΑΦΜ τεχνικού %s – απόδειξη: %s – γνήσια ανταλλακτικά: %s%s',
-                    $m['no'], TW_Util::date_label($sv->performed_date), $sv->technician_vat ?: '—', $sv->receipt_file ? 'ναι' : 'όχι',
+                    $m['no'], TW_Util::date_label($sv->performed_date), $sv->technician_vat ?: '—', self::receipt_text($sv),
                     $sv->genuine_parts ? 'ναι' : 'όχι', $sv->review_status === 'approved' ? ' – ελέγχθηκε' : '');
             } elseif (in_array($m['state'], ['due', 'rejected'], true)) {
                 $open = $m;
@@ -252,6 +252,8 @@ final class TW_Warranty {
             'genuine_parts' => $genuine ? 1 : 0,
             'receipt_file' => $receipt['file'] ?? '',
             'receipt_original_name' => $receipt['name'] ?? '',
+            'receipt_number' => $receipt['number'] ?? '',
+            'receipt_date' => $receipt['date'] ?? null,
             'source' => 'admin',
             'review_status' => 'approved',
             'reviewed_by' => get_current_user_id(),
@@ -277,8 +279,10 @@ final class TW_Warranty {
             'technician' => $technician,
             'technician_vat' => $technician_vat,
             'genuine_parts' => 1,
-            'receipt_file' => $receipt['file'],
-            'receipt_original_name' => $receipt['name'],
+            'receipt_file' => $receipt['file'] ?? '',
+            'receipt_original_name' => $receipt['name'] ?? '',
+            'receipt_number' => $receipt['number'] ?? '',
+            'receipt_date' => $receipt['date'] ?? null,
             'source' => 'customer',
             'review_status' => 'pending',
             'notes' => $notes,
@@ -322,6 +326,14 @@ final class TW_Warranty {
         $wpdb->delete(TW_DB::table('services'), ['id' => (int) $row->id]);
     }
 
+    /** e.g. "αρ. ΑΠΥ-123 / 03/11/2026, αρχείο: scan.pdf" */
+    public static function receipt_text($row) {
+        $parts = [];
+        if ($row->receipt_number) $parts[] = 'αρ. ' . $row->receipt_number . ($row->receipt_date ? ' / ' . TW_Util::date_label($row->receipt_date) : '');
+        if ($row->receipt_file) $parts[] = 'αρχείο' . ($row->receipt_original_name ? ': ' . $row->receipt_original_name : '');
+        return $parts ? implode(', ', $parts) : '—';
+    }
+
     /** Placeholders for the Service submission/review messages. */
     public static function service_vars($w, $row) {
         $next = null;
@@ -335,6 +347,7 @@ final class TW_Warranty {
             'milestone_no' => (int) $row->milestone_no,
             'performed_date' => TW_Util::date_label($row->performed_date),
             'technician_vat' => $row->technician_vat,
+            'receipt_info' => self::receipt_text($row),
             'review_note' => $row->review_note,
             'resubmit_until' => TW_Util::date_label((string) $row->resubmit_until),
             'next_step' => $next_step,

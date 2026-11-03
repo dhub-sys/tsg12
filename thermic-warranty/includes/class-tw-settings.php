@@ -32,7 +32,11 @@ final class TW_Settings {
             'notify_partner' => 0,
             'email_from_name' => 'Thermic',
             'email_from_address' => '',
-            'invoice_required' => 1,
+            'invoice_required' => 1, // legacy (≤1.3): replaced by invoice_mode
+            // Purchase invoice file at activation: required | optional | off
+            'invoice_mode' => 'required',
+            // Proof of Service at submission: upload (file) | fields (number + date, no file) | both
+            'service_proof_mode' => 'upload',
             'invoice_max_mb' => 5,
             'admin_slug' => 'warranty-admin',
             'public_slug' => 'warranty',
@@ -59,7 +63,7 @@ final class TW_Settings {
     /** Message templates. Placeholders are listed in the settings page. */
     public static function template_defaults() {
         $genuine = "Για τη διατήρηση της εγγύησης, το Service πρέπει να γίνεται αποκλειστικά με αυθεντικά (γνήσια) ανταλλακτικά Thermic.";
-        $submit = "Μόλις γίνει το Service, καταχωρήστε το στο {portal_url} («Οι εγγυήσεις μου» → «Υποβολή Service»): ημερομηνία, ΑΦΜ τεχνικού και φωτογραφία ή PDF της απόδειξης. Έτσι η εγγύηση συνεχίζει να ισχύει μέχρι το επόμενο Service.";
+        $submit = "Μόλις γίνει το Service, καταχωρήστε το στο {portal_url} («Οι εγγυήσεις μου» → «Υποβολή Service»): ημερομηνία, ΑΦΜ τεχνικού και {service_proof}. Έτσι η εγγύηση συνεχίζει να ισχύει μέχρι το επόμενο Service.";
         $where = "Για τον προγραμματισμό του Service μπορείτε να απευθυνθείτε στον συνεργάτη από τον οποίο αγοράσατε το προϊόν ({partner_email}) ή απευθείας στη {company_name}: {company_contact}.";
         $ident = "Προϊόν: {product_name}\nΣειριακός αριθμός: {serial}\nΚωδικός εγγύησης: {warranty_code}";
         return [
@@ -102,7 +106,7 @@ final class TW_Settings {
             'service_received' => [
                 'label' => 'Service – επιβεβαίωση υποβολής από τον πελάτη',
                 'subject' => 'Λάβαμε την υποβολή Service – S/N {serial}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nλάβαμε την καταχώρηση του {milestone_no}ου Service του προϊόντος σας.\n\n$ident\nΗμερομηνία Service: {performed_date}\nΑΦΜ τεχνικού: {technician_vat}\n\nΗ καταχώρηση και η απόδειξη φυλάσσονται στην καρτέλα της εγγύησής σας και η εγγύηση συνεχίζει να ισχύει. {next_step}\n\nΚρατήστε και εσείς την πρωτότυπη απόδειξη του Service.",
+                'body' => "Αγαπητέ/ή {customer_name},\n\nλάβαμε την καταχώρηση του {milestone_no}ου Service του προϊόντος σας.\n\n$ident\nΗμερομηνία Service: {performed_date}\nΑΦΜ τεχνικού: {technician_vat}\nΑπόδειξη: {receipt_info}\n\nΗ καταχώρηση και η απόδειξη φυλάσσονται στην καρτέλα της εγγύησής σας και η εγγύηση συνεχίζει να ισχύει. {next_step}\n\nΚρατήστε και εσείς την πρωτότυπη απόδειξη του Service.",
                 'sms' => '',
             ],
             'service_rejected' => [
@@ -162,6 +166,39 @@ final class TW_Settings {
     public static function get($key) {
         $all = self::all();
         return $all[$key] ?? null;
+    }
+
+    /** Purchase invoice file at activation: required | optional | off (keeps the pre-1.4 checkbox working). */
+    public static function invoice_mode() {
+        $saved = get_option(self::OPTION, []);
+        if (is_array($saved) && !isset($saved['invoice_mode']) && isset($saved['invoice_required'])) {
+            return $saved['invoice_required'] ? 'required' : 'optional';
+        }
+        $m = (string) self::get('invoice_mode');
+        return in_array($m, ['required', 'optional', 'off'], true) ? $m : 'required';
+    }
+
+    /** Proof of Service: upload | fields | both */
+    public static function service_proof_mode() {
+        $m = (string) self::get('service_proof_mode');
+        return in_array($m, ['upload', 'fields', 'both'], true) ? $m : 'upload';
+    }
+
+    public static function service_needs_file() {
+        return self::service_proof_mode() !== 'fields';
+    }
+
+    public static function service_needs_fields() {
+        return self::service_proof_mode() !== 'upload';
+    }
+
+    /** Words used in messages for what the customer must provide as proof of Service. */
+    public static function service_proof_text() {
+        switch (self::service_proof_mode()) {
+            case 'fields': return 'αριθμό και ημερομηνία της απόδειξης';
+            case 'both': return 'αριθμό και ημερομηνία της απόδειξης, μαζί με φωτογραφία ή PDF της';
+            default: return 'φωτογραφία ή PDF της απόδειξης';
+        }
     }
 
     public static function update(array $values) {
