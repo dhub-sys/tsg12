@@ -36,11 +36,21 @@ $user = wp_get_current_user();
             <span class="tw-user-text"><strong><?php echo esc_html($user->display_name); ?></strong><span><?php echo esc_html($user->user_email); ?></span></span>
         </div>
         <a href="<?php echo esc_url(TW_Staff_Auth::logout_url()); ?>" class="tw-logout"><?php echo TW_Admin::icon('logout'); // phpcs:ignore ?><span>Αποσύνδεση</span></a>
+        <div class="tw-credit">
+            <span>Έκδοση <?php echo esc_html(TW_VERSION); ?></span>
+            <span>Developed by <a href="https://www.dazzlink.gr" target="_blank" rel="noopener">Dazzlink</a></span>
+        </div>
     </div>
 </aside>
 <div class="tw-backdrop" hidden></div>
 <main class="tw-main">
-    <?php call_user_func(['TW_Admin', $screens[$screen][2]]); ?>
+    <?php
+    // Each screen's title gets the same icon as its menu item.
+    ob_start();
+    call_user_func(['TW_Admin', $screens[$screen][2]]);
+    $page = ob_get_clean();
+    echo preg_replace('/<h1([^>]*)>/', '<h1$1><span class="tw-title-ico">' . TW_Admin::icon($screens[$screen][1]) . '</span>', $page, 1); // phpcs:ignore
+    ?>
 </main>
 <script>
 (function () {

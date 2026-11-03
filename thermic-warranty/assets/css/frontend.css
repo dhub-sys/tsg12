@@ -95,3 +95,8 @@
 .tw-file-name { color: var(--tw-muted); font-size: 14px; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
 .tw-file.has-file .tw-file-name { color: inherit; font-weight: 500; }
 .tw-invalid .tw-file { border-color: var(--tw-bad); }
+
+.tw-file { gap: 16px; }
+.tw-file-btn { padding: 10px 16px; font-size: 15px; }
+.tw-file { flex-wrap: nowrap; }
+.tw-file-btn { flex: none; }

@@ -127,7 +127,7 @@ final class TW_Admin {
         $pages = (int) ceil($total / self::PER_PAGE);
         if ($pages <= 1) return;
         echo '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">' . (int) $total . ' εγγραφές</span> ';
-        echo paginate_links(['base' => add_query_arg('paged', '%#%'), 'format' => '', 'current' => $paged, 'total' => $pages]);
+        echo paginate_links(['base' => add_query_arg('paged', '%#%'), 'format' => '', 'current' => $paged, 'total' => $pages, 'prev_text' => '« Προηγούμενη', 'next_text' => 'Επόμενη »']);
         echo '</div></div>';
     }
 

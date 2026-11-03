@@ -67,5 +67,6 @@ $fields = function () {
         <p class="tw-auth-links"><a href="<?php echo esc_url(add_query_arg('forgot', 1, $action)); ?>">Πρώτη σύνδεση / ξέχασα τον κωδικό</a></p>
     <?php endif; ?>
 </main>
+<p class="tw-auth-credit">Έκδοση <?php echo esc_html(TW_VERSION); ?> · Developed by <a href="https://www.dazzlink.gr" target="_blank" rel="noopener">Dazzlink</a></p>
 </body>
 </html>
