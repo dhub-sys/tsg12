@@ -320,3 +320,26 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .tw-file-btn { flex: none; }
 .tw-panel label.tw-file, label.tw-file { display: flex !important; flex-wrap: nowrap; font-size: 14px; font-weight: 400; }
 .tw-panel p > .button + .description { flex: 1 1 180px; min-width: 0; }
+
+/* 1.10: two brand colours (primary + secondary), readable text on both */
+:root { --tw-brand-ink: #fff; --tw-side-strong: #fff; --tw-side-hover: rgba(255,255,255,.07); --tw-side-line: rgba(255,255,255,.08); --tw-side-ink: rgba(255,255,255,.72); }
+.button-primary, .button-primary:hover, .tw-nav a.is-active, .tw-user .tw-avatar, .page-numbers.current { color: var(--tw-brand-ink); }
+.tw-sidebar { background: linear-gradient(180deg, var(--tw-side-2) 0%, var(--tw-side) 100%); color: var(--tw-side-ink); }
+.tw-brand-sub { color: var(--tw-side-ink); opacity: 1; }
+.tw-brand-logo--text, .tw-user-text strong, .tw-credit a { color: var(--tw-side-strong); }
+.tw-nav a, .tw-sidebar-foot a, .tw-user-text span, .tw-credit { color: var(--tw-side-ink); }
+.tw-nav a.is-active { color: var(--tw-brand-ink); }
+.tw-nav a:hover:not(.is-active), .tw-logout:hover { background: var(--tw-side-hover); color: var(--tw-side-strong) !important; }
+.tw-sidebar-foot, .tw-credit { border-color: var(--tw-side-line); }
+.tw-user-text span, .tw-credit { opacity: 1; }
+.tw-appbar { background: var(--tw-side); color: var(--tw-side-strong); }
+.tw-menu-toggle { color: var(--tw-side-strong); }
+.tw-auth-credit, .tw-auth-credit a { color: var(--tw-side-ink); }
+.tw-colors { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; max-width: 720px; }
+.tw-color { display: flex; flex-direction: column; gap: 6px; }
+.tw-color-title { font-weight: 600; color: var(--tw-ink-2); font-size: 13px; }
+.tw-color-row { display: flex; gap: 8px; align-items: center; }
+.tw-color input[type=color] { width: 52px; height: 42px; padding: 3px; border: 1px solid var(--tw-line-2); border-radius: var(--tw-radius-sm); background: #fff; cursor: pointer; }
+.tw-color input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.tw-color input[type=color]::-webkit-color-swatch { border: 0; border-radius: 7px; }
+.tw-color-hex { width: 120px !important; font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; }

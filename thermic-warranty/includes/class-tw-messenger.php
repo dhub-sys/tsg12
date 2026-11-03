@@ -62,7 +62,7 @@ final class TW_Messenger {
         return '<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:Geom,Segoe UI,Arial,Helvetica,sans-serif;color:#1f2933">'
             . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">'
             . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:8px">'
-            . '<tr><td style="padding:20px 28px;border-bottom:3px solid #c8102e;font-size:20px;font-weight:bold">' . $company . '</td></tr>'
+            . '<tr><td style="padding:20px 28px;border-bottom:3px solid ' . esc_attr(TW_App::colors()[0]) . ';font-size:20px;font-weight:bold">' . $company . '</td></tr>'
             . '<tr><td style="padding:24px 28px;font-size:15px;line-height:1.55">' . $body . '</td></tr>'
             . '<tr><td style="padding:16px 28px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb">Το μήνυμα αφορά την εγγύηση και τη συντήρηση του προϊόντος σας και δεν αποτελεί εμπορική επικοινωνία.</td></tr>'
             . '</table></td></tr></table></body></html>';

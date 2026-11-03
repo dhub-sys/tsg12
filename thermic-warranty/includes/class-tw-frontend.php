@@ -37,7 +37,7 @@ final class TW_Frontend {
     public static function register_assets() {
         wp_register_style('tw-fonts', TW_URL . 'assets/css/fonts.css', [], TW_VERSION);
         wp_register_style('tw-front', TW_URL . 'assets/css/frontend.css', ['tw-fonts'], TW_VERSION);
-        wp_add_inline_style('tw-front', ':root{--tw-brand:' . (sanitize_hex_color((string) TW_Settings::get('brand_color')) ?: '#c8102e') . '}.tw-app{--tw-accent:var(--tw-brand)}');
+        wp_add_inline_style('tw-front', TW_App::brand_vars());
         wp_register_script('tw-front', TW_URL . 'assets/js/frontend.js', [], TW_VERSION, true);
         wp_localize_script('tw-front', 'TW', [
             'ajax' => admin_url('admin-ajax.php'),

@@ -168,9 +168,41 @@ final class TW_App {
     }
 
     /** <style> block that applies the brand colour. */
+    /** True when dark text reads better than white on this colour (WCAG relative luminance). */
+    public static function is_light($hex) {
+        $hex = ltrim((string) $hex, '#');
+        if (strlen($hex) !== 6) return false;
+        $l = 0;
+        foreach ([0.2126, 0.7152, 0.0722] as $i => $w) {
+            $c = hexdec(substr($hex, $i * 2, 2)) / 255;
+            $c = $c <= 0.03928 ? $c / 12.92 : pow(($c + 0.055) / 1.055, 2.4);
+            $l += $w * $c;
+        }
+        return $l > 0.45;
+    }
+
+    public static function colors() {
+        $primary = sanitize_hex_color((string) TW_Settings::get('brand_color')) ?: '#c8102e';
+        $secondary = sanitize_hex_color((string) TW_Settings::get('brand_color_2')) ?: '#0f1320';
+        return [$primary, $secondary];
+    }
+
+    /** CSS variables for the two brand colours, with readable text colours on top of them. */
+    public static function brand_vars() {
+        [$p, $s] = self::colors();
+        $p_ink = self::is_light($p) ? '#111827' : '#ffffff';
+        $light_side = self::is_light($s);
+        return ':root{--tw-brand:' . $p . ';--tw-brand-ink:' . $p_ink . ';--tw-side:' . $s . ';'
+            . '--tw-side-2:color-mix(in srgb,' . $s . ' 88%,' . ($light_side ? '#000' : '#fff') . ');'
+            . '--tw-side-ink:' . ($light_side ? 'rgba(17,24,39,.72)' : 'rgba(255,255,255,.72)') . ';'
+            . '--tw-side-strong:' . ($light_side ? '#111827' : '#ffffff') . ';'
+            . '--tw-side-hover:' . ($light_side ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.07)') . ';'
+            . '--tw-side-line:' . ($light_side ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.08)') . ';}'
+            . '.tw-app{--tw-accent:' . $p . ';--tw-accent-ink:' . $p_ink . ';}';
+    }
+
     public static function brand_style() {
-        $c = sanitize_hex_color((string) TW_Settings::get('brand_color')) ?: '#c8102e';
-        return '<style>:root{--tw-brand:' . esc_html($c) . ';}.tw-app{--tw-accent:' . esc_html($c) . ';}</style>';
+        return '<style id="tw-brand-vars">' . esc_html(self::brand_vars()) . '</style>';
     }
 
     public static function logo_html($class = 'tw-logo') {

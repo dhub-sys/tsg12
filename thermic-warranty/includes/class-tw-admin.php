@@ -825,7 +825,52 @@ final class TW_Admin {
                     $field('admin_slug', 'Διεύθυνση διαχειριστικού', 'text', 'Το διαχειριστικό ανοίγει στο <code>' . esc_html(home_url('/')) . '<strong>' . esc_html($s['admin_slug']) . '</strong>/</code>.', 'pattern="[a-z0-9\\-]+"');
                     $field('public_slug', 'Διεύθυνση σελίδων πελατών', 'text', 'Ενεργοποίηση: <code>' . esc_html(TW_App::public_url()) . '</code> – Οι εγγυήσεις μου: <code>' . esc_html(TW_App::public_url('my')) . '</code>', 'pattern="[a-z0-9\\-]+"');
                     $field('logo_url', 'Λογότυπο (URL εικόνας)', 'url', 'Εμφανίζεται στις σελίδες πελατών, στο διαχειριστικό και στη σύνδεση.');
-                    $field('brand_color', 'Χρώμα εταιρείας', 'text', 'Hex, π.χ. #c8102e', 'pattern="#[0-9a-fA-F]{6}"');
+                    [$c1, $c2] = TW_App::colors(); ?>
+                    <tr><th>Χρώματα</th><td>
+                        <div class="tw-colors">
+                            <label class="tw-color"><span class="tw-color-title">Κύριο χρώμα</span>
+                                <span class="tw-color-row"><input type="color" value="<?php echo esc_attr($c1); ?>" data-tw-color="brand"><input type="text" name="s[brand_color]" value="<?php echo esc_attr($c1); ?>" pattern="#[0-9a-fA-F]{6}" maxlength="7" class="tw-color-hex"></span>
+                                <span class="description">Κουμπιά, ενεργό μενού, σύνδεσμοι, εικονίδια τίτλων, σελίδες πελατών, email.</span></label>
+                            <label class="tw-color"><span class="tw-color-title">Δευτερεύον χρώμα</span>
+                                <span class="tw-color-row"><input type="color" value="<?php echo esc_attr($c2); ?>" data-tw-color="side"><input type="text" name="s[brand_color_2]" value="<?php echo esc_attr($c2); ?>" pattern="#[0-9a-fA-F]{6}" maxlength="7" class="tw-color-hex"></span>
+                                <span class="description">Αριστερό μενού, σελίδα σύνδεσης, κάτω μέρος σελίδων πελατών.</span></label>
+                        </div>
+                        <p class="description">Η αλλαγή φαίνεται αμέσως σε αυτή τη σελίδα· πατήστε «Αποθήκευση» για να κρατηθεί. Το χρώμα των γραμμάτων προσαρμόζεται αυτόματα ώστε να διαβάζονται. <button type="button" class="button-link" id="tw-color-reset">Επαναφορά προεπιλογών</button></p>
+                        <script>
+                        (function () {
+                            function light(hex) {
+                                var h = hex.replace('#', ''), w = [0.2126, 0.7152, 0.0722], l = 0;
+                                for (var i = 0; i < 3; i++) { var c = parseInt(h.substr(i * 2, 2), 16) / 255; c = c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); l += w[i] * c; }
+                                return l > 0.45;
+                            }
+                            var root = document.documentElement.style;
+                            function apply(kind, hex) {
+                                if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+                                if (kind === 'brand') { root.setProperty('--tw-brand', hex); root.setProperty('--tw-brand-ink', light(hex) ? '#111827' : '#ffffff'); }
+                                else {
+                                    var L = light(hex);
+                                    root.setProperty('--tw-side', hex);
+                                    root.setProperty('--tw-side-2', 'color-mix(in srgb,' + hex + ' 88%,' + (L ? '#000' : '#fff') + ')');
+                                    root.setProperty('--tw-side-ink', L ? 'rgba(17,24,39,.72)' : 'rgba(255,255,255,.72)');
+                                    root.setProperty('--tw-side-strong', L ? '#111827' : '#ffffff');
+                                    root.setProperty('--tw-side-hover', L ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.07)');
+                                    root.setProperty('--tw-side-line', L ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.08)');
+                                }
+                            }
+                            document.querySelectorAll('[data-tw-color]').forEach(function (picker) {
+                                var hex = picker.parentNode.querySelector('.tw-color-hex'), kind = picker.getAttribute('data-tw-color');
+                                picker.addEventListener('input', function () { hex.value = picker.value; apply(kind, picker.value); });
+                                hex.addEventListener('input', function () { if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) { picker.value = hex.value; apply(kind, hex.value); } });
+                            });
+                            document.getElementById('tw-color-reset').addEventListener('click', function () {
+                                [['brand', '#c8102e'], ['side', '#0f1320']].forEach(function (d) {
+                                    var p = document.querySelector('[data-tw-color="' + d[0] + '"]'); p.value = d[1]; p.parentNode.querySelector('.tw-color-hex').value = d[1]; apply(d[0], d[1]);
+                                });
+                            });
+                        })();
+                        </script>
+                    </td></tr>
+                    <?php
                     $field('staff_2fa', 'Διπλή επαλήθευση ομάδας', 'checkbox', 'Μετά τον κωδικό πρόσβασης, η ομάδα λαμβάνει κωδικό μίας χρήσης στο email (συνιστάται).');
                 elseif ($tab === 'schedule') :
                     $field('warranty_years', 'Διάρκεια εγγύησης (έτη)', 'number', 'Από την ημερομηνία αγοράς.', 'min="1" max="50"');
@@ -1424,7 +1469,7 @@ final class TW_Admin {
             elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
             elseif ($k === 'invoice_mode') $values[$k] = in_array($v, ['required', 'optional', 'off'], true) ? $v : 'required';
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
-            elseif ($k === 'brand_color') $values[$k] = sanitize_hex_color($v) ?: $defaults[$k];
+            elseif ($k === 'brand_color' || $k === 'brand_color_2') $values[$k] = sanitize_hex_color($v) ?: $defaults[$k];
             elseif ($k === 'reminder_offsets') $values[$k] = implode(',', array_filter(array_map('trim', explode(',', $v)), function ($p) { return preg_match('/^[+-]?\d+$/', $p); }));
             else $values[$k] = sanitize_text_field($v);
         }

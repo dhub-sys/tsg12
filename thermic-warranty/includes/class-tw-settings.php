@@ -42,6 +42,7 @@ final class TW_Settings {
             'public_slug' => 'warranty',
             'logo_url' => '',
             'brand_color' => '#c8102e',
+            'brand_color_2' => '#0f1320',
             'staff_2fa' => 1,
             'portal_url' => '',
             'register_url' => '',
