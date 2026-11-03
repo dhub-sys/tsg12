@@ -17,7 +17,7 @@ final class TW_Backup {
     const DIR = 'backups';
     const TABLES = ['serials', 'warranties', 'services', 'consents', 'notifications', 'events', 'otps'];
     /** Never written to a backup and never overwritten by a restore. */
-    const SECRET_SETTINGS = ['brevo_api_key', 'brevo_webhook_token', 'backup_password'];
+    const SECRET_SETTINGS = ['brevo_api_key', 'brevo_webhook_token', 'backup_password', 'backup_gdrive_client_secret', 'backup_onedrive_client_secret', 'backup_dropbox_app_secret', 'backup_ftp_password'];
 
     public static function init() {
         add_action(self::HOOK, [__CLASS__, 'run_scheduled']);
@@ -54,6 +54,19 @@ final class TW_Backup {
             return;
         }
         self::prune();
+        if (TW_Backup_Remote::enabled()) self::send_remote($r);
+    }
+
+    /** Off-site copy; on failure the company is emailed. @return true|WP_Error */
+    public static function send_remote(array $backup) {
+        $r = TW_Backup_Remote::send($backup['path']);
+        if (is_wp_error($r)) {
+            foreach (TW_Messenger::admin_recipients() as $to) {
+                TW_Messenger::send_email($to, '[Εγγυήσεις] Αποτυχία αποστολής backup – ' . TW_Backup_Remote::label(),
+                    "Το αντίγραφο " . $backup['file'] . " δημιουργήθηκε στον server, αλλά η αποστολή στο " . TW_Backup_Remote::label() . " απέτυχε:\n\n" . $r->get_error_message() . "\n\n" . TW_App::admin_url('backups'));
+            }
+        }
+        return $r;
     }
 
     /** Keeps the newest N automatic backups; manual and pre-restore backups are kept until deleted. */
@@ -220,6 +233,8 @@ final class TW_Backup {
                 foreach (self::SECRET_SETTINGS as $k) $settings[$k] = $current[$k] ?? '';
                 // Keep this site's addresses: a backup may come from staging.
                 foreach (['admin_slug', 'public_slug', 'portal_url', 'register_url'] as $k) $settings[$k] = $current[$k] ?? '';
+                // …and this site's backup configuration (schedule, encryption, off-site destination).
+                foreach ($current as $k => $v) if (strpos($k, 'backup_') === 0) $settings[$k] = $v;
                 update_option(TW_Settings::OPTION, $settings, false);
             }
             if (isset($options['tw_terms_versions']) && is_array($options['tw_terms_versions'])) {

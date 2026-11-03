@@ -1,7 +1,7 @@
 === Thermic Warranty ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.6.0
+Stable tag: 1.7.0
 
 Αυτόνομη πλατφόρμα (standalone app) ηλεκτρονικής ενεργοποίησης και διαχείρισης εγγυήσεων με σειριακούς
 αριθμούς. Το WordPress λειτουργεί μόνο ως «μηχανή»: η ομάδα της εταιρείας δουλεύει σε δικό της
@@ -141,7 +141,22 @@ Stable tag: 1.6.0
   δεδομένα της πλατφόρμας, τις ρυθμίσεις/όρους και τα αρχεία (παραστατικά, αποδείξεις)· όχι τα κλειδιά
   πρόσβασης (Brevo) και όχι το υπόλοιπο WordPress. Αν αποτύχει το αυτόματο αντίγραφο, η εταιρεία λαμβάνει email.
   Φυλάσσονται στο uploads/thermic-warranty-private/backups (προστασία όπως στα παραστατικά· σε nginx ο ίδιος
-  κανόνας deny). Κατεβάζετε τακτικά ένα αντίγραφο και εκτός server.
+  κανόνας deny).
+- Αποστολή εκτός server (ίδια οθόνη): Google Drive, OneDrive, Dropbox ή FTP/FTPS. Κάθε αυτόματο αντίγραφο
+  ανεβαίνει στην υπηρεσία (προαιρετικά και τα χειροκίνητα, και κουμπί «Αποστολή» σε κάθε αντίγραφο), όπου
+  κρατούνται τα τελευταία Ν. Στέλνονται μόνο κρυπτογραφημένα αντίγραφα. Αποτυχία → email στην εταιρεία.
+  Ρύθμιση:
+  - Google Drive: Google Cloud Console → ενεργοποίηση Google Drive API → OAuth consent screen → Credentials →
+    OAuth client ID «Web application» με redirect URI τη διεύθυνση που δείχνει η οθόνη
+    (…/wp-json/thermic-warranty/v1/oauth). Πρόσβαση μόνο στα αρχεία που δημιουργεί η εφαρμογή (drive.file).
+  - OneDrive: portal.azure.com → App registrations → redirect URI «Web» την ίδια διεύθυνση, client secret,
+    δικαιώματα Microsoft Graph: Files.ReadWrite, offline_access, User.Read. Tenant: common / organizations / ID.
+  - Dropbox: dropbox.com/developers/apps → Scoped access, App folder, δικαιώματα files.content.write/read,
+    files.metadata.read, account_info.read, redirect URI την ίδια διεύθυνση.
+  - Μετά: Client ID/secret → Αποθήκευση → «Σύνδεση με …» → έγκριση με τον λογαριασμό της εταιρείας →
+    «Δοκιμή σύνδεσης». Χρειάζονται «φιλικά» permalinks.
+  - FTP: server, θύρα, χρήστης, κωδικός, φάκελος· FTPS (κρυπτογραφημένη σύνδεση) προτείνεται.
+  Τα μυστικά (client secrets, κωδικός FTP, tokens) δεν μπαίνουν ποτέ στα αντίγραφα.
 - Λειτουργεί σε κινητό και tablet (πλαϊνό μενού που ανοίγει από το ☰).
 
 == Για developers ==

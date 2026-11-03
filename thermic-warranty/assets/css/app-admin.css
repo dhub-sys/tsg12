@@ -184,3 +184,7 @@ body.tw-auth { min-height: 100vh; display: flex; align-items: center; justify-co
 
 .tw-row-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .tw-row-actions form { display: inline-flex; gap: 4px; align-items: center; margin: 0; }
+
+.tw-remote { margin-top: 20px; }
+.tw-remote .form-table { border: 0; margin-top: 0; }
+[data-remote][hidden] { display: none; }

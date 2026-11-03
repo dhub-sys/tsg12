@@ -18,7 +18,8 @@ final class TW_Admin {
     /** Actions accepted by the app router (POST, or GET for downloads). */
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
-            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings'];
+            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -832,14 +833,19 @@ final class TW_Admin {
                 <span class="description">Αυτόματο ημερήσιο αντίγραφο: <?php echo $s['backup_daily'] ? 'ενεργό – επόμενο ' . esc_html($next ? wp_date('d/m/Y H:i', $next) : '—') . ', διατηρούνται τα τελευταία ' . (int) $s['backup_keep'] : '<strong>ανενεργό</strong>'; ?>.</span>
             </form>
 
-            <table class="widefat striped"><thead><tr><th>Ημερομηνία</th><th>Τύπος</th><th>Μέγεθος</th><th>Περιεχόμενο</th><th>Κρυπτογράφηση</th><th></th></tr></thead><tbody>
-            <?php if (!$list) echo '<tr><td colspan="6">Δεν υπάρχει αντίγραφο ακόμη.</td></tr>'; ?>
+            <table class="widefat striped"><thead><tr><th>Ημερομηνία</th><th>Τύπος</th><th>Μέγεθος</th><th>Περιεχόμενο</th><th>Κρυπτογράφηση</th><th>Εκτός server</th><th></th></tr></thead><tbody>
+            <?php if (!$list) echo '<tr><td colspan="7">Δεν υπάρχει αντίγραφο ακόμη.</td></tr>'; ?>
             <?php foreach ($list as $b) : $m = TW_Backup::manifest($b['path']); ?>
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($b['time'])); ?></td><td><?php echo esc_html($types[$b['type']] ?? $b['type']); ?></td>
                     <td><?php echo esc_html(self::size_label($b['size'])); ?></td>
                     <td><?php echo $m ? esc_html(sprintf('%d εγγυήσεις, %d σειριακοί, %d αρχεία', $m['rows']['warranties'] ?? 0, $m['rows']['serials'] ?? 0, $m['files'] ?? 0)) : '—'; ?></td>
                     <td><?php echo $m && !empty($m['encrypted']) ? '🔒 Ναι' : 'Όχι'; ?></td>
+                    <td><?php $si = TW_Backup_Remote::sent_info($b['file']); echo $si ? '✔ ' . esc_html(TW_Backup_Remote::label($si['service'])) . '<br><small>' . esc_html(TW_Util::datetime_label($si['at'])) . '</small>' : '—'; ?></td>
                     <td class="tw-row-actions">
+                        <?php if (TW_Backup_Remote::enabled() && $m && !empty($m['encrypted'])) : ?>
+                        <form method="post" action="<?php echo esc_url($post); ?>"><?php wp_nonce_field('tw_backup_send'); ?><input type="hidden" name="action" value="tw_backup_send"><input type="hidden" name="file" value="<?php echo esc_attr($b['file']); ?>">
+                            <button class="button" title="Αποστολή στο <?php echo esc_attr(TW_Backup_Remote::label()); ?>">⇪ Αποστολή</button></form>
+                        <?php endif; ?>
                         <a class="button" href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_backup_download', 'file' => $b['file']], $post), 'tw_backup_download')); ?>">Λήψη</a>
                         <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('ΕΠΑΝΑΦΟΡΑ: όλα τα τωρινά δεδομένα της πλατφόρμας θα αντικατασταθούν με αυτά του <?php echo esc_attr(TW_Util::datetime_label($b['time'])); ?>. Πριν από την επαναφορά θα κρατηθεί αντίγραφο της τωρινής κατάστασης. Συνέχεια;')">
                             <?php wp_nonce_field('tw_backup_restore'); ?><input type="hidden" name="action" value="tw_backup_restore"><input type="hidden" name="file" value="<?php echo esc_attr($b['file']); ?>">
@@ -876,7 +882,83 @@ final class TW_Admin {
                     </form>
                 </div>
             </div>
-            <p class="description">Τα αντίγραφα φυλάσσονται στον server, σε προστατευμένο φάκελο. Κατεβάζετε τακτικά ένα αντίγραφο και το φυλάτε και εκτός server, ώστε να υπάρχει αν χαθεί ο ίδιος ο server.</p>
+            <?php self::remote_panel(); ?>
+        </div>
+        <?php
+    }
+
+    private static function remote_panel() {
+        $s = TW_Settings::all();
+        $post = self::url('backups');
+        $svc = TW_Backup_Remote::service();
+        $tokens = TW_Backup_Remote::tokens();
+        $status = get_option(TW_Backup_Remote::STATUS);
+        $secret_ph = function ($k) use ($s) { return $s[$k] ? 'Αποθηκευμένο – αφήστε κενό για να μείνει' : ''; };
+        $oauth = [
+            'gdrive' => ['Google Drive', 'Google Cloud Console → APIs & Services: ενεργοποιήστε το «Google Drive API», στο «OAuth consent screen» ορίστε την εφαρμογή, και στο «Credentials» δημιουργήστε «OAuth client ID» τύπου «Web application» με Authorized redirect URI την παρακάτω διεύθυνση.', 'backup_gdrive_client_id', 'backup_gdrive_client_secret', 'Client ID', 'Client secret'],
+            'onedrive' => ['OneDrive', 'Microsoft Entra admin center (portal.azure.com) → App registrations → New registration, με Redirect URI τύπου «Web» την παρακάτω διεύθυνση. Μετά: Certificates & secrets → New client secret, και API permissions → Microsoft Graph → Files.ReadWrite, offline_access, User.Read.', 'backup_onedrive_client_id', 'backup_onedrive_client_secret', 'Application (client) ID', 'Client secret (Value)'],
+            'dropbox' => ['Dropbox', 'dropbox.com/developers/apps → Create app → «Scoped access», «App folder». Στο Permissions ενεργοποιήστε files.content.write, files.content.read, files.metadata.read και account_info.read, και στο Settings προσθέστε στα Redirect URIs την παρακάτω διεύθυνση.', 'backup_dropbox_app_key', 'backup_dropbox_app_secret', 'App key', 'App secret'],
+        ];
+        ?>
+        <div class="tw-panel tw-remote">
+            <h2>Αποστολή εκτός server</h2>
+            <p class="description">Κάθε αυτόματο αντίγραφο ανεβαίνει και σε μια υπηρεσία της εταιρείας, ώστε να υπάρχει ακόμη κι αν χαθεί ο server. Στέλνονται μόνο <strong>κρυπτογραφημένα</strong> αντίγραφα (περιέχουν προσωπικά δεδομένα πελατών)<?php echo $s['backup_password'] ? '.' : ' – <strong class="tw-danger">ορίστε πρώτα κωδικό κρυπτογράφησης στις Ρυθμίσεις αντιγράφων.</strong>'; ?></p>
+            <?php if ($status) : ?>
+                <p>Τελευταία αποστολή: <?php echo esc_html(TW_Util::datetime_label($status['at'])); ?> – <?php echo esc_html(TW_Backup_Remote::label($status['service'])); ?> –
+                    <?php echo $status['ok'] ? '<span class="tw-ok">✔ επιτυχής</span>' : '<span class="tw-danger">✘ ' . esc_html($status['message']) . '</span>'; ?></p>
+            <?php endif; ?>
+            <form method="post" action="<?php echo esc_url($post); ?>" id="tw-remote-form">
+                <?php wp_nonce_field('tw_remote_settings'); ?><input type="hidden" name="action" value="tw_remote_settings">
+                <table class="form-table">
+                    <tr><th><label for="tw-backup_remote">Υπηρεσία</label></th><td><select id="tw-backup_remote" name="backup_remote">
+                        <?php foreach (TW_Backup_Remote::services() as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($svc, $k, false), esc_html($l)); ?>
+                    </select></td></tr>
+                    <tr data-remote="gdrive onedrive dropbox"><th>Φάκελος</th><td><input type="text" name="backup_remote_folder" value="<?php echo esc_attr($s['backup_remote_folder']); ?>" class="regular-text"></td></tr>
+                    <tr data-remote="gdrive onedrive dropbox ftp"><th>Διατήρηση εκεί</th><td>τα τελευταία <input type="number" name="backup_remote_keep" value="<?php echo (int) $s['backup_remote_keep']; ?>" min="1" max="3650" class="small-text"> αυτόματα αντίγραφα</td></tr>
+                    <tr data-remote="gdrive onedrive dropbox ftp"><th>Χειροκίνητα αντίγραφα</th><td><label><input type="checkbox" name="backup_remote_manual" value="1" <?php checked((int) $s['backup_remote_manual'], 1); ?>> Αποστολή και των χειροκίνητων αντιγράφων</label></td></tr>
+                    <?php foreach ($oauth as $k => $o) : ?>
+                        <tr data-remote="<?php echo esc_attr($k); ?>"><th>Ρύθμιση <?php echo esc_html($o[0]); ?></th><td>
+                            <p class="description"><?php echo esc_html($o[1]); ?></p>
+                            <p>Redirect URI: <code style="word-break:break-all"><?php echo esc_html(TW_Backup_Remote::redirect_uri()); ?></code></p>
+                            <?php if (!get_option('permalink_structure')) : ?><p class="tw-danger">Χρειάζονται «φιλικά» permalinks (Ρυθμίσεις WordPress → Μόνιμοι σύνδεσμοι) για τη σύνδεση.</p><?php endif; ?>
+                        </td></tr>
+                        <tr data-remote="<?php echo esc_attr($k); ?>"><th><?php echo esc_html($o[4]); ?></th><td><input type="text" name="<?php echo esc_attr($o[2]); ?>" value="<?php echo esc_attr($s[$o[2]]); ?>" class="regular-text" autocomplete="off"></td></tr>
+                        <tr data-remote="<?php echo esc_attr($k); ?>"><th><?php echo esc_html($o[5]); ?></th><td><input type="password" name="<?php echo esc_attr($o[3]); ?>" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($secret_ph($o[3])); ?>"></td></tr>
+                        <?php if ($k === 'onedrive') : ?>
+                        <tr data-remote="onedrive"><th>Tenant</th><td><input type="text" name="backup_onedrive_tenant" value="<?php echo esc_attr($s['backup_onedrive_tenant']); ?>" class="regular-text"><p class="description"><code>common</code> (προεπιλογή), <code>organizations</code> για Microsoft 365 της εταιρείας, ή το Directory (tenant) ID.</p></td></tr>
+                        <?php endif; ?>
+                        <tr data-remote="<?php echo esc_attr($k); ?>"><th>Λογαριασμός</th><td>
+                            <?php if (TW_Backup_Remote::connected($k)) : ?>
+                                <span class="tw-ok">✔ Συνδεδεμένο</span> <?php echo !empty($tokens[$k]['account']) ? esc_html($tokens[$k]['account']) : ''; ?> <small>(<?php echo esc_html(TW_Util::datetime_label($tokens[$k]['connected_at'] ?? '')); ?>)</small>
+                                <button class="button-link tw-danger" form="tw-remote-disconnect-<?php echo esc_attr($k); ?>">Αποσύνδεση</button>
+                            <?php else : ?>
+                                <button class="button button-primary" form="tw-remote-connect-<?php echo esc_attr($k); ?>">Σύνδεση με <?php echo esc_html($o[0]); ?></button>
+                                <p class="description">Αποθηκεύστε πρώτα τα στοιχεία παραπάνω. Θα μεταφερθείτε στη σελίδα της υπηρεσίας για να εγκρίνετε την πρόσβαση με τον λογαριασμό της εταιρείας.</p>
+                            <?php endif; ?>
+                        </td></tr>
+                    <?php endforeach; ?>
+                    <tr data-remote="ftp"><th>Server</th><td><input type="text" name="backup_ftp_host" value="<?php echo esc_attr($s['backup_ftp_host']); ?>" class="regular-text" placeholder="ftp.example.gr"> θύρα <input type="number" name="backup_ftp_port" value="<?php echo (int) $s['backup_ftp_port']; ?>" class="small-text"></td></tr>
+                    <tr data-remote="ftp"><th>Σύνδεση</th><td><select name="backup_ftp_mode"><option value="ftps" <?php selected($s['backup_ftp_mode'], 'ftps'); ?>>FTPS (κρυπτογραφημένη, συνιστάται)</option><option value="ftp" <?php selected($s['backup_ftp_mode'], 'ftp'); ?>>FTP (χωρίς κρυπτογράφηση)</option></select>
+                        <label><input type="checkbox" name="backup_ftp_passive" value="1" <?php checked((int) $s['backup_ftp_passive'], 1); ?>> Passive mode</label></td></tr>
+                    <tr data-remote="ftp"><th>Χρήστης</th><td><input type="text" name="backup_ftp_user" value="<?php echo esc_attr($s['backup_ftp_user']); ?>" class="regular-text" autocomplete="off"></td></tr>
+                    <tr data-remote="ftp"><th>Κωδικός</th><td><input type="password" name="backup_ftp_password" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($secret_ph('backup_ftp_password')); ?>"></td></tr>
+                    <tr data-remote="ftp"><th>Φάκελος</th><td><input type="text" name="backup_ftp_path" value="<?php echo esc_attr($s['backup_ftp_path']); ?>" class="regular-text"></td></tr>
+                </table>
+                <p><button class="button button-primary">Αποθήκευση</button>
+                    <?php if ($svc !== 'none') : ?><button class="button" form="tw-remote-test">Δοκιμή σύνδεσης</button><?php endif; ?></p>
+            </form>
+            <?php foreach (array_keys($oauth) as $k) : ?>
+                <form method="post" action="<?php echo esc_url($post); ?>" id="tw-remote-connect-<?php echo esc_attr($k); ?>"><?php wp_nonce_field('tw_remote_connect'); ?><input type="hidden" name="action" value="tw_remote_connect"><input type="hidden" name="service" value="<?php echo esc_attr($k); ?>"></form>
+                <form method="post" action="<?php echo esc_url($post); ?>" id="tw-remote-disconnect-<?php echo esc_attr($k); ?>" onsubmit="return confirm('Αποσύνδεση;')"><?php wp_nonce_field('tw_remote_disconnect'); ?><input type="hidden" name="action" value="tw_remote_disconnect"><input type="hidden" name="service" value="<?php echo esc_attr($k); ?>"></form>
+            <?php endforeach; ?>
+            <form method="post" action="<?php echo esc_url($post); ?>" id="tw-remote-test"><?php wp_nonce_field('tw_remote_test'); ?><input type="hidden" name="action" value="tw_remote_test"></form>
+            <script>
+            (function () {
+                var sel = document.getElementById('tw-backup_remote');
+                function show() { document.querySelectorAll('#tw-remote-form [data-remote]').forEach(function (r) { r.hidden = r.getAttribute('data-remote').split(' ').indexOf(sel.value) < 0; }); }
+                sel.addEventListener('change', show); show();
+            })();
+            </script>
         </div>
         <?php
     }
@@ -889,9 +971,19 @@ final class TW_Admin {
     public static function handle_backup_create() {
         self::backup_guard('tw_backup_create');
         $r = TW_Backup::create('manual');
-        if (is_wp_error($r)) self::flash('Αποτυχία: ' . esc_html($r->get_error_message()), 'error');
-        else self::flash(sprintf('Το αντίγραφο δημιουργήθηκε (%s). <a href="%s">Λήψη</a>', esc_html(self::size_label($r['size'])),
-            esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_backup_download', 'file' => $r['file']], self::url('backups')), 'tw_backup_download'))));
+        if (is_wp_error($r)) {
+            self::flash('Αποτυχία: ' . esc_html($r->get_error_message()), 'error');
+        } else {
+            $msg = sprintf('Το αντίγραφο δημιουργήθηκε (%s). <a href="%s">Λήψη</a>', esc_html(self::size_label($r['size'])),
+                esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_backup_download', 'file' => $r['file']], self::url('backups')), 'tw_backup_download')));
+            $type = 'success';
+            if (TW_Backup_Remote::enabled() && TW_Settings::get('backup_remote_manual')) {
+                $sent = TW_Backup::send_remote($r);
+                $msg .= $sent === true ? ' Στάλθηκε στο ' . esc_html(TW_Backup_Remote::label()) . '.' : ' Η αποστολή απέτυχε: ' . esc_html($sent->get_error_message());
+                if ($sent !== true) $type = 'warning';
+            }
+            self::flash($msg, $type);
+        }
         self::back('tw-backups');
     }
 
@@ -933,6 +1025,65 @@ final class TW_Admin {
             self::flash(sprintf('Η επαναφορά ολοκληρώθηκε από το αντίγραφο της %s: %d εγγυήσεις, %d σειριακοί, %d αρχεία. Η προηγούμενη κατάσταση φυλάχθηκε ως αντίγραφο «Πριν από επαναφορά».',
                 esc_html(TW_Util::datetime_label($r['manifest']['created_at'] ?? '')), $r['rows']['warranties'] ?? 0, $r['rows']['serials'] ?? 0, $r['files']));
         }
+        self::back('tw-backups');
+    }
+
+    public static function handle_remote_settings() {
+        self::backup_guard('tw_remote_settings');
+        $svc = sanitize_key(self::post('backup_remote'));
+        $v = [
+            'backup_remote' => isset(TW_Backup_Remote::services()[$svc]) ? $svc : 'none',
+            'backup_remote_folder' => trim(sanitize_text_field(self::post('backup_remote_folder')), '/ ') ?: 'Thermic Warranty Backups',
+            'backup_remote_keep' => max(1, min(3650, (int) self::post('backup_remote_keep'))),
+            'backup_remote_manual' => empty($_POST['backup_remote_manual']) ? 0 : 1,
+            'backup_ftp_passive' => empty($_POST['backup_ftp_passive']) ? 0 : 1,
+            'backup_ftp_mode' => self::post('backup_ftp_mode') === 'ftp' ? 'ftp' : 'ftps',
+            'backup_ftp_port' => max(1, min(65535, (int) self::post('backup_ftp_port') ?: 21)),
+        ];
+        foreach (['backup_gdrive_client_id', 'backup_onedrive_client_id', 'backup_dropbox_app_key', 'backup_onedrive_tenant', 'backup_ftp_host', 'backup_ftp_user', 'backup_ftp_path'] as $k) {
+            if (isset($_POST[$k])) $v[$k] = sanitize_text_field(self::post($k));
+        }
+        foreach (['backup_gdrive_client_secret', 'backup_onedrive_client_secret', 'backup_dropbox_app_secret', 'backup_ftp_password'] as $k) {
+            $val = (string) wp_unslash($_POST[$k] ?? '');
+            if ($val !== '') $v[$k] = trim($val);
+        }
+        if ($v['backup_remote_folder'] !== TW_Settings::get('backup_remote_folder')) $v['backup_gdrive_folder_id'] = '';
+        TW_Settings::update($v);
+        TW_DB::log_event('remote_settings', ['service' => $v['backup_remote']]);
+        self::flash('Οι ρυθμίσεις αποστολής αποθηκεύτηκαν.' . ($v['backup_remote'] !== 'none' && !TW_Settings::get('backup_password') ? ' Ορίστε κωδικό κρυπτογράφησης – χωρίς αυτόν δεν στέλνονται αντίγραφα.' : ''));
+        self::back('tw-backups');
+    }
+
+    public static function handle_remote_connect() {
+        self::backup_guard('tw_remote_connect');
+        $url = TW_Backup_Remote::auth_url(sanitize_key(self::post('service')));
+        if (is_wp_error($url)) { self::flash(esc_html($url->get_error_message()), 'error'); self::back('tw-backups'); }
+        wp_redirect($url); // external: the provider's consent page
+        exit;
+    }
+
+    public static function handle_remote_disconnect() {
+        self::backup_guard('tw_remote_disconnect');
+        $svc = sanitize_key(self::post('service'));
+        TW_Backup_Remote::disconnect($svc);
+        TW_DB::log_event('remote_disconnected', ['service' => $svc]);
+        self::flash('Αποσυνδέθηκε.');
+        self::back('tw-backups');
+    }
+
+    public static function handle_remote_test() {
+        self::backup_guard('tw_remote_test');
+        $r = TW_Backup_Remote::test();
+        self::flash($r === true ? 'Η σύνδεση με ' . esc_html(TW_Backup_Remote::label()) . ' λειτουργεί: ανέβηκε και σβήστηκε ένα δοκιμαστικό αρχείο.' : 'Αποτυχία: ' . esc_html($r->get_error_message()), $r === true ? 'success' : 'error');
+        self::back('tw-backups');
+    }
+
+    public static function handle_backup_send() {
+        self::backup_guard('tw_backup_send');
+        $b = TW_Backup::find(sanitize_file_name(self::post('file')));
+        if (!$b) { self::flash('Το αντίγραφο δεν βρέθηκε.', 'error'); self::back('tw-backups'); }
+        $r = TW_Backup_Remote::send($b['path']);
+        self::flash($r === true ? 'Το αντίγραφο στάλθηκε στο ' . esc_html(TW_Backup_Remote::label()) . '.' : 'Αποτυχία αποστολής: ' . esc_html($r->get_error_message()), $r === true ? 'success' : 'error');
         self::back('tw-backups');
     }
 
