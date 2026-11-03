@@ -117,7 +117,9 @@ final class TW_Backup_Remote {
             set_transient('tw_notice_' . (int) $data['user'], ['text' => $text, 'type' => $type], 300);
         };
         if ($req->get_param('error') || !$req->get_param('code')) {
-            $notice('Η σύνδεση με ' . esc_html(self::label($data['service'])) . ' ακυρώθηκε: ' . esc_html((string) ($req->get_param('error_description') ?: $req->get_param('error'))), 'error');
+            $desc = (string) ($req->get_param('error_description') ?: $req->get_param('error'));
+            $hint = self::error_hint($data['service'], $desc);
+            $notice($hint !== '' ? esc_html($hint) : 'Η σύνδεση με ' . esc_html(self::label($data['service'])) . ' ακυρώθηκε: ' . esc_html($desc), 'error');
             wp_redirect($back);
             exit;
         }
@@ -139,6 +141,24 @@ final class TW_Backup_Remote {
         exit;
     }
 
+    /** Plain-language explanation for the provider errors administrators actually run into. */
+    private static function error_hint($service, $desc) {
+        if ($service !== 'onedrive') return '';
+        if (stripos($desc, 'multi-tenant') !== false || stripos($desc, 'AADSTS50194') !== false) {
+            return 'Η εφαρμογή στο Microsoft Entra είναι «Single tenant»: στο πεδίο «Tenant» βάλτε το Directory (tenant) ID της εταιρείας (Entra → App registrations → η εφαρμογή → Overview) αντί για «common», αποθηκεύστε και πατήστε ξανά «Σύνδεση με OneDrive».';
+        }
+        if (stripos($desc, 'AADSTS50011') !== false || stripos($desc, 'redirect') !== false) {
+            return 'Η διεύθυνση επιστροφής (Redirect URI) δεν ταιριάζει: στο Entra → η εφαρμογή → Authentication προσθέστε ακριβώς τη διεύθυνση που δείχνει η πλατφόρμα (τύπου «Web»).';
+        }
+        if (stripos($desc, 'AADSTS65001') !== false || stripos($desc, 'consent') !== false) {
+            return 'Χρειάζεται έγκριση διαχειριστή: στο Entra → η εφαρμογή → API permissions πατήστε «Grant admin consent» και δοκιμάστε ξανά.';
+        }
+        if (stripos($desc, 'AADSTS7000215') !== false || stripos($desc, 'AADSTS7000222') !== false) {
+            return 'Το Client secret είναι λάθος ή έχει λήξει: δημιουργήστε νέο (Certificates & secrets) και βάλτε τη στήλη «Value».';
+        }
+        return '';
+    }
+
     private static function token_request($service, array $params) {
         $c = self::oauth_config($service);
         $body = array_merge($params, ['client_id' => trim($c['id']), 'client_secret' => trim($c['secret'])]);
@@ -149,7 +169,8 @@ final class TW_Backup_Remote {
         $code = (int) wp_remote_retrieve_response_code($res);
         if ($code !== 200 || !is_array($data) || empty($data['access_token'])) {
             $msg = is_array($data) ? (string) ($data['error_description'] ?? ($data['error'] ?? '')) : '';
-            return new WP_Error('oauth', sprintf('HTTP %d %s', $code, $msg));
+            $hint = self::error_hint($service, $msg);
+            return new WP_Error('oauth', $hint !== '' ? $hint : sprintf('HTTP %d %s', $code, $msg));
         }
         return $data;
     }

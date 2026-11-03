@@ -925,7 +925,7 @@ final class TW_Admin {
                         <tr data-remote="<?php echo esc_attr($k); ?>"><th><?php echo esc_html($o[4]); ?></th><td><input type="text" name="<?php echo esc_attr($o[2]); ?>" value="<?php echo esc_attr($s[$o[2]]); ?>" class="regular-text" autocomplete="off"></td></tr>
                         <tr data-remote="<?php echo esc_attr($k); ?>"><th><?php echo esc_html($o[5]); ?></th><td><input type="password" name="<?php echo esc_attr($o[3]); ?>" class="regular-text" autocomplete="new-password" placeholder="<?php echo esc_attr($secret_ph($o[3])); ?>"></td></tr>
                         <?php if ($k === 'onedrive') : ?>
-                        <tr data-remote="onedrive"><th>Tenant</th><td><input type="text" name="backup_onedrive_tenant" value="<?php echo esc_attr($s['backup_onedrive_tenant']); ?>" class="regular-text"><p class="description"><code>common</code> (προεπιλογή), <code>organizations</code> για Microsoft 365 της εταιρείας, ή το Directory (tenant) ID.</p></td></tr>
+                        <tr data-remote="onedrive"><th>Tenant</th><td><input type="text" name="backup_onedrive_tenant" value="<?php echo esc_attr($s['backup_onedrive_tenant']); ?>" class="regular-text"><p class="description">Για εταιρικό Microsoft 365 / OneDrive for Business: το <strong>Directory (tenant) ID</strong> (Entra → App registrations → η εφαρμογή → Overview). Το <code>common</code> λειτουργεί μόνο αν η εφαρμογή έχει δηλωθεί «multi-tenant».</p></td></tr>
                         <?php endif; ?>
                         <tr data-remote="<?php echo esc_attr($k); ?>"><th>Λογαριασμός</th><td>
                             <?php if (TW_Backup_Remote::connected($k)) : ?>
