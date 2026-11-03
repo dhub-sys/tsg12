@@ -135,7 +135,7 @@ final class TW_Brevo {
         }
         $r = self::request('POST', 'webhooks', [
             'url' => $url,
-            'description' => 'Thermic Warranty – αναφορές παράδοσης',
+            'description' => 'Warranty Manager – αναφορές παράδοσης',
             'events' => ['delivered', 'hardBounce', 'softBounce', 'blocked', 'spam', 'invalid', 'deferred', 'error'],
             'type' => 'transactional',
         ]);

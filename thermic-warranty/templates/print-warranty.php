@@ -34,6 +34,7 @@ $printed = sprintf('Εκτύπωση: %s – %s', TW_Util::datetime_label(TW_DB:
 <head>
     <meta charset="utf-8">
     <meta name="robots" content="noindex,nofollow">
+    <?php echo TW_App::favicon_tag(); // phpcs:ignore ?>
     <title><?php echo esc_html($title); ?></title>
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/print.css')); ?>">

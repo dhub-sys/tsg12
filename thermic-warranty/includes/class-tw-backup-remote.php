@@ -54,7 +54,7 @@ final class TW_Backup_Remote {
 
     public static function folder() {
         $f = trim((string) TW_Settings::get('backup_remote_folder'), " /");
-        return $f !== '' ? $f : 'Thermic Warranty Backups';
+        return $f !== '' ? $f : 'Warranty Manager Backups';
     }
 
     // ------------------------------------------------------------------ OAuth
@@ -300,7 +300,7 @@ final class TW_Backup_Remote {
     public static function test() {
         $service = self::service();
         $tmp = trailingslashit(get_temp_dir()) . 'tw-test-' . bin2hex(random_bytes(4)) . '.txt';
-        file_put_contents($tmp, "Thermic Warranty – δοκιμή σύνδεσης " . TW_DB::now() . "\n");
+        file_put_contents($tmp, "Warranty Manager – δοκιμή σύνδεσης " . TW_DB::now() . "\n");
         $r = self::send($tmp, $service);
         if ($r === true) self::delete_remote($service, basename($tmp));
         @unlink($tmp);

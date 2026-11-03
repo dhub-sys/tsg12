@@ -19,6 +19,7 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
+    <?php echo TW_App::favicon_tag(); // phpcs:ignore ?>
     <title>Αντίγραφο στοιχείων – <?php echo esc_html($s['company_name']); ?></title>
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/app-copy.css')); ?>">

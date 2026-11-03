@@ -357,3 +357,9 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .form-table p > label > input[type=url] { display: block; margin-top: 6px; font-weight: 400; }
 /* Image logos on the sidebar sit on a light tile, so dark logos stay visible on any secondary colour. */
 .tw-brand img.tw-brand-logo { background: #fff; padding: 8px 12px; border-radius: 10px; max-width: 200px; max-height: 56px; box-sizing: content-box; }
+
+/* 1.12: Warranty Manager mark */
+.tw-brand-sub { display: flex; align-items: center; gap: 8px; }
+.tw-mark { width: 22px; height: auto; flex: none; }
+.tw-auth-app { display: inline-flex !important; align-items: center; gap: 8px; color: var(--tw-muted); }
+.tw-auth-app .tw-mark { color: var(--tw-brand); width: 24px; }

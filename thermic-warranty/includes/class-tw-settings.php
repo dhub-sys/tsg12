@@ -69,7 +69,7 @@ final class TW_Settings {
             'backup_password' => '',
             // Off-site copies: none | gdrive | onedrive | dropbox | ftp
             'backup_remote' => 'none',
-            'backup_remote_folder' => 'Thermic Warranty Backups',
+            'backup_remote_folder' => 'Warranty Manager Backups',
             'backup_remote_keep' => 30,
             'backup_remote_manual' => 0,
             'backup_gdrive_client_id' => '',

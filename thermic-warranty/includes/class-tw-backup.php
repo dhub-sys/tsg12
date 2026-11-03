@@ -31,7 +31,7 @@ final class TW_Backup {
 
     public static function cron_schedules($s) {
         foreach (self::PER_DAY as $n => $h) {
-            if ($n > 1) $s['tw_backup_' . $h . 'h'] = ['interval' => $h * HOUR_IN_SECONDS, 'display' => sprintf('Κάθε %d ώρες (Thermic Warranty)', $h)];
+            if ($n > 1) $s['tw_backup_' . $h . 'h'] = ['interval' => $h * HOUR_IN_SECONDS, 'display' => sprintf('Κάθε %d ώρες (Warranty Manager)', $h)];
         }
         return $s;
     }
@@ -204,7 +204,7 @@ final class TW_Backup {
         ];
         // The manifest stays readable so a backup can be identified without the password.
         $zip->addFromString('manifest.json', wp_json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        $zip->setArchiveComment('Thermic Warranty backup ' . $manifest['created_at']);
+        $zip->setArchiveComment('Warranty Manager backup ' . $manifest['created_at']);
         $ok = $zip->close();
         foreach ($tmp as $f) @unlink($f);
         if (!$ok || !file_exists($path)) return new WP_Error('zip', 'Η ολοκλήρωση του αρχείου backup απέτυχε (χώρος στον δίσκο;).');

@@ -209,6 +209,29 @@ final class TW_App {
         return '<style id="tw-brand-vars">' . esc_html(self::brand_vars()) . '</style>';
     }
 
+    const APP_NAME = 'Warranty Manager';
+
+    /** The Warranty Manager mark (assets/img/warranty-manager.svg) in a given colour. */
+    public static function mark_svg($fill = '#ffffff', $attrs = '') {
+        $svg = (string) @file_get_contents(TW_DIR . 'assets/img/warranty-manager.svg');
+        $svg = str_replace('fill="#ffffff"', 'fill="' . $fill . '"', trim($svg));
+        return $attrs !== '' ? preg_replace('/^<svg /', '<svg ' . $attrs . ' ', $svg) : $svg;
+    }
+
+    /** Menu icon for wp-admin: WordPress repaints the fill to its own menu colours. */
+    public static function menu_icon() {
+        return 'data:image/svg+xml;base64,' . base64_encode(self::mark_svg('#a7aaad'));
+    }
+
+    /** Browser-tab icon: the mark on a rounded tile in the primary colour. */
+    public static function favicon_tag() {
+        [$p] = self::colors();
+        $inner = preg_replace(['/^<svg[^>]*>/', '/<\/svg>$/'], '', self::mark_svg(self::is_light($p) ? '#111827' : '#ffffff'));
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="' . $p . '"/>'
+            . '<g transform="translate(8 10) scale(.274)">' . $inner . '</g></svg>';
+        return '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,' . base64_encode($svg) . '">';
+    }
+
     public static function logo_html($class = 'tw-logo') {
         $s = TW_Settings::all();
         if ($s['logo_url']) {

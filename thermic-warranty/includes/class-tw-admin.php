@@ -72,7 +72,7 @@ final class TW_Admin {
     /** wp-admin only gets a launcher that opens the standalone app. */
     public static function init() {
         add_action('admin_menu', function () {
-            $hook = add_menu_page('Εγγυήσεις', 'Εγγυήσεις ↗', self::cap(), 'tw-app', '__return_null', 'dashicons-shield', 56);
+            $hook = add_menu_page(TW_App::APP_NAME, TW_App::APP_NAME . ' ↗', self::cap(), 'tw-app', '__return_null', TW_App::menu_icon(), 56);
             add_action('load-' . $hook, function () {
                 wp_safe_redirect(TW_App::admin_url());
                 exit;
@@ -1234,7 +1234,7 @@ final class TW_Admin {
         $svc = sanitize_key(self::post('backup_remote'));
         $v = [
             'backup_remote' => isset(TW_Backup_Remote::services()[$svc]) ? $svc : 'none',
-            'backup_remote_folder' => trim(sanitize_text_field(self::post('backup_remote_folder')), '/ ') ?: 'Thermic Warranty Backups',
+            'backup_remote_folder' => trim(sanitize_text_field(self::post('backup_remote_folder')), '/ ') ?: 'Warranty Manager Backups',
             'backup_remote_keep' => max(1, min(3650, (int) self::post('backup_remote_keep'))),
             'backup_remote_manual' => empty($_POST['backup_remote_manual']) ? 0 : 1,
             'backup_ftp_passive' => empty($_POST['backup_ftp_passive']) ? 0 : 1,
@@ -1392,7 +1392,7 @@ final class TW_Admin {
         <div class="wrap tw-wrap">
             <h1>Ομάδα</h1>
             <?php self::notice(); ?>
-            <p class="description">Τα μέλη της ομάδας συνδέονται στο <code><?php echo esc_html(TW_App::admin_url()); ?></code> με email και κωδικό<?php echo TW_Settings::get('staff_2fa') ? ', και επιβεβαιώνουν με κωδικό μίας χρήσης στο email' : ''; ?>. Έχουν δικαιώματα στην Πλατφόρμα Διαχείρισης Εγγυήσεων της <?php echo esc_html(TW_Settings::get('company_name')); ?>, δεν έχουν πρόσβαση στη διαχείριση της Ιστοσελίδας.</p>
+            <p class="description">Τα μέλη της ομάδας συνδέονται στο <code><?php echo esc_html(TW_App::admin_url()); ?></code> με email και κωδικό<?php echo TW_Settings::get('staff_2fa') ? ', και επιβεβαιώνουν με κωδικό μίας χρήσης στο email' : ''; ?>. Έχουν δικαιώματα στο <?php echo esc_html(TW_App::APP_NAME); ?> της <?php echo esc_html(TW_Settings::get('company_name')); ?>, δεν έχουν πρόσβαση στη διαχείριση της Ιστοσελίδας.</p>
             <table class="widefat striped"><thead><tr><th>Όνομα</th><th>Email</th><th>Ρόλος</th><th>Τελευταία σύνδεση</th><th></th></tr></thead><tbody>
             <?php foreach ($users as $u) : $is_admin = user_can($u, 'manage_options'); $last = get_user_meta($u->ID, 'tw_last_login', true); ?>
                 <tr><td><?php echo esc_html($u->display_name); ?></td><td><?php echo esc_html($u->user_email); ?></td>
