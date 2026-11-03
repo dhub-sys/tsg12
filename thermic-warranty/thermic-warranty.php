@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Thermic Warranty
  * Description: Αυτόνομη πλατφόρμα (standalone app) ηλεκτρονικής ενεργοποίησης και διαχείριση εγγυήσεων με σειριακούς αριθμούς: εγγραφή με επαλήθευση email, πύλη πελάτη, ειδοποιήσεις Service/λήξης μέσω email και SMS, διαχειριστικό με μαζική εισαγωγή από Excel/CSV και καταγραφή συγκαταθέσεων (GDPR).
- * Version: 1.5.0
+ * Version: 1.6.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Author: Custom
@@ -10,7 +10,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('TW_VERSION', '1.5.0');
+define('TW_VERSION', '1.6.0');
 define('TW_FILE', __FILE__);
 define('TW_DIR', plugin_dir_path(__FILE__));
 define('TW_URL', plugin_dir_url(__FILE__));
@@ -27,12 +27,16 @@ require_once TW_DIR . 'includes/class-tw-frontend.php';
 require_once TW_DIR . 'includes/class-tw-cron.php';
 require_once TW_DIR . 'includes/class-tw-importer.php';
 require_once TW_DIR . 'includes/class-tw-privacy.php';
+require_once TW_DIR . 'includes/class-tw-backup.php';
 require_once TW_DIR . 'includes/class-tw-admin.php';
 require_once TW_DIR . 'includes/class-tw-staff-auth.php';
 require_once TW_DIR . 'includes/class-tw-app.php';
 
 register_activation_hook(__FILE__, ['TW_DB', 'activate']);
-register_deactivation_hook(__FILE__, ['TW_Cron', 'unschedule']);
+register_deactivation_hook(__FILE__, function () {
+    TW_Cron::unschedule();
+    TW_Backup::unschedule();
+});
 
 add_action('plugins_loaded', function () {
     TW_DB::maybe_upgrade();
@@ -41,6 +45,7 @@ add_action('plugins_loaded', function () {
     TW_Privacy::init();
     TW_App::init();
     TW_Brevo::init();
+    TW_Backup::init();
     if (is_admin()) {
         TW_Admin::init();
     }

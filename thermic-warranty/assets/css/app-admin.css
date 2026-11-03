@@ -181,3 +181,6 @@ body.tw-auth { min-height: 100vh; display: flex; align-items: center; justify-co
 }
 
 .tw-ok { color: var(--tw-ok); }
+
+.tw-row-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tw-row-actions form { display: inline-flex; gap: 4px; align-items: center; margin: 0; }

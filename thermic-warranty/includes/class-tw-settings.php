@@ -57,6 +57,9 @@ final class TW_Settings {
             'brevo_webhook_token' => '',
             // If a reminder is reported as not delivered, resend it through the other channel.
             'fallback_channel' => 1,
+            'backup_daily' => 1,
+            'backup_keep' => 14,
+            'backup_password' => '',
             'sms_enabled' => 0,
             'sms_url' => '',
             'sms_method' => 'POST',

@@ -126,7 +126,7 @@ final class TW_App {
         $action = isset($_REQUEST['action']) ? sanitize_key(wp_unslash($_REQUEST['action'])) : '';
         if ($action && strpos($action, 'tw_') === 0) {
             $name = substr($action, 3);
-            $get_ok = in_array($name, ['invoice', 'export', 'terms_view', 'template', 'receipt'], true);
+            $get_ok = in_array($name, ['invoice', 'export', 'terms_view', 'template', 'receipt', 'backup_download'], true);
             if (in_array($name, TW_Admin::actions(), true) && ($get_ok || $_SERVER['REQUEST_METHOD'] === 'POST')) {
                 call_user_func(['TW_Admin', 'handle_' . $name]); // each handler checks its nonce and exits
             }

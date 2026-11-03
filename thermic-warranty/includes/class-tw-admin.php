@@ -18,7 +18,7 @@ final class TW_Admin {
     /** Actions accepted by the app router (POST, or GET for downloads). */
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
-            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool'];
+            'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -29,11 +29,17 @@ final class TW_Admin {
             'serials' => ['Σειριακοί αριθμοί', '#', 'page_serials'],
             'notifications' => ['Ειδοποιήσεις', '✉', 'page_notifications'],
         ];
-        if (current_user_can('manage_options') || current_user_can('tw_manage_team')) {
+        if (self::can_admin()) {
             $screens['team'] = ['Ομάδα', '👥', 'page_team'];
+            $screens['backups'] = ['Αντίγραφα ασφαλείας', '⛁', 'page_backups'];
         }
         $screens['settings'] = ['Ρυθμίσεις', '⚙', 'page_settings'];
         return $screens;
+    }
+
+    /** Platform administrators: WordPress admins and team members with team management rights. */
+    public static function can_admin() {
+        return current_user_can('manage_options') || current_user_can('tw_manage_team');
     }
 
     /** wp-admin only gets a launcher that opens the standalone app. */
@@ -798,6 +804,148 @@ final class TW_Admin {
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    // ------------------------------------------------------------------ backups
+
+    private static function size_label($bytes) {
+        if ($bytes >= 1048576) return number_format_i18n($bytes / 1048576, 1) . ' MB';
+        return number_format_i18n(max(1, $bytes / 1024), 0) . ' KB';
+    }
+
+    public static function page_backups() {
+        if (!self::can_admin()) { echo '<p>Δεν έχετε πρόσβαση.</p>'; return; }
+        $s = TW_Settings::all();
+        $list = TW_Backup::all();
+        $post = self::url('backups');
+        $next = wp_next_scheduled(TW_Backup::HOOK);
+        $types = ['auto' => 'Αυτόματο', 'manual' => 'Χειροκίνητο', 'prerestore' => 'Πριν από επαναφορά'];
+        ?>
+        <div class="wrap tw-wrap">
+            <h1>Αντίγραφα ασφαλείας</h1>
+            <?php self::notice(); ?>
+            <p class="description">Κάθε αντίγραφο περιέχει όλα τα δεδομένα της πλατφόρμας: σειριακούς, εγγυήσεις και πελάτες, υποβολές Service, συγκαταθέσεις, ιστορικό ειδοποιήσεων, ρυθμίσεις και όρους, καθώς και τα αρχεία (παραστατικά, αποδείξεις). Δεν περιλαμβάνει τα κλειδιά πρόσβασης (Brevo) ούτε το υπόλοιπο WordPress (σελίδες, χρήστες, theme), που καλύπτονται από το backup της φιλοξενίας.</p>
+
+            <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
+                <?php wp_nonce_field('tw_backup_create'); ?><input type="hidden" name="action" value="tw_backup_create">
+                <button class="button button-primary">⛁ Δημιουργία αντιγράφου τώρα</button>
+                <span class="description">Αυτόματο ημερήσιο αντίγραφο: <?php echo $s['backup_daily'] ? 'ενεργό – επόμενο ' . esc_html($next ? wp_date('d/m/Y H:i', $next) : '—') . ', διατηρούνται τα τελευταία ' . (int) $s['backup_keep'] : '<strong>ανενεργό</strong>'; ?>.</span>
+            </form>
+
+            <table class="widefat striped"><thead><tr><th>Ημερομηνία</th><th>Τύπος</th><th>Μέγεθος</th><th>Περιεχόμενο</th><th>Κρυπτογράφηση</th><th></th></tr></thead><tbody>
+            <?php if (!$list) echo '<tr><td colspan="6">Δεν υπάρχει αντίγραφο ακόμη.</td></tr>'; ?>
+            <?php foreach ($list as $b) : $m = TW_Backup::manifest($b['path']); ?>
+                <tr><td><?php echo esc_html(TW_Util::datetime_label($b['time'])); ?></td><td><?php echo esc_html($types[$b['type']] ?? $b['type']); ?></td>
+                    <td><?php echo esc_html(self::size_label($b['size'])); ?></td>
+                    <td><?php echo $m ? esc_html(sprintf('%d εγγυήσεις, %d σειριακοί, %d αρχεία', $m['rows']['warranties'] ?? 0, $m['rows']['serials'] ?? 0, $m['files'] ?? 0)) : '—'; ?></td>
+                    <td><?php echo $m && !empty($m['encrypted']) ? '🔒 Ναι' : 'Όχι'; ?></td>
+                    <td class="tw-row-actions">
+                        <a class="button" href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_backup_download', 'file' => $b['file']], $post), 'tw_backup_download')); ?>">Λήψη</a>
+                        <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('ΕΠΑΝΑΦΟΡΑ: όλα τα τωρινά δεδομένα της πλατφόρμας θα αντικατασταθούν με αυτά του <?php echo esc_attr(TW_Util::datetime_label($b['time'])); ?>. Πριν από την επαναφορά θα κρατηθεί αντίγραφο της τωρινής κατάστασης. Συνέχεια;')">
+                            <?php wp_nonce_field('tw_backup_restore'); ?><input type="hidden" name="action" value="tw_backup_restore"><input type="hidden" name="file" value="<?php echo esc_attr($b['file']); ?>">
+                            <?php if ($m && !empty($m['encrypted'])) : ?><input type="password" name="password" placeholder="κωδικός" size="10"><?php endif; ?>
+                            <button class="button">Επαναφορά</button></form>
+                        <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('Οριστική διαγραφή του αντιγράφου;')">
+                            <?php wp_nonce_field('tw_backup_delete'); ?><input type="hidden" name="action" value="tw_backup_delete"><input type="hidden" name="file" value="<?php echo esc_attr($b['file']); ?>">
+                            <button class="button-link tw-danger">Διαγραφή</button></form>
+                    </td></tr>
+            <?php endforeach; ?>
+            </tbody></table>
+
+            <div class="tw-columns">
+                <div class="tw-panel">
+                    <h2>Επαναφορά από αρχείο</h2>
+                    <p class="description">Για αντίγραφο που έχετε κατεβάσει (π.χ. από άλλον server). Όλα τα τωρινά δεδομένα θα αντικατασταθούν· πριν από αυτό κρατείται αυτόματα αντίγραφο της τωρινής κατάστασης.</p>
+                    <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data" onsubmit="return confirm('Όλα τα τωρινά δεδομένα θα αντικατασταθούν με αυτά του αρχείου. Συνέχεια;')">
+                        <?php wp_nonce_field('tw_backup_restore'); ?><input type="hidden" name="action" value="tw_backup_restore">
+                        <p><input type="file" name="backup_file" accept=".zip" required></p>
+                        <p><input type="password" name="password" placeholder="Κωδικός (αν είναι κρυπτογραφημένο)" class="regular-text"></p>
+                        <p><button class="button">Επαναφορά από αρχείο</button></p>
+                    </form>
+                </div>
+                <div class="tw-panel">
+                    <h2>Ρυθμίσεις</h2>
+                    <form method="post" action="<?php echo esc_url($post); ?>">
+                        <?php wp_nonce_field('tw_backup_settings'); ?><input type="hidden" name="action" value="tw_backup_settings">
+                        <p><label><input type="checkbox" name="backup_daily" value="1" <?php checked((int) $s['backup_daily'], 1); ?>> Αυτόματο αντίγραφο κάθε μέρα (03:30)</label></p>
+                        <p><label>Διατήρηση των τελευταίων <input type="number" name="backup_keep" value="<?php echo (int) $s['backup_keep']; ?>" min="1" max="365" class="small-text"> αυτόματων αντιγράφων</label></p>
+                        <p><label>Κωδικός κρυπτογράφησης (AES-256)<br><input type="password" name="backup_password" class="regular-text" autocomplete="new-password" placeholder="<?php echo $s['backup_password'] ? 'Ορισμένος – αφήστε κενό για να μείνει' : 'Χωρίς κρυπτογράφηση'; ?>"></label></p>
+                        <?php if ($s['backup_password']) : ?><p><label><input type="checkbox" name="backup_password_clear" value="1"> Κατάργηση κρυπτογράφησης</label></p><?php endif; ?>
+                        <p class="description">Συνιστάται: το αρχείο περιέχει προσωπικά δεδομένα πελατών. Φυλάξτε τον κωδικό σε ασφαλές μέρος – χωρίς αυτόν το αντίγραφο δεν ανοίγει. Ισχύει για τα νέα αντίγραφα.</p>
+                        <p><button class="button button-primary">Αποθήκευση</button></p>
+                    </form>
+                </div>
+            </div>
+            <p class="description">Τα αντίγραφα φυλάσσονται στον server, σε προστατευμένο φάκελο. Κατεβάζετε τακτικά ένα αντίγραφο και το φυλάτε και εκτός server, ώστε να υπάρχει αν χαθεί ο ίδιος ο server.</p>
+        </div>
+        <?php
+    }
+
+    private static function backup_guard($action) {
+        self::guard($action);
+        if (!self::can_admin()) wp_die('Δεν έχετε πρόσβαση.', 403);
+    }
+
+    public static function handle_backup_create() {
+        self::backup_guard('tw_backup_create');
+        $r = TW_Backup::create('manual');
+        if (is_wp_error($r)) self::flash('Αποτυχία: ' . esc_html($r->get_error_message()), 'error');
+        else self::flash(sprintf('Το αντίγραφο δημιουργήθηκε (%s). <a href="%s">Λήψη</a>', esc_html(self::size_label($r['size'])),
+            esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_backup_download', 'file' => $r['file']], self::url('backups')), 'tw_backup_download'))));
+        self::back('tw-backups');
+    }
+
+    public static function handle_backup_download() {
+        if (!current_user_can(self::cap()) || !self::can_admin()) wp_die('', 403);
+        check_admin_referer('tw_backup_download');
+        $b = TW_Backup::find(sanitize_file_name(wp_unslash($_GET['file'] ?? '')));
+        if (!$b) wp_die('Το αντίγραφο δεν βρέθηκε.');
+        TW_DB::log_event('backup_downloaded', ['file' => $b['file']]);
+        nocache_headers();
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $b['file'] . '"');
+        header('Content-Length: ' . $b['size']);
+        readfile($b['path']);
+        exit;
+    }
+
+    public static function handle_backup_delete() {
+        self::backup_guard('tw_backup_delete');
+        $b = TW_Backup::find(sanitize_file_name(self::post('file')));
+        if ($b) { @unlink($b['path']); TW_DB::log_event('backup_deleted', ['file' => $b['file']]); self::flash('Το αντίγραφο διαγράφηκε.'); }
+        self::back('tw-backups');
+    }
+
+    public static function handle_backup_restore() {
+        self::backup_guard('tw_backup_restore');
+        $password = (string) wp_unslash($_POST['password'] ?? '');
+        if (!empty($_FILES['backup_file']['tmp_name']) && is_uploaded_file($_FILES['backup_file']['tmp_name'])) {
+            $path = $_FILES['backup_file']['tmp_name'];
+        } else {
+            $b = TW_Backup::find(sanitize_file_name(self::post('file')));
+            if (!$b) { self::flash('Το αντίγραφο δεν βρέθηκε.', 'error'); self::back('tw-backups'); }
+            $path = $b['path'];
+        }
+        $r = TW_Backup::restore($path, $password);
+        if (is_wp_error($r)) {
+            self::flash('Η επαναφορά δεν έγινε: ' . esc_html($r->get_error_message()), 'error');
+        } else {
+            self::flash(sprintf('Η επαναφορά ολοκληρώθηκε από το αντίγραφο της %s: %d εγγυήσεις, %d σειριακοί, %d αρχεία. Η προηγούμενη κατάσταση φυλάχθηκε ως αντίγραφο «Πριν από επαναφορά».',
+                esc_html(TW_Util::datetime_label($r['manifest']['created_at'] ?? '')), $r['rows']['warranties'] ?? 0, $r['rows']['serials'] ?? 0, $r['files']));
+        }
+        self::back('tw-backups');
+    }
+
+    public static function handle_backup_settings() {
+        self::backup_guard('tw_backup_settings');
+        $values = ['backup_daily' => empty($_POST['backup_daily']) ? 0 : 1, 'backup_keep' => max(1, min(365, (int) self::post('backup_keep')))];
+        $pw = (string) wp_unslash($_POST['backup_password'] ?? '');
+        if ($pw !== '') $values['backup_password'] = $pw;
+        if (!empty($_POST['backup_password_clear'])) $values['backup_password'] = '';
+        TW_Settings::update($values);
+        TW_DB::log_event('backup_settings', ['daily' => $values['backup_daily'], 'keep' => $values['backup_keep'], 'encrypted' => (string) TW_Settings::get('backup_password') !== '']);
+        self::flash('Οι ρυθμίσεις αντιγράφων αποθηκεύτηκαν.');
+        self::back('tw-backups');
     }
 
     // ------------------------------------------------------------------ Brevo tools
