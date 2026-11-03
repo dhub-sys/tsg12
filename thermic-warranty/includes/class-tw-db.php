@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.2.0';
+    const DB_VERSION = '1.3.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -127,6 +127,13 @@ final class TW_DB {
   KEY token_hash (token_hash)
 ) $c;");
 
+        // 1.3.0: every Service submission is kept (history), so (warranty, milestone) is no longer unique.
+        if (version_compare((string) get_option(self::DB_VERSION_OPTION, '0'), '1.3.0', '<')
+            && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $t('services'))) === $t('services')) {
+            $suppress = $wpdb->suppress_errors(true);
+            $wpdb->query("ALTER TABLE {$t('services')} DROP INDEX warranty_milestone");
+            $wpdb->suppress_errors($suppress);
+        }
         dbDelta("CREATE TABLE {$t('services')} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   warranty_id bigint(20) unsigned NOT NULL,
@@ -148,7 +155,7 @@ final class TW_DB {
   created_by bigint(20) unsigned NOT NULL DEFAULT 0,
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
-  UNIQUE KEY warranty_milestone (warranty_id,milestone_no)
+  KEY warranty_milestone (warranty_id,milestone_no)
 ) $c;");
 
         dbDelta("CREATE TABLE {$t('notifications')} (

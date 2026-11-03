@@ -371,13 +371,13 @@ final class TW_Frontend {
         $vars = TW_Warranty::service_vars($w, $row);
         TW_Messenger::send_template_email($w->email, 'service_received', $vars);
         $link = TW_App::admin_url('warranties', ['view' => $w->id]);
-        foreach (TW_Messenger::admin_recipients() as $to) {
+        foreach (TW_Settings::get('service_notify_company') ? TW_Messenger::admin_recipients() : [] as $to) {
             TW_Messenger::send_email($to, sprintf('[Εγγυήσεις] Νέα υποβολή Service – S/N %s', $w->serial), sprintf(
-                "Ο πελάτης %s καταχώρησε το %dο Service.\n\nS/N: %s\nΚωδικός εγγύησης: %s\nΗμερομηνία Service: %s\nΑΦΜ τεχνικού: %s\n\nΈλεγχος και έγκριση: %s",
+                "Ο πελάτης %s καταχώρησε το %dο Service.\n\nS/N: %s\nΚωδικός εγγύησης: %s\nΗμερομηνία Service: %s\nΑΦΜ τεχνικού: %s\n\nΚαρτέλα εγγύησης: %s",
                 $w->customer_name, $no, $w->serial, $w->warranty_code, TW_Util::date_label($date), $vat, $link));
         }
         do_action('tw_service_submitted', $w, $row);
-        wp_send_json_success(['message' => sprintf('Το %dο Service καταχωρήθηκε. Η εγγύηση συνεχίζει κανονικά· θα σας ενημερώσουμε μόλις ελεγχθεί η απόδειξη.', $no)]);
+        wp_send_json_success(['message' => sprintf('Το %dο Service καταχωρήθηκε και η εγγύηση συνεχίζει να ισχύει. Σας στείλαμε επιβεβαίωση με email· κρατήστε και την πρωτότυπη απόδειξη.', $no)]);
     }
 
     public static function ajax_portal_export() {

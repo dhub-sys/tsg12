@@ -132,6 +132,7 @@ final class TW_App {
             }
         }
 
+        TW_Admin::maybe_open_exact();
         $screens = TW_Admin::screens();
         $screen = isset($_GET['screen']) ? sanitize_key(wp_unslash($_GET['screen'])) : 'dashboard';
         if (!isset($screens[$screen])) $screen = 'dashboard';

@@ -127,13 +127,63 @@ final class TW_Warranty {
 
     public static function services($warranty_id) {
         global $wpdb;
-        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('services') . " WHERE warranty_id = %d ORDER BY milestone_no", $warranty_id));
+        // Latest submission per milestone (all submissions are kept, see services_history()).
+        $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('services') . " WHERE warranty_id = %d ORDER BY milestone_no, id", $warranty_id));
         $out = [];
         foreach ($rows as $r) $out[(int) $r->milestone_no] = $r;
         return $out;
     }
 
-    /** A Service row keeps the warranty going while it is pending review or approved. */
+    /** Every Service submission/record of a warranty, newest first. */
+    public static function services_history($warranty_id) {
+        global $wpdb;
+        return $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('services') . " WHERE warranty_id = %d ORDER BY id DESC", $warranty_id));
+    }
+
+    public static function service_row($id) {
+        global $wpdb;
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM " . TW_DB::table('services') . " WHERE id = %d", $id));
+    }
+
+    /**
+     * What the administrator needs when a warranty claim comes in: is the warranty valid today,
+     * and what has the customer submitted for each Service that has fallen due.
+     * @return array ['ok' => bool, 'title' => string, 'lines' => string[]]
+     */
+    public static function validity($w) {
+        $labels = TW_Util::status_labels();
+        $today = TW_Schedule::today();
+        $lines = [];
+        $open = null;
+        foreach (self::timeline($w) as $m) {
+            if ($m['type'] !== 'service' || $m['state'] === 'before_registration') continue;
+            if ($m['due'] > $today && !$m['service']) continue; // not due yet
+            $sv = $m['service'];
+            if ($sv && self::service_counts($sv)) {
+                $lines[] = sprintf('%dο Service: καταχωρήθηκε %s – ΑΦΜ τεχνικού %s – απόδειξη: %s – γνήσια ανταλλακτικά: %s%s',
+                    $m['no'], TW_Util::date_label($sv->performed_date), $sv->technician_vat ?: '—', $sv->receipt_file ? 'ναι' : 'όχι',
+                    $sv->genuine_parts ? 'ναι' : 'όχι', $sv->review_status === 'approved' ? ' – ελέγχθηκε' : '');
+            } elseif (in_array($m['state'], ['due', 'rejected'], true)) {
+                $open = $m;
+                $lines[] = sprintf('%dο Service (%s): εκκρεμεί – η καταχώρηση επιτρέπεται έως %s', $m['no'], TW_Util::date_label($m['due']),
+                    TW_Util::date_label($m['state'] === 'rejected' && $sv ? $sv->resubmit_until : $m['lock_date']));
+            } else {
+                $lines[] = sprintf('%dο Service (%s): δεν καταχωρήθηκε', $m['no'], TW_Util::date_label($m['due']));
+            }
+        }
+        if (!$lines) $lines[] = 'Δεν έχει έρθει ακόμη η ημερομηνία του πρώτου Service.';
+
+        if ($w->status === 'active') {
+            $title = $open
+                ? sprintf('Σε ισχύ – εκκρεμεί η καταχώρηση του %dου Service', $open['no'])
+                : 'Σε ισχύ – όλα τα Service που έχουν λήξει έχουν καταχωρηθεί';
+            return ['ok' => true, 'title' => $title . ' (λήξη εγγύησης ' . TW_Util::date_label($w->warranty_end) . ')', 'lines' => $lines];
+        }
+        $why = $w->status === 'locked' ? ' – ' . $w->lock_reason : '';
+        return ['ok' => false, 'title' => 'Δεν ισχύει – ' . ($labels[$w->status] ?? $w->status) . $why, 'lines' => $lines];
+    }
+
+    /** A submitted ('pending' = not checked yet) or checked Service keeps the warranty going; a rejected one does not. */
     public static function service_counts($row) {
         return $row && in_array($row->review_status, ['pending', 'approved'], true);
     }
@@ -192,9 +242,7 @@ final class TW_Warranty {
     /** Service recorded directly by the company: approved at once. */
     public static function record_service($w, $milestone_no, $date, $by, $technician, $genuine, $notes, $technician_vat = '', $receipt = null) {
         global $wpdb;
-        $t = TW_DB::table('services');
-        self::delete_service_row($w->id, $milestone_no);
-        $wpdb->insert($t, [
+        $wpdb->insert(TW_DB::table('services'), [
             'warranty_id' => (int) $w->id,
             'milestone_no' => (int) $milestone_no,
             'performed_date' => $date,
@@ -215,10 +263,12 @@ final class TW_Warranty {
         TW_DB::log_event('service_recorded', ['milestone' => $milestone_no, 'date' => $date, 'by' => $by, 'technician_vat' => $technician_vat, 'genuine_parts' => $genuine ? 1 : 0], $w->id, $w->serial_id);
     }
 
-    /** Service submitted by the customer from the portal: pending review, the warranty continues meanwhile. */
+    /**
+     * Service submitted by the customer from the portal. Accepted at once (the warranty continues);
+     * the company may check it later, typically when a warranty claim comes in. Earlier submissions are kept.
+     */
     public static function submit_service($w, $milestone_no, $date, $technician_vat, $technician, array $receipt, $notes) {
         global $wpdb;
-        self::delete_service_row($w->id, $milestone_no); // replaces an earlier rejected submission
         $wpdb->insert(TW_DB::table('services'), [
             'warranty_id' => (int) $w->id,
             'milestone_no' => (int) $milestone_no,
@@ -265,15 +315,11 @@ final class TW_Warranty {
         return self::services($w->id)[(int) $milestone_no];
     }
 
-    public static function delete_service_row($warranty_id, $milestone_no) {
+    /** Removes one submission (admin correction). */
+    public static function delete_service($row) {
         global $wpdb;
-        $t = TW_DB::table('services');
-        $old = $wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE warranty_id = %d AND milestone_no = %d", $warranty_id, $milestone_no));
-        if ($old && $old->receipt_file) {
-            $p = TW_Util::invoice_path($old->receipt_file);
-            if ($p) @unlink($p);
-        }
-        $wpdb->query($wpdb->prepare("DELETE FROM $t WHERE warranty_id = %d AND milestone_no = %d", $warranty_id, $milestone_no));
+        if ($row->receipt_file && ($p = TW_Util::invoice_path($row->receipt_file))) @unlink($p);
+        $wpdb->delete(TW_DB::table('services'), ['id' => (int) $row->id]);
     }
 
     /** Placeholders for the Service submission/review messages. */
@@ -319,7 +365,7 @@ final class TW_Warranty {
             'updated_at' => TW_DB::now(),
         ], ['id' => $w->id]);
         $wpdb->update(TW_DB::table('consents'), ['ip' => '', 'user_agent' => ''], ['warranty_id' => $w->id]);
-        foreach (self::services($w->id) as $sv) {
+        foreach (self::services_history($w->id) as $sv) {
             if ($sv->receipt_file && ($p = TW_Util::invoice_path($sv->receipt_file))) @unlink($p);
         }
         $wpdb->update(TW_DB::table('services'), ['receipt_file' => '', 'receipt_original_name' => ''], ['warranty_id' => $w->id]);

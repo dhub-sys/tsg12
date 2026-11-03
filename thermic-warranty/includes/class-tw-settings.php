@@ -26,6 +26,7 @@ final class TW_Settings {
             // and how long a customer has to resubmit after a rejection.
             'service_submit_window_days' => 90,
             'service_resubmit_days' => 15,
+            'service_notify_company' => 0,
             'admin_emails' => get_option('admin_email'),
             'admin_digest' => 1,
             'notify_partner' => 0,
@@ -101,14 +102,8 @@ final class TW_Settings {
             'service_received' => [
                 'label' => 'Service – επιβεβαίωση υποβολής από τον πελάτη',
                 'subject' => 'Λάβαμε την υποβολή Service – S/N {serial}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nλάβαμε την καταχώρηση του {milestone_no}ου Service του προϊόντος σας.\n\n$ident\nΗμερομηνία Service: {performed_date}\nΑΦΜ τεχνικού: {technician_vat}\n\nΗ εγγύηση συνεχίζει κανονικά. Θα ελέγξουμε την απόδειξη και θα σας ενημερώσουμε αν χρειαστεί κάτι επιπλέον.",
+                'body' => "Αγαπητέ/ή {customer_name},\n\nλάβαμε την καταχώρηση του {milestone_no}ου Service του προϊόντος σας.\n\n$ident\nΗμερομηνία Service: {performed_date}\nΑΦΜ τεχνικού: {technician_vat}\n\nΗ καταχώρηση και η απόδειξη φυλάσσονται στην καρτέλα της εγγύησής σας και η εγγύηση συνεχίζει να ισχύει. {next_step}\n\nΚρατήστε και εσείς την πρωτότυπη απόδειξη του Service.",
                 'sms' => '',
-            ],
-            'service_approved' => [
-                'label' => 'Service – έγκριση από την εταιρεία',
-                'subject' => 'Το Service εγκρίθηκε – η εγγύηση συνεχίζει – S/N {serial}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nτο {milestone_no}ο Service του προϊόντος σας ({performed_date}) ελέγχθηκε και εγκρίθηκε.\n\n$ident\n\nΗ εγγύηση συνεχίζει να ισχύει. {next_step}\n\nΣας ευχαριστούμε.",
-                'sms' => '{company_name}: Το Service του S/N {serial} εγκρίθηκε. Η εγγύηση συνεχίζει. {next_step}',
             ],
             'service_rejected' => [
                 'label' => 'Service – απόρριψη υποβολής',

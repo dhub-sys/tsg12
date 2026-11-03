@@ -102,6 +102,10 @@ final class TW_Admin {
         return '<span class="tw-badge tw-badge--' . esc_attr($status) . '">' . esc_html($labels[$status] ?? $status) . '</span>';
     }
 
+    private static function receipt_url($w, $sv) {
+        return wp_nonce_url(add_query_arg(['action' => 'tw_receipt', 'id' => (int) $w->id, 'service_id' => (int) $sv->id], self::url()), 'tw_receipt');
+    }
+
     private static function warranty_link($id, $text) {
         return '<a href="' . esc_url(self::url('warranties', ['view' => (int) $id])) . '">' . esc_html($text) . '</a>';
     }
@@ -132,13 +136,19 @@ final class TW_Admin {
         usort($upcoming, function ($a, $b) { return strcmp($a['m']['due'], $b['m']['due']); });
         $recent = $wpdb->get_results(TW_Warranty::select_sql() . " ORDER BY w.created_at DESC LIMIT 10");
         $sv_t = TW_DB::table('services');
-        $pending_rows = $wpdb->get_results("SELECT * FROM $sv_t WHERE review_status = 'pending' ORDER BY created_at ASC LIMIT 100");
+        $recent_sv = $wpdb->get_results($wpdb->prepare("SELECT * FROM $sv_t WHERE source = 'customer' AND created_at >= %s ORDER BY id DESC LIMIT 50", TW_Schedule::add_days($today, -30) . ' 00:00:00'));
         $last = get_option('tw_last_run');
         $labels = TW_Util::status_labels();
         ?>
         <div class="wrap tw-wrap">
             <h1>Εγγυήσεις – Επισκόπηση</h1>
             <?php self::notice(); ?>
+            <form method="get" class="tw-filters tw-lookup">
+                <?php self::get_form_fields('warranties'); ?>
+                <label for="tw-lookup"><strong>Αναζήτηση εγγύησης</strong></label>
+                <input type="search" id="tw-lookup" name="s" placeholder="Σειριακός αριθμός, κωδικός εγγύησης, email ή τηλέφωνο" size="44" autofocus>
+                <button class="button button-primary">Άνοιγμα καρτέλας</button>
+            </form>
             <div class="tw-cards">
                 <div class="tw-stat"><span><?php echo $n($serial_counts, 'available') + $n($serial_counts, 'registered') + $n($serial_counts, 'void'); ?></span>Σειριακοί στο σύστημα</div>
                 <div class="tw-stat"><span><?php echo $n($serial_counts, 'available'); ?></span>Διαθέσιμοι (μη ενεργοποιημένοι)</div>
@@ -147,26 +157,19 @@ final class TW_Admin {
                 <div class="tw-stat tw-stat--bad"><span><?php echo $n($w_counts, 'locked'); ?></span>Οριστικά κλειδωμένες</div>
                 <div class="tw-stat tw-stat--warn"><span><?php echo $exp60; ?></span>Λήγουν σε 60 ημέρες</div>
                 <div class="tw-stat"><span><?php echo $last30; ?></span>Ενεργοποιήσεις 30 ημερών</div>
-                <div class="tw-stat tw-stat--warn"><span><?php echo count($pending_rows); ?></span>Υποβολές Service προς έλεγχο</div>
+                <div class="tw-stat"><span><?php echo count($recent_sv); ?></span>Υποβολές Service 30 ημερών</div>
             </div>
             <p class="description">Τελευταία εκτέλεση ειδοποιήσεων: <?php echo $last ? esc_html(TW_Util::datetime_label($last['at']) . ' – ' . (int) $last['count'] . ' ενέργειες') : 'καμία ακόμη'; ?>.
                 Επόμενη: <?php $nx = wp_next_scheduled(TW_Cron::HOOK); echo $nx ? esc_html(wp_date('d/m/Y H:i', $nx)) : '—'; ?>.</p>
 
-            <h2>Υποβολές Service προς έλεγχο (<?php echo count($pending_rows); ?>)</h2>
-            <table class="widefat striped"><thead><tr><th>Υποβλήθηκε</th><th>S/N</th><th>Πελάτης</th><th>Service</th><th>Ημ/νία Service</th><th>ΑΦΜ τεχνικού</th><th>Απόδειξη</th><th>Απόφαση</th></tr></thead><tbody>
-            <?php if (!$pending_rows) echo '<tr><td colspan="8">Καμία υποβολή σε αναμονή.</td></tr>'; ?>
-            <?php foreach ($pending_rows as $sv) : $pw = TW_Warranty::get($sv->warranty_id); if (!$pw) continue; ?>
+            <h2>Πρόσφατες υποβολές Service από πελάτες (30 ημέρες)</h2>
+            <table class="widefat striped"><thead><tr><th>Καταχώρηση</th><th>S/N</th><th>Πελάτης</th><th>Service</th><th>Ημ/νία Service</th><th>ΑΦΜ τεχνικού</th><th>Απόδειξη</th></tr></thead><tbody>
+            <?php if (!$recent_sv) echo '<tr><td colspan="7">Καμία υποβολή τις τελευταίες 30 ημέρες.</td></tr>'; ?>
+            <?php foreach ($recent_sv as $sv) : $pw = TW_Warranty::get($sv->warranty_id); if (!$pw) continue; ?>
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($sv->created_at)); ?></td><td><?php echo self::warranty_link($pw->id, $pw->serial); ?></td>
                     <td><?php echo esc_html($pw->customer_name); ?></td><td><?php echo (int) $sv->milestone_no; ?>ο</td>
-                    <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td><td><code><?php echo esc_html($sv->technician_vat); ?></code><?php echo $sv->technician ? '<br><small>' . esc_html($sv->technician) . '</small>' : ''; ?></td>
-                    <td><?php if ($sv->receipt_file) : ?><a href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_receipt', 'id' => $pw->id, 'milestone_no' => $sv->milestone_no], self::url()), 'tw_receipt')); ?>" target="_blank">Προβολή</a><?php endif; ?></td>
-                    <td><form method="post" action="<?php echo esc_url(self::url()); ?>" class="tw-review-form">
-                        <?php wp_nonce_field('tw_review_service'); ?><input type="hidden" name="action" value="tw_review_service"><input type="hidden" name="back" value="dashboard">
-                        <input type="hidden" name="id" value="<?php echo (int) $pw->id; ?>"><input type="hidden" name="milestone_no" value="<?php echo (int) $sv->milestone_no; ?>">
-                        <input type="text" name="note" placeholder="Αιτιολογία απόρριψης">
-                        <button class="button button-primary" name="decision" value="approve">✔</button>
-                        <button class="button tw-danger" name="decision" value="reject" title="Απόρριψη" onclick="return this.form.note.value.trim() ? confirm('Απόρριψη της υποβολής;') : (alert('Συμπληρώστε αιτιολογία απόρριψης.'), false)">✘</button>
-                    </form></td></tr>
+                    <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td><td><code><?php echo esc_html($sv->technician_vat); ?></code></td>
+                    <td><?php echo $sv->receipt_file ? '<a href="' . esc_url(self::receipt_url($pw, $sv)) . '" target="_blank">Προβολή</a>' : '—'; ?></td></tr>
             <?php endforeach; ?>
             </tbody></table>
 
@@ -219,6 +222,28 @@ final class TW_Admin {
         if (!empty($args['to'])) { $where[] = 'w.purchase_date <= %s'; $params[] = $args['to']; }
         $sql = implode(' AND ', $where);
         return $params ? $wpdb->prepare($sql, $params) : $sql;
+    }
+
+    /** Exact serial / warranty code from a search opens the card directly. Called by the router before output. */
+    public static function maybe_open_exact() {
+        global $wpdb;
+        if (($_GET['screen'] ?? '') !== 'warranties' || !empty($_GET['view']) || empty($_GET['s'])) return;
+        $q = trim(sanitize_text_field(wp_unslash($_GET['s'])));
+        $id = $wpdb->get_var($wpdb->prepare(
+            "SELECT w.id FROM " . TW_DB::table('warranties') . " w JOIN " . TW_DB::table('serials') . " s ON s.id = w.serial_id WHERE s.serial_no = %s OR w.warranty_code = %s LIMIT 1",
+            TW_Util::normalize_serial($q), strtoupper($q)
+        ));
+        if ($id) {
+            wp_safe_redirect(self::url('warranties', ['view' => (int) $id]));
+            exit;
+        }
+        // A serial that exists but was never activated: say so on the serials screen.
+        $serial = TW_Warranty::find_serial($q);
+        if ($serial) {
+            self::flash(sprintf('Ο σειριακός %s υπάρχει αλλά δεν έχει ενεργοποιηθεί εγγύηση (%s).', esc_html($serial->serial), esc_html(TW_Util::serial_status_labels()[$serial->status] ?? $serial->status)), 'warning');
+            wp_safe_redirect(self::url('serials', ['s' => $serial->serial]));
+            exit;
+        }
     }
 
     public static function page_warranties() {
@@ -279,13 +304,21 @@ final class TW_Admin {
         $notes = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('notifications') . " WHERE warranty_id = %d ORDER BY id DESC", $id));
         $events = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('events') . " WHERE warranty_id = %d ORDER BY id DESC", $id));
         $post = self::url();
-        $ms_labels = ['done' => 'Πραγματοποιήθηκε', 'due' => 'Εκκρεμεί', 'missed' => 'Δεν πραγματοποιήθηκε', 'upcoming' => 'Προσεχώς', 'before_registration' => 'Πριν από την ενεργοποίηση', 'expired' => 'Έληξε', 'submitted' => 'Υποβλήθηκε – προς έλεγχο', 'rejected' => 'Απορρίφθηκε – αναμένεται νέα υποβολή'];
+        $ms_labels = ['done' => 'Καταχωρήθηκε – ελέγχθηκε', 'due' => 'Εκκρεμεί καταχώρηση', 'missed' => 'Δεν καταχωρήθηκε', 'upcoming' => 'Προσεχώς', 'before_registration' => 'Πριν από την ενεργοποίηση', 'expired' => 'Έληξε', 'submitted' => 'Καταχωρήθηκε από τον πελάτη', 'rejected' => 'Απορρίφθηκε – αναμένεται νέα υποβολή'];
+        $history = TW_Warranty::services_history($w->id);
+        $validity = TW_Warranty::validity($w);
         $consent_labels = ['terms' => 'Όροι εγγύησης', 'data_accuracy' => 'Ορθότητα στοιχείων', 'marketing' => 'Εμπορικές ενημερώσεις'];
         ?>
         <div class="wrap tw-wrap">
             <p><a href="<?php echo esc_url(self::url('warranties')); ?>">&larr; Όλες οι εγγυήσεις</a></p>
-            <h1>Εγγύηση <?php echo esc_html($w->warranty_code); ?> <?php echo self::status_badge($w->status, $labels); ?></h1>
+            <h1>Εγγύηση <?php echo esc_html($w->warranty_code); ?> <?php echo self::status_badge($w->status, $labels); ?>
+                <button type="button" class="page-title-action tw-no-print" onclick="window.print()">🖨 Εκτύπωση καρτέλας</button></h1>
             <?php self::notice(); ?>
+            <div class="tw-validity tw-validity--<?php echo $validity['ok'] ? 'ok' : 'bad'; ?>">
+                <strong><?php echo $validity['ok'] ? '✔' : '✘'; ?> <?php echo esc_html($validity['title']); ?></strong>
+                <ul><?php foreach ($validity['lines'] as $l) echo '<li>' . esc_html($l) . '</li>'; ?></ul>
+                <small>S/N <?php echo esc_html($w->serial); ?> · <?php echo esc_html($w->product_name); ?> · αγορά <?php echo esc_html(TW_Util::date_label($w->purchase_date)); ?> · κατάσταση στις <?php echo esc_html(TW_Util::datetime_label(TW_DB::now())); ?></small>
+            </div>
             <?php if ($w->status === 'locked') : ?><div class="notice notice-error inline"><p><strong>Οριστικά κλειδωμένη</strong> στις <?php echo esc_html(TW_Util::datetime_label($w->locked_at)); ?>: <?php echo esc_html($w->lock_reason); ?></p></div><?php endif; ?>
             <?php if ($w->anonymized_at) : ?><div class="notice notice-warning inline"><p>Τα προσωπικά στοιχεία ανωνυμοποιήθηκαν στις <?php echo esc_html(TW_Util::datetime_label($w->anonymized_at)); ?>.</p></div><?php endif; ?>
 
@@ -324,36 +357,53 @@ final class TW_Admin {
                     <td><?php echo esc_html(TW_Util::date_label($m['lock_date'])); ?></td>
                     <td><?php echo esc_html($ms_labels[$m['state']] ?? $m['state']); ?></td>
                     <td><?php if ($m['service']) : $sv = $m['service']; ?>
-                        <?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?> –
-                        <?php echo esc_html(['thermic' => 'Thermic', 'partner' => 'Συνεργάτης', 'customer' => 'Υποβολή πελάτη'][$sv->performed_by] ?? $sv->performed_by); ?>
-                        <?php echo $sv->technician ? '(' . esc_html($sv->technician) . ')' : ''; ?>
-                        <?php echo $sv->technician_vat ? '<br>ΑΦΜ τεχνικού: <code>' . esc_html($sv->technician_vat) . '</code>' : ''; ?>
-                        <br>Γνήσια ανταλλακτικά: <?php echo $sv->genuine_parts ? 'ναι' : '<strong>όχι</strong>'; ?>
-                        <?php if ($sv->receipt_file) : ?><br><a href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_receipt', 'id' => $w->id, 'milestone_no' => $m['no']], $post), 'tw_receipt')); ?>" target="_blank">Απόδειξη (<?php echo esc_html($sv->receipt_original_name); ?>)</a><?php endif; ?>
-                        <?php echo $sv->notes ? '<br><small>' . esc_html($sv->notes) . '</small>' : ''; ?>
-                        <?php if ($sv->review_status === 'rejected') : ?><br><small class="tw-danger">Απόρριψη: <?php echo esc_html($sv->review_note); ?> – νέα υποβολή έως <?php echo esc_html(TW_Util::date_label($sv->resubmit_until)); ?></small><?php endif; ?>
-                        <?php if ($sv->review_status === 'approved' && $sv->source === 'customer') : ?><br><small>Εγκρίθηκε <?php echo esc_html(TW_Util::datetime_label($sv->reviewed_at)); ?></small><?php endif; ?>
-                        <?php if ($sv->review_status === 'pending') : ?>
-                            <form method="post" action="<?php echo esc_url($post); ?>" class="tw-review-form">
-                                <?php wp_nonce_field('tw_review_service'); ?><input type="hidden" name="action" value="tw_review_service"><input type="hidden" name="id" value="<?php echo (int) $w->id; ?>"><input type="hidden" name="milestone_no" value="<?php echo (int) $m['no']; ?>">
-                                <input type="text" name="note" placeholder="Αιτιολογία (υποχρεωτική για απόρριψη)" class="regular-text">
-                                <button class="button button-primary" name="decision" value="approve">✔ Έγκριση</button>
-                                <button class="button tw-danger" name="decision" value="reject" onclick="return this.form.note.value.trim() ? confirm('Απόρριψη της υποβολής; Ο πελάτης θα ενημερωθεί για νέα υποβολή.') : (alert('Συμπληρώστε αιτιολογία απόρριψης.'), false)">✘ Απόρριψη</button>
-                            </form>
-                        <?php endif; ?>
+                        <?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?> · ΑΦΜ <?php echo esc_html($sv->technician_vat ?: '—'); ?>
+                        <?php echo $sv->receipt_file ? '· <a href="' . esc_url(self::receipt_url($w, $sv)) . '" target="_blank">απόδειξη</a>' : ''; ?>
                     <?php endif; ?></td>
-                    <td><?php if ($m['service']) : ?>
-                        <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('Διαγραφή της καταχώρησης Service;')">
-                            <?php wp_nonce_field('tw_delete_service'); ?><input type="hidden" name="action" value="tw_delete_service"><input type="hidden" name="id" value="<?php echo (int) $w->id; ?>"><input type="hidden" name="milestone_no" value="<?php echo (int) $m['no']; ?>">
-                            <button class="button-link tw-danger">Διαγραφή</button></form>
-                    <?php endif; ?></td></tr>
+                    <td></td></tr>
             <?php endforeach; ?>
             </tbody></table>
 
-            <div class="tw-columns">
+            <h2>Υποβολές Service (<?php echo count($history); ?>)</h2>
+            <p class="description tw-no-print">Όλες οι καταχωρήσεις Service για αυτόν τον σειριακό, με τις αποδείξεις. Καμία δεν διαγράφεται όταν ο πελάτης υποβάλει ξανά. Ο έλεγχος είναι προαιρετικός: σημειώστε μια υποβολή ως ελεγμένη ή απορρίψτε την αν δεν είναι σωστή (ο πελάτης ενημερώνεται και μπορεί να υποβάλει ξανά).</p>
+            <table class="widefat striped"><thead><tr><th>Καταχώρηση</th><th>Service</th><th>Ημ/νία Service</th><th>Τεχνικός</th><th>Απόδειξη</th><th>Γνήσια ανταλλ.</th><th>Από</th><th>Έλεγχος</th><th class="tw-no-print"></th></tr></thead><tbody>
+            <?php if (!$history) echo '<tr><td colspan="9">Καμία υποβολή ακόμη.</td></tr>'; ?>
+            <?php $latest = TW_Warranty::services($w->id); foreach ($history as $sv) : $is_latest = isset($latest[$sv->milestone_no]) && (int) $latest[$sv->milestone_no]->id === (int) $sv->id; ?>
+                <tr<?php echo $is_latest ? '' : ' class="tw-superseded"'; ?>>
+                    <td><?php echo esc_html(TW_Util::datetime_label($sv->created_at)); ?><?php echo $is_latest ? '' : '<br><small>αντικαταστάθηκε από νεότερη</small>'; ?></td>
+                    <td><?php echo (int) $sv->milestone_no; ?>ο</td>
+                    <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td>
+                    <td><?php echo $sv->technician_vat ? 'ΑΦΜ <code>' . esc_html($sv->technician_vat) . '</code>' : '—'; ?><?php echo $sv->technician ? '<br>' . esc_html($sv->technician) : ''; ?><?php echo $sv->notes ? '<br><small>' . esc_html($sv->notes) . '</small>' : ''; ?></td>
+                    <td><?php echo $sv->receipt_file ? '<a href="' . esc_url(self::receipt_url($w, $sv)) . '" target="_blank">' . esc_html($sv->receipt_original_name ?: 'Προβολή') . '</a>' : '—'; ?></td>
+                    <td><?php echo $sv->genuine_parts ? 'Ναι' : '<strong>Όχι</strong>'; ?></td>
+                    <td><?php echo esc_html(['customer' => 'Πελάτης (πύλη)', 'admin' => 'Εταιρεία'][$sv->source] ?? $sv->source); ?></td>
+                    <td><?php
+                        if ($sv->review_status === 'approved') echo '✔ Ελέγχθηκε' . ($sv->reviewed_at ? '<br><small>' . esc_html(TW_Util::datetime_label($sv->reviewed_at)) . '</small>' : '');
+                        elseif ($sv->review_status === 'rejected') echo '<span class="tw-danger">✘ Απορρίφθηκε</span><br><small>' . esc_html($sv->review_note) . '</small>';
+                        else echo 'Δεν έχει ελεγχθεί';
+                    ?></td>
+                    <td class="tw-no-print">
+                        <?php if ($is_latest && $sv->review_status !== 'approved') : ?>
+                        <form method="post" action="<?php echo esc_url($post); ?>" class="tw-review-form">
+                            <?php wp_nonce_field('tw_review_service'); ?><input type="hidden" name="action" value="tw_review_service"><input type="hidden" name="id" value="<?php echo (int) $w->id; ?>"><input type="hidden" name="milestone_no" value="<?php echo (int) $sv->milestone_no; ?>">
+                            <button class="button" name="decision" value="approve">✔ Ελέγχθηκε</button>
+                            <?php if ($sv->review_status !== 'rejected') : ?>
+                            <input type="text" name="note" placeholder="Λόγος απόρριψης">
+                            <button class="button tw-danger" name="decision" value="reject" onclick="return this.form.note.value.trim() ? confirm('Απόρριψη; Ο πελάτης θα ενημερωθεί για νέα υποβολή.') : (alert('Συμπληρώστε λόγο απόρριψης.'), false)">✘ Απόρριψη</button>
+                            <?php endif; ?>
+                        </form>
+                        <?php endif; ?>
+                        <form method="post" action="<?php echo esc_url($post); ?>" onsubmit="return confirm('Οριστική διαγραφή αυτής της καταχώρησης και της απόδειξης;')">
+                            <?php wp_nonce_field('tw_delete_service'); ?><input type="hidden" name="action" value="tw_delete_service"><input type="hidden" name="id" value="<?php echo (int) $w->id; ?>"><input type="hidden" name="service_id" value="<?php echo (int) $sv->id; ?>">
+                            <button class="button-link tw-danger">Διαγραφή</button></form>
+                    </td></tr>
+            <?php endforeach; ?>
+            </tbody></table>
+
+            <div class="tw-columns tw-no-print">
                 <div class="tw-panel">
                     <h2>Καταχώρηση Service από την εταιρεία</h2>
-                    <p class="description">Συνήθως το Service το καταχωρεί ο πελάτης από την πύλη. Από εδώ το καταχωρείτε εσείς (εγκρίνεται αμέσως).</p>
+                    <p class="description">Συνήθως το Service το καταχωρεί ο πελάτης από την πύλη. Από εδώ το καταχωρείτε εσείς (π.χ. όταν το έκανε η Thermic).</p>
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_record_service'); ?>
                         <input type="hidden" name="action" value="tw_record_service"><input type="hidden" name="id" value="<?php echo (int) $w->id; ?>">
@@ -618,6 +668,7 @@ final class TW_Admin {
                     $field('catchup_days', 'Καθυστερημένη αποστολή (ημέρες)', 'number', 'Αν η αυτόματη εκτέλεση χάσει μέρες (π.χ. το site ήταν εκτός λειτουργίας), μια υπενθύμιση στέλνεται έως τόσες ημέρες αργότερα. Παλαιότερες παραλείπονται.', 'min="0" max="60"');
                     $field('service_submit_window_days', 'Υποβολή Service από τον πελάτη (ημέρες πριν)', 'number', 'Πόσες ημέρες πριν από την ημερομηνία Service ανοίγει η φόρμα υποβολής στην πύλη. Η υποβολή επιτρέπεται έως την ημερομηνία κλειδώματος.', 'min="0" max="365"');
                     $field('service_resubmit_days', 'Προθεσμία νέας υποβολής μετά από απόρριψη (ημέρες)', 'number', 'Αν απορρίψετε μια υποβολή, ο πελάτης έχει τόσες ημέρες (και τουλάχιστον έως την κανονική ημερομηνία κλειδώματος) για να υποβάλει ξανά.', 'min="1" max="120"');
+                    $field('service_notify_company', 'Email για κάθε υποβολή Service', 'checkbox', 'Αποστολή email στην εταιρεία κάθε φορά που ένας πελάτης καταχωρεί Service. Χωρίς αυτό, οι υποβολές φαίνονται στην καρτέλα κάθε εγγύησης και στην Επισκόπηση.');
                     $field('max_registration_delay_days', 'Προθεσμία ενεργοποίησης (ημέρες)', 'number', 'Μέγιστες ημέρες από την αγορά έως την ενεργοποίηση. 0 = χωρίς όριο.', 'min="0"');
                 elseif ($tab === 'terms') : ?>
                     <tr><th>Όροι εγγύησης</th><td>
@@ -796,7 +847,7 @@ final class TW_Admin {
         $checkboxes = [
             'general' => ['admin_digest', 'invoice_required'],
             'app' => ['staff_2fa'],
-            'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner'],
+            'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner', 'service_notify_company'],
             'sms' => ['sms_enabled'],
         ];
         $numbers = ['service_submit_window_days', 'service_resubmit_days', 'warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
@@ -987,12 +1038,15 @@ final class TW_Admin {
         if (is_wp_error($row)) {
             self::flash($row->get_error_message(), 'error');
         } else {
-            $vars = TW_Warranty::service_vars($w, $row);
-            $key = $approve ? 'service_approved' : 'service_rejected';
-            $r = TW_Messenger::send_template_email($w->email, $key, $vars);
-            TW_Messenger::send_template_sms($w->phone_mobile, $key, $vars);
-            self::flash(($approve ? 'Το Service εγκρίθηκε.' : sprintf('Η υποβολή απορρίφθηκε. Ο πελάτης μπορεί να υποβάλει ξανά έως %s.', TW_Util::date_label($row->resubmit_until)))
-                . ($r === true ? ' Ο πελάτης ενημερώθηκε με email.' : ' Το email προς τον πελάτη απέτυχε: ' . esc_html($r)), $r === true ? 'success' : 'warning');
+            if ($approve) {
+                self::flash('Η υποβολή σημειώθηκε ως ελεγμένη.');
+            } else {
+                $vars = TW_Warranty::service_vars($w, $row);
+                $r = TW_Messenger::send_template_email($w->email, 'service_rejected', $vars);
+                TW_Messenger::send_template_sms($w->phone_mobile, 'service_rejected', $vars);
+                self::flash(sprintf('Η υποβολή απορρίφθηκε. Ο πελάτης μπορεί να υποβάλει ξανά έως %s.', TW_Util::date_label($row->resubmit_until))
+                    . ($r === true ? ' Ο πελάτης ενημερώθηκε με email.' : ' Το email προς τον πελάτη απέτυχε: ' . esc_html($r)), $r === true ? 'success' : 'warning');
+            }
         }
         $back = self::post('back');
         if ($back === 'dashboard') self::back('tw-dashboard');
@@ -1003,7 +1057,8 @@ final class TW_Admin {
         if (!current_user_can(self::cap())) wp_die('', 403);
         check_admin_referer('tw_receipt');
         $w = TW_Warranty::get((int) ($_GET['id'] ?? 0));
-        $sv = $w ? (TW_Warranty::services($w->id)[(int) ($_GET['milestone_no'] ?? 0)] ?? null) : null;
+        $sv = $w ? TW_Warranty::service_row((int) ($_GET['service_id'] ?? 0)) : null;
+        if ($sv && (int) $sv->warranty_id !== (int) $w->id) $sv = null;
         $path = $sv ? TW_Util::invoice_path($sv->receipt_file) : '';
         if (!$path) wp_die('Το αρχείο δεν βρέθηκε.');
         TW_DB::log_event('receipt_downloaded', ['milestone' => (int) $sv->milestone_no], $w->id, $w->serial_id);
@@ -1018,13 +1073,14 @@ final class TW_Admin {
     }
 
     public static function handle_delete_service() {
-        global $wpdb;
         self::guard('tw_delete_service');
         $w = self::warranty_from_post();
-        $no = (int) self::post('milestone_no');
-        TW_Warranty::delete_service_row($w->id, $no);
-        TW_DB::log_event('service_deleted', ['milestone' => $no], $w->id, $w->serial_id);
-        self::flash('Η καταχώρηση Service διαγράφηκε.');
+        $sv = TW_Warranty::service_row((int) self::post('service_id'));
+        if ($sv && (int) $sv->warranty_id === (int) $w->id) {
+            TW_Warranty::delete_service($sv);
+            TW_DB::log_event('service_deleted', ['milestone' => (int) $sv->milestone_no, 'date' => $sv->performed_date, 'source' => $sv->source], $w->id, $w->serial_id);
+            self::flash('Η καταχώρηση Service διαγράφηκε.');
+        }
         self::back('tw-warranties', ['view' => $w->id]);
     }
 

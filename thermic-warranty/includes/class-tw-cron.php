@@ -78,7 +78,7 @@ final class TW_Cron {
             foreach (TW_Schedule::milestones($w->purchase_date, $w->warranty_end) as $m) {
                 if ($m['type'] === 'service') {
                     $sv = $services[$m['no']] ?? null;
-                    // Submitted (pending review) or approved: the warranty continues, no reminders.
+                    // Submitted by the customer (or checked by the company): the warranty continues, no reminders.
                     if (TW_Warranty::service_counts($sv)) continue;
                     // Rejected but the customer may still resubmit: hold reminders and the lock until the deadline.
                     if (TW_Warranty::resubmit_open($sv, $today)) continue;
@@ -129,11 +129,6 @@ final class TW_Cron {
                         $w->customer_name, $w->email, $res === true ? '' : ' [ΑΠΟΤΥΧΙΑ: ' . $res . ']');
                 }
             }
-        }
-
-        $pending = (int) $wpdb->get_var("SELECT COUNT(*) FROM " . TW_DB::table('services') . " WHERE review_status = 'pending'");
-        if ($pending && $digest) {
-            $digest[] = sprintf('Υποβολές Service που περιμένουν έλεγχο: %d', $pending);
         }
 
         self::retention($today);
