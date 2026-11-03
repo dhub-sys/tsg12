@@ -76,3 +76,9 @@
 .tw-details summary { cursor: pointer; margin: 10px 0; }
 .tw-portal-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px; }
 .tw-privacy-box .tw-btn { margin: 4px 6px 4px 0; }
+
+.tw-service-form { border: 2px solid var(--tw-accent); border-radius: 10px; padding: 16px; margin: 16px 0; background: #fff; }
+.tw-service-form h5 { margin: 0 0 6px; font-size: 16px; }
+.tw-service-form .tw-alert { margin: 8px 0 12px; }
+.tw-ms--submitted td:last-child { color: #1e40af; font-weight: 600; }
+.tw-ms--rejected td:last-child { color: var(--tw-bad); font-weight: 600; }

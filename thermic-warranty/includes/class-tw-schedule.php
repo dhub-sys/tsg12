@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) exit;
 final class TW_Schedule {
 
     public static function add_years($date, $years) {
-        return (new DateTimeImmutable($date))->modify('+' . (int) $years . ' years')->format('Y-m-d');
+        return (new DateTimeImmutable($date))->modify(sprintf('%+d years', (int) $years))->format('Y-m-d');
     }
 
     public static function add_days($date, $days) {

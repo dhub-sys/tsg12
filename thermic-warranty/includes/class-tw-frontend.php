@@ -18,7 +18,7 @@ final class TW_Frontend {
         add_action('template_redirect', [__CLASS__, 'no_cache_on_our_pages']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
 
-        $public = ['reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_export', 'portal_erase', 'logout'];
+        $public = ['reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_service', 'portal_export', 'portal_erase', 'logout'];
         foreach ($public as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
@@ -339,6 +339,45 @@ final class TW_Frontend {
             TW_Warranty::set_marketing($w, $granted, 'portal');
         }
         wp_send_json_success(['message' => $granted ? 'Η συγκατάθεσή σας καταχωρήθηκε.' : 'Η συγκατάθεσή σας ανακλήθηκε. Δεν θα λαμβάνετε εμπορικές ενημερώσεις.']);
+    }
+
+    /** Customer submits the Service of a milestone: date, technician ΑΦΜ, receipt. */
+    public static function ajax_portal_service() {
+        $s = self::require_session();
+        $w = self::owned_warranty($s);
+        $no = (int) self::input('milestone_no');
+        $m = null;
+        foreach (TW_Warranty::timeline($w) as $row) {
+            if ($row['type'] === 'service' && $row['no'] === $no) $m = $row;
+        }
+        if (!$m || !$m['can_submit']) self::fail('Η υποβολή για αυτό το Service δεν είναι διαθέσιμη. Ανανεώστε τη σελίδα.', '', 409);
+
+        $date = self::input('performed_date');
+        $d = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if (!$d || $d->format('Y-m-d') !== $date) self::fail('Συμπληρώστε την ημερομηνία του Service.', 'performed_date');
+        if ($date > TW_Schedule::today()) self::fail('Η ημερομηνία του Service δεν μπορεί να είναι μελλοντική.', 'performed_date');
+        $earliest = TW_Schedule::add_days($m['due'], -max(0, (int) TW_Settings::get('service_submit_window_days')));
+        if ($date < $earliest) {
+            self::fail(sprintf('Για το %dο Service δεκτές είναι ημερομηνίες από %s και μετά.', $no, TW_Util::date_label($earliest)), 'performed_date');
+        }
+        $vat = preg_replace('/\D/', '', self::input('technician_vat'));
+        if (!TW_Util::valid_afm($vat)) self::fail('Ο ΑΦΜ τεχνικού δεν είναι έγκυρος.', 'technician_vat');
+        if (self::input('genuine_parts') !== '1') self::fail('Επιβεβαιώστε ότι χρησιμοποιήθηκαν αυθεντικά ανταλλακτικά.', 'genuine_parts');
+        if (empty($_FILES['receipt_file']['name'])) self::fail('Επισυνάψτε την απόδειξη του Service (PDF, JPG ή PNG).', 'receipt_file');
+        $receipt = TW_Util::store_invoice($_FILES['receipt_file'], 'της απόδειξης');
+        if (is_wp_error($receipt)) self::fail($receipt->get_error_message(), 'receipt_file');
+
+        $row = TW_Warranty::submit_service($w, $no, $date, $vat, sanitize_text_field(self::input('technician')), $receipt, sanitize_textarea_field(self::input('notes')));
+        $vars = TW_Warranty::service_vars($w, $row);
+        TW_Messenger::send_template_email($w->email, 'service_received', $vars);
+        $link = TW_App::admin_url('warranties', ['view' => $w->id]);
+        foreach (TW_Messenger::admin_recipients() as $to) {
+            TW_Messenger::send_email($to, sprintf('[Εγγυήσεις] Νέα υποβολή Service – S/N %s', $w->serial), sprintf(
+                "Ο πελάτης %s καταχώρησε το %dο Service.\n\nS/N: %s\nΚωδικός εγγύησης: %s\nΗμερομηνία Service: %s\nΑΦΜ τεχνικού: %s\n\nΈλεγχος και έγκριση: %s",
+                $w->customer_name, $no, $w->serial, $w->warranty_code, TW_Util::date_label($date), $vat, $link));
+        }
+        do_action('tw_service_submitted', $w, $row);
+        wp_send_json_success(['message' => sprintf('Το %dο Service καταχωρήθηκε. Η εγγύηση συνεχίζει κανονικά· θα σας ενημερώσουμε μόλις ελεγχθεί η απόδειξη.', $no)]);
     }
 
     public static function ajax_portal_export() {

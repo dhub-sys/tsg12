@@ -76,7 +76,13 @@ final class TW_Cron {
             }
 
             foreach (TW_Schedule::milestones($w->purchase_date, $w->warranty_end) as $m) {
-                if ($m['type'] === 'service' && isset($services[$m['no']])) continue;
+                if ($m['type'] === 'service') {
+                    $sv = $services[$m['no']] ?? null;
+                    // Submitted (pending review) or approved: the warranty continues, no reminders.
+                    if (TW_Warranty::service_counts($sv)) continue;
+                    // Rejected but the customer may still resubmit: hold reminders and the lock until the deadline.
+                    if (TW_Warranty::resubmit_open($sv, $today)) continue;
+                }
                 if ($m['type'] === 'service' && $w->status !== 'active') continue;
                 // A Service that fell due before the customer registered is not chased or used to lock.
                 if ($m['type'] === 'service' && $m['due'] < $registered) continue;
@@ -94,7 +100,7 @@ final class TW_Cron {
                         $claim = self::claim($w->id, $m['key'], $offset, 'email', $w->email);
                         if (!$claim) continue;
                         $reason = $m['type'] === 'service'
-                            ? sprintf('Δεν πραγματοποιήθηκε το %dο Service (ημερομηνία %s)', $m['no'], TW_Util::date_label($m['due']))
+                            ? sprintf('Δεν καταχωρήθηκε (ή δεν εγκρίθηκε) το %dο Service (ημερομηνία %s)', $m['no'], TW_Util::date_label($m['due']))
                             : sprintf('Οριστικό κλείδωμα μετά τη λήξη (%s)', TW_Util::date_label($m['due']));
                         TW_Warranty::lock($w, $reason);
                         $vars = self::vars($w, $m, $offset, $step_date);
@@ -123,6 +129,11 @@ final class TW_Cron {
                         $w->customer_name, $w->email, $res === true ? '' : ' [ΑΠΟΤΥΧΙΑ: ' . $res . ']');
                 }
             }
+        }
+
+        $pending = (int) $wpdb->get_var("SELECT COUNT(*) FROM " . TW_DB::table('services') . " WHERE review_status = 'pending'");
+        if ($pending && $digest) {
+            $digest[] = sprintf('Υποβολές Service που περιμένουν έλεγχο: %d', $pending);
         }
 
         self::retention($today);

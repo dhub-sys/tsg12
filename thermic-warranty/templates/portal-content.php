@@ -41,10 +41,13 @@ $s = TW_Settings::all();
             <?php foreach ($timeline as $m) :
                 if ($m['type'] === 'service') {
                     $label = sprintf('%dο Service (%d έτη)', $m['no'], $m['years']);
+                    $sv = $m['service'];
                     $state = [
-                        'done' => 'Πραγματοποιήθηκε ' . ($m['service'] ? TW_Util::date_label($m['service']->performed_date) : ''),
-                        'due' => 'Εκκρεμεί – έως ' . TW_Util::date_label($m['lock_date']),
-                        'missed' => 'Δεν πραγματοποιήθηκε',
+                        'done' => 'Εγκρίθηκε – Service ' . ($sv ? TW_Util::date_label($sv->performed_date) : ''),
+                        'submitted' => 'Υποβλήθηκε ' . ($sv ? TW_Util::date_label($sv->performed_date) : '') . ' – σε έλεγχο',
+                        'rejected' => 'Χρειάζεται νέα υποβολή έως ' . ($sv ? TW_Util::date_label($sv->resubmit_until) : ''),
+                        'due' => 'Εκκρεμεί – καταχώρηση έως ' . TW_Util::date_label($m['lock_date']),
+                        'missed' => 'Δεν καταχωρήθηκε',
                         'upcoming' => 'Προγραμματισμένο',
                         'before_registration' => '—',
                     ][$m['state']];
@@ -57,6 +60,42 @@ $s = TW_Settings::all();
             <?php endforeach; ?>
             </tbody>
         </table>
+        <?php foreach ($timeline as $m) : if (!$m['can_submit']) continue; $sv = $m['service']; ?>
+            <form class="tw-service-form" data-warranty="<?php echo (int) $w->id; ?>" novalidate enctype="multipart/form-data">
+                <h5>Υποβολή <?php echo (int) $m['no']; ?>ου Service</h5>
+                <?php if ($m['state'] === 'rejected' && $sv) : ?>
+                    <p class="tw-alert tw-alert--error">Η προηγούμενη υποβολή δεν εγκρίθηκε: <?php echo esc_html($sv->review_note); ?>. Υποβάλετε ξανά έως <?php echo esc_html(TW_Util::date_label($sv->resubmit_until)); ?>.</p>
+                <?php else : ?>
+                    <p class="tw-hint">Μόλις γίνει το Service, καταχωρήστε το εδώ έως <strong><?php echo esc_html(TW_Util::date_label($m['lock_date'])); ?></strong>, ώστε η εγγύηση να συνεχίσει να ισχύει μέχρι το επόμενο Service.</p>
+                <?php endif; ?>
+                <input type="hidden" name="milestone_no" value="<?php echo (int) $m['no']; ?>">
+                <div class="tw-grid">
+                    <div class="tw-field">
+                        <label>Ημερομηνία Service <span class="tw-req">*</span></label>
+                        <input type="date" name="performed_date" required max="<?php echo esc_attr(TW_Schedule::today()); ?>" min="<?php echo esc_attr(TW_Schedule::add_days($m['due'], -max(0, (int) $s['service_submit_window_days']))); ?>">
+                    </div>
+                    <div class="tw-field">
+                        <label>ΑΦΜ τεχνικού <span class="tw-req">*</span></label>
+                        <input type="text" name="technician_vat" inputmode="numeric" maxlength="9" required>
+                    </div>
+                </div>
+                <div class="tw-field">
+                    <label>Ονοματεπώνυμο / επωνυμία τεχνικού</label>
+                    <input type="text" name="technician" maxlength="200">
+                </div>
+                <div class="tw-field">
+                    <label>Απόδειξη Service (PDF, JPG ή PNG, έως <?php echo (int) $s['invoice_max_mb']; ?> MB) <span class="tw-req">*</span></label>
+                    <input type="file" name="receipt_file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
+                </div>
+                <div class="tw-field">
+                    <label>Σημειώσεις</label>
+                    <input type="text" name="notes" maxlength="500">
+                </div>
+                <label class="tw-check"><input type="checkbox" name="genuine_parts" value="1" required> <span>Βεβαιώνω ότι το Service έγινε με αυθεντικά ανταλλακτικά <?php echo esc_html($s['company_name']); ?>. <span class="tw-req">*</span></span></label>
+                <button type="submit" class="tw-btn">Υποβολή Service</button>
+            </form>
+        <?php endforeach; ?>
+
         <p class="tw-hint">Για το Service απευθυνθείτε στον συνεργάτη από τον οποίο αγοράσατε το προϊόν<?php echo $w->partner_email ? ' (' . esc_html($w->partner_email) . ')' : ''; ?> ή απευθείας στη <?php echo esc_html($s['company_name']); ?>: <?php echo esc_html($s['company_contact']); ?>. Το Service πρέπει να γίνεται με αυθεντικά ανταλλακτικά.</p>
 
         <details class="tw-details">

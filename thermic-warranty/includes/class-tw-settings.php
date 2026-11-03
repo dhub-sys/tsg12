@@ -22,6 +22,10 @@ final class TW_Settings {
             // If the daily job was missed (site down), still send a step up to this many days late.
             'catchup_days' => 7,
             'max_registration_delay_days' => 0,
+            // Customer Service submission: how many days before the due date the form opens,
+            // and how long a customer has to resubmit after a rejection.
+            'service_submit_window_days' => 90,
+            'service_resubmit_days' => 15,
             'admin_emails' => get_option('admin_email'),
             'admin_digest' => 1,
             'notify_partner' => 0,
@@ -54,6 +58,7 @@ final class TW_Settings {
     /** Message templates. Placeholders are listed in the settings page. */
     public static function template_defaults() {
         $genuine = "Για τη διατήρηση της εγγύησης, το Service πρέπει να γίνεται αποκλειστικά με αυθεντικά (γνήσια) ανταλλακτικά Thermic.";
+        $submit = "Μόλις γίνει το Service, καταχωρήστε το στο {portal_url} («Οι εγγυήσεις μου» → «Υποβολή Service»): ημερομηνία, ΑΦΜ τεχνικού και φωτογραφία ή PDF της απόδειξης. Έτσι η εγγύηση συνεχίζει να ισχύει μέχρι το επόμενο Service.";
         $where = "Για τον προγραμματισμό του Service μπορείτε να απευθυνθείτε στον συνεργάτη από τον οποίο αγοράσατε το προϊόν ({partner_email}) ή απευθείας στη {company_name}: {company_contact}.";
         $ident = "Προϊόν: {product_name}\nΣειριακός αριθμός: {serial}\nΚωδικός εγγύησης: {warranty_code}";
         return [
@@ -72,26 +77,44 @@ final class TW_Settings {
             'activation' => [
                 'label' => 'Επιβεβαίωση ενεργοποίησης εγγύησης',
                 'subject' => 'Η εγγύησή σας ενεργοποιήθηκε – {warranty_code}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nη εγγύηση του προϊόντος σας ενεργοποιήθηκε επιτυχώς.\n\n$ident\nΗμερομηνία αγοράς: {purchase_date}\nΛήξη εγγύησης: {warranty_end}\n\nΠρογραμματισμένο Service:\n{service_schedule}\n\n$genuine\n$where\n\nΜπορείτε να δείτε την εγγύησή σας οποτεδήποτε: {portal_url}",
+                'body' => "Αγαπητέ/ή {customer_name},\n\nη εγγύηση του προϊόντος σας ενεργοποιήθηκε επιτυχώς.\n\n$ident\nΗμερομηνία αγοράς: {purchase_date}\nΛήξη εγγύησης: {warranty_end}\n\nΠρογραμματισμένο Service:\n{service_schedule}\n\nΗ εγγύηση διατηρείται εφόσον κάθε Service γίνεται εγκαίρως και καταχωρείται στην πλατφόρμα (ημερομηνία, ΑΦΜ τεχνικού, απόδειξη).\n$genuine\n$where\n\nΜπορείτε να δείτε την εγγύησή σας οποτεδήποτε: {portal_url}",
                 'sms' => '{company_name}: Η εγγύηση του προϊόντος S/N {serial} ενεργοποιήθηκε. Κωδ. εγγύησης {warranty_code}, λήξη {warranty_end}.',
             ],
             'service_before' => [
                 'label' => 'Service – υπενθύμιση πριν από την ημερομηνία',
                 'subject' => 'Πλησιάζει το Service του προϊόντος σας – S/N {serial}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nσε {days} ημέρες ({due_date}) συμπληρώνονται {years} χρόνια από την αγορά και προβλέπεται το {milestone_no}ο περιοδικό Service του προϊόντος σας.\n\n$ident\n\n$where\n$genuine",
-                'sms' => '{company_name}: Στις {due_date} προβλέπεται Service για το S/N {serial}. Επικοινωνήστε με τον συνεργάτη σας ή με εμάς. Μόνο γνήσια ανταλλακτικά.',
+                'body' => "Αγαπητέ/ή {customer_name},\n\nσε {days} ημέρες ({due_date}) συμπληρώνονται {years} χρόνια από την αγορά και προβλέπεται το {milestone_no}ο περιοδικό Service του προϊόντος σας.\n\n$ident\n\n$where\n$genuine\n\n$submit",
+                'sms' => '{company_name}: Στις {due_date} προβλέπεται Service για το S/N {serial}. Μετά το Service καταχωρήστε το στο {portal_url}',
             ],
             'service_today' => [
                 'label' => 'Service – ημέρα Service',
                 'subject' => 'Σήμερα είναι η ημερομηνία Service – S/N {serial}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nσήμερα ({due_date}) είναι η προβλεπόμενη ημερομηνία του {milestone_no}ου περιοδικού Service.\n\n$ident\n\nΑν δεν έχει πραγματοποιηθεί, παρακαλούμε προγραμματίστε το έως {grace_end_date}.\n$where\n$genuine",
+                'body' => "Αγαπητέ/ή {customer_name},\n\nσήμερα ({due_date}) είναι η προβλεπόμενη ημερομηνία του {milestone_no}ου περιοδικού Service.\n\n$ident\n\nΑν δεν έχει πραγματοποιηθεί, παρακαλούμε προγραμματίστε το έως {grace_end_date}.\n$where\n$genuine\n\n$submit",
                 'sms' => '{company_name}: Σήμερα είναι η ημερομηνία Service για το S/N {serial}. Προγραμματίστε το έως {grace_end_date}.',
             ],
             'service_after' => [
                 'label' => 'Service – ολοκλήρωση περιόδου χάριτος',
-                'subject' => 'Δεν έχει καταγραφεί Service – S/N {serial}',
-                'body' => "Αγαπητέ/ή {customer_name},\n\nέχουν περάσει {days} ημέρες από την προβλεπόμενη ημερομηνία Service ({due_date}) και δεν έχει καταγραφεί Service για το προϊόν σας.\n\n$ident\n\nΑν το Service δεν πραγματοποιηθεί έως {lock_date}, η εγγύηση θα κλειδωθεί οριστικά.\n$where\n$genuine",
-                'sms' => '{company_name}: Δεν έχει καταγραφεί Service για το S/N {serial}. Αν δεν γίνει έως {lock_date}, η εγγύηση κλειδώνει οριστικά.',
+                'subject' => 'Δεν έχει καταχωρηθεί Service – S/N {serial}',
+                'body' => "Αγαπητέ/ή {customer_name},\n\nέχουν περάσει {days} ημέρες από την προβλεπόμενη ημερομηνία Service ({due_date}) και δεν έχει καταχωρηθεί Service για το προϊόν σας.\n\n$ident\n\nΑν το Service δεν γίνει και δεν καταχωρηθεί έως {lock_date}, η εγγύηση θα κλειδωθεί οριστικά.\n\n$submit\n$where\n$genuine",
+                'sms' => '{company_name}: Δεν έχει καταχωρηθεί Service για το S/N {serial}. Καταχωρήστε το έως {lock_date} στο {portal_url}, αλλιώς η εγγύηση κλειδώνει.',
+            ],
+            'service_received' => [
+                'label' => 'Service – επιβεβαίωση υποβολής από τον πελάτη',
+                'subject' => 'Λάβαμε την υποβολή Service – S/N {serial}',
+                'body' => "Αγαπητέ/ή {customer_name},\n\nλάβαμε την καταχώρηση του {milestone_no}ου Service του προϊόντος σας.\n\n$ident\nΗμερομηνία Service: {performed_date}\nΑΦΜ τεχνικού: {technician_vat}\n\nΗ εγγύηση συνεχίζει κανονικά. Θα ελέγξουμε την απόδειξη και θα σας ενημερώσουμε αν χρειαστεί κάτι επιπλέον.",
+                'sms' => '',
+            ],
+            'service_approved' => [
+                'label' => 'Service – έγκριση από την εταιρεία',
+                'subject' => 'Το Service εγκρίθηκε – η εγγύηση συνεχίζει – S/N {serial}',
+                'body' => "Αγαπητέ/ή {customer_name},\n\nτο {milestone_no}ο Service του προϊόντος σας ({performed_date}) ελέγχθηκε και εγκρίθηκε.\n\n$ident\n\nΗ εγγύηση συνεχίζει να ισχύει. {next_step}\n\nΣας ευχαριστούμε.",
+                'sms' => '{company_name}: Το Service του S/N {serial} εγκρίθηκε. Η εγγύηση συνεχίζει. {next_step}',
+            ],
+            'service_rejected' => [
+                'label' => 'Service – απόρριψη υποβολής',
+                'subject' => 'Χρειάζεται νέα υποβολή Service – S/N {serial}',
+                'body' => "Αγαπητέ/ή {customer_name},\n\nη υποβολή του {milestone_no}ου Service του προϊόντος σας δεν μπόρεσε να εγκριθεί.\n\nΛόγος: {review_note}\n\n$ident\n\nΠαρακαλούμε υποβάλετε ξανά τα σωστά στοιχεία έως {resubmit_until} στο {portal_url}. Αν δεν γίνει νέα υποβολή έως τότε, η εγγύηση θα κλειδωθεί οριστικά.\n\nΓια οποιαδήποτε απορία: {company_contact}.",
+                'sms' => '{company_name}: Η υποβολή Service για το S/N {serial} χρειάζεται διόρθωση. Δείτε το email σας και υποβάλετε ξανά έως {resubmit_until}.',
             ],
             'service_locked' => [
                 'label' => 'Service – οριστικό κλείδωμα',

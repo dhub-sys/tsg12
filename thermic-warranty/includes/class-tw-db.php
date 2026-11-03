@@ -8,12 +8,13 @@ if (!defined('ABSPATH')) exit;
  * warranties     – one activated warranty per serial (customer data lives here)
  * consents       – every consent given/withdrawn, with terms version, IP and time (GDPR proof)
  * otps           – email verification codes (registration and portal login), stored hashed
- * services       – Service visits recorded by the company, one per 3-year milestone
+ * services       – Service per 3-year milestone: submitted by the customer (date, technician ΑΦΜ,
+ *                  receipt) and reviewed by the company, or recorded by the company directly
  * notifications  – every reminder sent; the unique key makes the daily run idempotent
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.1.0';
+    const DB_VERSION = '1.2.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -133,7 +134,16 @@ final class TW_DB {
   performed_date date NOT NULL,
   performed_by varchar(20) NOT NULL DEFAULT 'partner',
   technician varchar(200) NOT NULL DEFAULT '',
+  technician_vat varchar(20) NOT NULL DEFAULT '',
   genuine_parts tinyint(1) NOT NULL DEFAULT 1,
+  receipt_file varchar(255) NOT NULL DEFAULT '',
+  receipt_original_name varchar(255) NOT NULL DEFAULT '',
+  source varchar(20) NOT NULL DEFAULT 'admin',
+  review_status varchar(20) NOT NULL DEFAULT 'approved',
+  review_note varchar(255) NOT NULL DEFAULT '',
+  reviewed_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  reviewed_at datetime NULL,
+  resubmit_until date NULL,
   notes text NULL,
   created_by bigint(20) unsigned NOT NULL DEFAULT 0,
   created_at datetime NOT NULL,

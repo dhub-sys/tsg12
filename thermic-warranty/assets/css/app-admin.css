@@ -157,3 +157,6 @@ body.tw-auth { min-height: 100vh; display: flex; align-items: center; justify-co
 .tw-auth .tw-otp { font-size: 24px; letter-spacing: 8px; text-align: center; }
 .tw-auth-links { text-align: center; margin: 16px 0 0; font-size: 13px; }
 .tw-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+.tw-review-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.tw-review-form input[type=text] { min-width: 180px; flex: 1; }

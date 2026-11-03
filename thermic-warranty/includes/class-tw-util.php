@@ -125,9 +125,9 @@ final class TW_Util {
      * Validates and stores the invoice upload in the private directory.
      * @return array|WP_Error ['file' => relative path, 'name' => original name]
      */
-    public static function store_invoice(array $file) {
+    public static function store_invoice(array $file, $label = 'του παραστατικού') {
         if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || (int) $file['error'] !== UPLOAD_ERR_OK) {
-            return new WP_Error('upload', 'Το αρχείο του παραστατικού δεν ανέβηκε σωστά.');
+            return new WP_Error('upload', sprintf('Το αρχείο %s δεν ανέβηκε σωστά.', $label));
         }
         $max = max(1, (int) TW_Settings::get('invoice_max_mb')) * 1024 * 1024;
         if ((int) $file['size'] > $max) {

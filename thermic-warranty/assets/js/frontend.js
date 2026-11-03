@@ -267,6 +267,31 @@
                 });
             });
 
+            content.querySelectorAll('.tw-service-form').forEach(function (f) {
+                f.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var req = f.querySelectorAll('[required]');
+                    for (var i = 0; i < req.length; i++) {
+                        var el = req[i];
+                        var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
+                        if (empty) { alertBox(root, 'Συμπληρώστε όλα τα υποχρεωτικά πεδία του Service.'); markField(f, el.name); return; }
+                    }
+                    var file = f.receipt_file.files[0];
+                    if (file && file.size > TW.maxMb * 1024 * 1024) { alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f, 'receipt_file'); return; }
+                    var fd = new FormData(f);
+                    fd.set('genuine_parts', f.genuine_parts.checked ? '1' : '0');
+                    fd.append('csrf', csrf);
+                    fd.append('warranty_id', f.getAttribute('data-warranty'));
+                    busy(f, true);
+                    post('portal_service', fd).then(function (r) {
+                        busy(f, false);
+                        if (!r.success) { alertBox(root, r.data.message); markField(f, r.data.field); return; }
+                        load();
+                        alertBox(root, r.data.message, 'success');
+                    });
+                });
+            });
+
             var exp = content.querySelector('[data-action="export"]');
             if (exp) exp.addEventListener('click', function () {
                 post('portal_export', { csrf: csrf }).then(function (r) {

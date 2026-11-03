@@ -53,7 +53,8 @@ final class TW_Privacy {
                 'registered_at' => $w->created_at,
                 'consents' => $consents,
                 'services' => array_values(array_map(function ($s) {
-                    return ['milestone' => (int) $s->milestone_no, 'date' => $s->performed_date, 'by' => $s->performed_by];
+                    return ['milestone' => (int) $s->milestone_no, 'date' => $s->performed_date, 'by' => $s->performed_by,
+                        'technician_vat' => $s->technician_vat, 'receipt_uploaded' => $s->receipt_file ? 'yes' : 'no', 'review_status' => $s->review_status];
                 }, TW_Warranty::services($w->id))),
             ];
         }
