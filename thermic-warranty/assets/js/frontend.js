@@ -124,7 +124,7 @@
                 l.classList.toggle('is-current', i + 1 === n);
                 l.classList.toggle('is-done', i + 1 < n);
             });
-            var first = root.querySelector('.tw-step[data-step="' + n + '"] input:not([readonly]):not([type=hidden])');
+            var first = root.querySelector('.tw-step[data-step="' + n + '"] input:not([readonly]):not([type=hidden]):not([name=tw_website])');
             if (first) first.focus();
         }
 
@@ -163,6 +163,7 @@
                 state.serial = r.data.serial;
                 state.pass = r.data.pass || '';
                 f2.querySelector('.tw-step-info').textContent = r.data.message;
+                if (window.TWOtp) { TWOtp.clear(f2.code); TWOtp.timer(f2.code, r.data.ttl); }
                 return true;
             });
         }
@@ -183,7 +184,7 @@
             busy(f2, true);
             post('reg_verify', extend({ serial: state.serial, email: state.email, code: code }, guard(f2, root) || {})).then(function (r) {
                 busy(f2, false);
-                if (!r.success) { alertBox(root, r.data.message); markField(f2, 'code'); return; }
+                if (!r.success) { alertBox(root, r.data.message); if (window.TWOtp) TWOtp.clear(f2.code); markField(f2, 'code'); return; }
                 alertBox(root, '');
                 state.token = r.data.token;
                 state.product = r.data.product;
@@ -308,6 +309,7 @@
                 if (!r.success) { alertBox(root, r.data.message); return; }
                 alertBox(root, '');
                 l2.querySelector('.tw-step-info').textContent = r.data.message;
+                if (window.TWOtp) { TWOtp.clear(l2.code); TWOtp.timer(l2.code, r.data.ttl); }
                 l1.hidden = true; l2.hidden = false;
                 l2.code.focus();
             });
@@ -318,7 +320,7 @@
             busy(l2, true);
             post('login_verify', extend({ email: email, code: l2.code.value }, guard(l2, root) || {})).then(function (r) {
                 busy(l2, false);
-                if (!r.success) { alertBox(root, r.data.message); markField(l2, 'code'); return; }
+                if (!r.success) { alertBox(root, r.data.message); if (window.TWOtp) TWOtp.clear(l2.code); markField(l2, 'code'); return; }
                 alertBox(root, '');
                 l2.reset();
                 load();

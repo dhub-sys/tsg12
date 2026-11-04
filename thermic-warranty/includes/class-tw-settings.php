@@ -30,7 +30,8 @@ final class TW_Settings {
             'admin_emails' => get_option('admin_email'),
             'admin_digest' => 1,
             'notify_partner' => 0,
-            'email_from_name' => 'Thermic',
+            'email_from_name' => '',
+            'email_reply_to' => '',
             'email_from_address' => '',
             'invoice_required' => 1, // legacy (≤1.3): replaced by invoice_mode
             // Purchase invoice file at activation: required | optional | off
@@ -55,6 +56,12 @@ final class TW_Settings {
             'turnstile_secret' => '',
             'turnstile_staff' => 0,
             'turnstile_public' => 0,
+            // Manager access by IP – changed only by WordPress administrators (wp-admin → Πρόσβαση με IP).
+            'ip_lock' => 0,
+            'ip_allow' => '',
+            'ip_proxy' => '',
+            // Lifetime of the emailed one-time codes, in minutes.
+            'otp_minutes' => 2,
             'portal_url' => '',
             'register_url' => '',
             'privacy_url' => '',

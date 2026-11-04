@@ -81,8 +81,8 @@ final class TW_Admin {
         // Open the standalone app in a new tab straight from the wp-admin menu.
         add_action('admin_footer', function () {
             if (!current_user_can(self::cap())) return;
-            echo '<script>(function(){var a=document.querySelector("#toplevel_page_tw-app > a");if(!a)return;'
-                . 'a.href=' . wp_json_encode(TW_App::admin_url()) . ';a.target="_blank";a.rel="noopener";})();</script>';
+            echo '<script>(function(){document.querySelectorAll("#toplevel_page_tw-app > a, #toplevel_page_tw-app .wp-submenu a[href$=\'page=tw-app\']").forEach(function(a){'
+                . 'a.href=' . wp_json_encode(TW_App::admin_url()) . ';a.target="_blank";a.rel="noopener";});})();</script>';
         });
         add_action('admin_menu', function () {
             $hook = add_menu_page(TW_App::APP_NAME, TW_App::APP_NAME, self::cap(), 'tw-app', '__return_null', TW_App::menu_icon(), 56);
@@ -792,7 +792,7 @@ final class TW_Admin {
         $tpl = TW_Settings::template_defaults();
         $post = self::url();
         $tab = self::q('tab') ?: 'general';
-        $tabs = ['general' => 'Γενικά', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo (email & SMS)', 'sms' => 'Άλλος πάροχος SMS', 'security' => 'Προστασία φορμών', 'privacy' => 'GDPR'];
+        $tabs = ['general' => 'Γενικά', 'sender' => 'Αποστολέας', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo (email & SMS)', 'sms' => 'Άλλος πάροχος SMS', 'security' => 'Ασφάλεια', 'privacy' => 'GDPR'];
         $field = function ($key, $label, $type = 'text', $desc = '', $attrs = '') use ($s) {
             echo '<tr><th><label for="tw-' . esc_attr($key) . '">' . esc_html($label) . '</label></th><td>';
             if ($type === 'checkbox') {
@@ -822,8 +822,6 @@ final class TW_Admin {
                     $field('company_contact', 'Στοιχεία επικοινωνίας για Service', 'text', 'Εμφανίζεται στα μηνύματα: «…ή απευθείας στη Thermic: <em>αυτό το κείμενο</em>».');
                     $field('register_url', 'Σελίδα ενεργοποίησης (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url()) . '</code>. Συμπληρώστε μόνο αν βάλατε το shortcode <code>[thermic_warranty_register]</code> σε δική σας σελίδα του site.');
                     $field('portal_url', 'Σελίδα «Οι εγγυήσεις μου» (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url('my')) . '</code>. Συμπληρώστε μόνο αν χρησιμοποιείτε το shortcode <code>[thermic_warranty_portal]</code>. Μπαίνει στα email.');
-                    $field('email_from_name', 'Όνομα αποστολέα email');
-                    $field('email_from_address', 'Email αποστολέα', 'email', 'Προτείνεται SMTP plugin (π.χ. WP Mail SMTP) με SPF/DKIM για τον τομέα, ώστε τα μηνύματα να μην πηγαίνουν στα ανεπιθύμητα.');
                     $field('admin_emails', 'Email εταιρείας για ειδοποιήσεις', 'text', 'Ένα ή περισσότερα, χωρισμένα με κόμμα.');
                     $field('admin_digest', 'Ημερήσια αναφορά', 'checkbox', 'Κάθε πρωί (περίπου 09:00) email στα «Email εταιρείας για ειδοποιήσεις» με όσα έγιναν τις τελευταίες 24 ώρες: υπενθυμίσεις, αποτυχίες, μηνύματα που δεν παραδόθηκαν, λήξεις και κλειδώματα, νέες ενεργοποιήσεις, υποβολές Service. Στέλνεται μόνο αν υπάρχει κάτι.');
                     self::select_row('invoice_mode', 'Αρχείο παραστατικού αγοράς (ενεργοποίηση)', TW_Settings::invoice_mode(), [
@@ -966,9 +964,9 @@ final class TW_Admin {
                         <p class="description">Brevo → Settings → SMTP &amp; API → API Keys. Αφήστε κενό για να κρατήσετε το αποθηκευμένο.</p></td></tr>
                     <?php
                     $field('brevo_email', 'Email μέσω Brevo', 'checkbox', 'Όλα τα email της πλατφόρμας (υπενθυμίσεις, επιβεβαιώσεις, κωδικοί) στέλνονται μέσω Brevo.');
-                    $field('brevo_sender_email', 'Email αποστολέα', 'email', 'Διεύθυνση του domain σας, επιβεβαιωμένη στο Brevo (Senders & IP), π.χ. warranty@thermic.gr.');
-                    $field('brevo_sender_name', 'Όνομα αποστολέα', 'text');
-                    $field('brevo_reply_to', 'Απαντήσεις πελατών στο', 'email', 'Προαιρετικό, π.χ. service@thermic.gr.');
+                    $field('brevo_sender_email', 'Email αποστολέα', 'email', 'Επιβεβαιωμένο στο Brevo (Senders &amp; IP). Κενό = το email της καρτέλας «Αποστολέας».');
+                    $field('brevo_sender_name', 'Όνομα αποστολέα', 'text', 'Κενό = η επωνυμία της καρτέλας «Αποστολέας».');
+                    $field('brevo_reply_to', 'Απαντήσεις πελατών στο', 'email', 'Κενό = το Reply-To της καρτέλας «Αποστολέας».');
                     $field('brevo_sms', 'SMS μέσω Brevo', 'checkbox', 'Τα SMS στέλνονται μέσω Brevo (χρειάζονται μονάδες SMS στον λογαριασμό).');
                     $field('brevo_sms_sender', 'Αποστολέας SMS', 'text', 'Έως 11 λατινικοί χαρακτήρες, π.χ. THERMIC.', 'maxlength="11"');
                     $field('fallback_channel', 'Εναλλακτικό κανάλι', 'checkbox', 'Αν μια υπενθύμιση δεν παραδοθεί με email, στέλνεται με SMS (και το αντίστροφο).');
@@ -986,10 +984,33 @@ final class TW_Admin {
                     $field('sms_method', 'Μέθοδος HTTP', 'text', 'POST ή GET.');
                     $field('sms_headers', 'Headers', 'textarea', 'Ένα ανά γραμμή, π.χ. <code>Authorization: Bearer …</code>.');
                     $field('sms_body', 'Σώμα αιτήματος', 'textarea', 'Για POST. Πεδία: <code>{to} {to_no_plus} {text} {sender}</code>. Για JSON οι τιμές μπαίνουν με σωστό escaping.');
+                elseif ($tab === 'sender') :
+                    $host = preg_replace('/^www\./', '', (string) wp_parse_url(home_url(), PHP_URL_HOST));
+                    ?>
+                    <tr><td colspan="2"><p class="description">Από ποιον φαίνεται ότι έρχονται <strong>όλα</strong> τα email της πλατφόρμας: κωδικοί OTP, επιβεβαιώσεις, υπενθυμίσεις Service, ειδοποιήσεις της ομάδας και η ημερήσια αναφορά. Ισχύει και για το Brevo, εκτός αν εκεί ορίσετε διαφορετικά στοιχεία.</p></td></tr>
+                    <?php
+                    $field('email_from_name', 'Επωνυμία αποστολέα', 'text', 'Το όνομα που βλέπει ο παραλήπτης, π.χ. «Thermic Sol – Εγγυήσεις». Κενό = η επωνυμία από τα Γενικά (' . esc_html($s['company_name']) . ').', 'placeholder="' . esc_attr($s['company_name']) . '"');
+                    $field('email_from_address', 'Email αποστολέα', 'email', 'Διεύθυνση του domain σας, π.χ. <code>warranty@' . esc_html($host) . '</code> ή <code>noreply@' . esc_html($host) . '</code>. Κενό = η προεπιλογή της ιστοσελίδας (συνήθως <code>wordpress@' . esc_html($host) . '</code>), γι’ αυτό τα μηνύματα φαίνονται να έρχονται από το «WordPress».', 'placeholder="warranty@' . esc_attr($host) . '"');
+                    $field('email_reply_to', 'Απαντήσεις στο (Reply-To)', 'email', 'Προαιρετικό: πού πηγαίνει η απάντηση αν ο πελάτης πατήσει «Απάντηση», π.χ. <code>service@' . esc_html($host) . '</code>.');
+                    ?>
+                    <tr><td colspan="2"><div class="tw-tip"><span>💡</span><span>Για να μην πηγαίνουν τα μηνύματα στα ανεπιθύμητα, το email αποστολέα πρέπει να ανήκει στο domain σας και να στέλνεται μέσω Brevo ή SMTP (π.χ. WP Mail SMTP) με SPF/DKIM. Αν χρησιμοποιείτε SMTP plugin με ενεργή την επιλογή «Force From Email / Name», αυτό υπερισχύει: απενεργοποιήστε την ή βάλτε εκεί τα ίδια στοιχεία. Με «Αποστολή δοκιμής» παρακάτω βλέπετε πώς φτάνει το μήνυμα.</span></div></td></tr>
+                    <?php
                 elseif ($tab === 'security') :
                     $st = TW_Guard::stats(30);
                     ?>
-                    <tr><td colspan="2"><p class="description">Προστασία από bots και αυτόματες υποβολές σε όλες τις φόρμες: σύνδεση ομάδας, ενεργοποίηση εγγύησης, σύνδεση πελάτη στο «Οι εγγυήσεις μου» και υποβολή Service.</p>
+                    <tr><td colspan="2"><h2 style="margin:4px 0 0">Κωδικοί μίας χρήσης (OTP)</h2></td></tr>
+                    <tr><th><label for="tw-otp-min">Διάρκεια κωδικού</label></th><td>
+                        <select id="tw-otp-min" name="s[otp_minutes]">
+                            <?php foreach (TW_OTP::MINUTE_CHOICES as $m) printf('<option value="%d"%s>%d λεπτά</option>', $m, selected(TW_OTP::ttl_minutes(), $m, false), $m); ?>
+                        </select>
+                        <p class="description">Πόσο ισχύει ο κωδικός που στέλνεται με email στους πελάτες (ενεργοποίηση, «Οι εγγυήσεις μου») και στην ομάδα (σύνδεση, ορισμός κωδικού πρόσβασης). Στην οθόνη του κωδικού φαίνεται ο χρόνος που απομένει.</p>
+                    </td></tr>
+                    <tr><td colspan="2"><h2 style="margin:8px 0 0">Πρόσβαση με IP</h2>
+                        <p><?php if (TW_Access::active()) : ?><strong style="color:#15803d">Ενεργός.</strong> Το <?php echo esc_html(TW_App::APP_NAME); ?> ανοίγει μόνο από: <code><?php echo esc_html(implode(', ', TW_Access::allowed_list())); ?></code>.
+                        <?php else : ?><strong>Ανενεργός.</strong> Το <?php echo esc_html(TW_App::APP_NAME); ?> ανοίγει από οποιαδήποτε σύνδεση.<?php endif; ?>
+                        Η IP σας: <code><?php echo esc_html(TW_Access::visitor_ip()); ?></code>.</p>
+                        <p class="description">Τον περιορισμό τον ενεργοποιούν και τον αλλάζουν μόνο οι διαχειριστές της ιστοσελίδας<?php if (current_user_can('manage_options')) : ?>, από <a href="<?php echo esc_url(TW_Access::admin_page_url()); ?>" target="_blank" rel="noopener">Warranty Manager → Πρόσβαση με IP</a><?php endif; ?>.</p></td></tr>
+                    <tr><td colspan="2"><h2 style="margin:8px 0 0">Προστασία φορμών</h2><p class="description">Προστασία από bots και αυτόματες υποβολές σε όλες τις φόρμες: σύνδεση ομάδας, ενεργοποίηση εγγύησης, σύνδεση πελάτη στο «Οι εγγυήσεις μου» και υποβολή Service.</p>
                         <?php if (TW_Guard::disabled_by_constant()) : ?><div class="notice notice-warning inline"><p>Το Turnstile είναι απενεργοποιημένο από το <code>wp-config.php</code> (<code>TW_DISABLE_TURNSTILE</code>). Το honeypot παραμένει ενεργό.</p></div><?php endif; ?></td></tr>
                     <tr><th>Honeypot</th><td><p><strong>Πάντα ενεργό.</strong> Κάθε φόρμα έχει ένα κρυφό πεδίο που δεν βλέπει ο άνθρωπος· τα bots το συμπληρώνουν και η υποβολή απορρίπτεται. Επίσης απορρίπτονται φόρμες που στάλθηκαν σε λιγότερο από <?php echo (int) TW_Guard::MIN_SECONDS; ?> δευτερόλεπτα από το άνοιγμά τους.</p>
                         <p class="description">Τελευταίες 30 ημέρες: <?php echo (int) $st['honeypot']; ?> μπλοκαρίστηκαν από το honeypot · <?php echo (int) $st['too_fast']; ?> ως πολύ γρήγορες · <?php echo (int) $st['turnstile']; ?> από το Turnstile.</p></td></tr>
@@ -1040,7 +1061,7 @@ final class TW_Admin {
             </form>
             <?php if ($tab === 'privacy') self::erasure_requests(); ?>
             <?php if ($tab === 'brevo') self::brevo_tools(); ?>
-            <?php if (in_array($tab, ['messages', 'sms', 'general', 'brevo'], true)) : ?>
+            <?php if (in_array($tab, ['messages', 'sms', 'general', 'brevo', 'sender'], true)) : ?>
                 <h2>Δοκιμαστική αποστολή</h2>
                 <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
                     <?php wp_nonce_field('tw_test_message'); ?><input type="hidden" name="action" value="tw_test_message"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
@@ -1578,19 +1599,21 @@ final class TW_Admin {
             'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner', 'service_notify_company'],
             'sms' => ['sms_enabled'],
             'security' => ['turnstile_staff', 'turnstile_public'],
+            'sender' => [],
         ];
         $numbers = ['service_submit_window_days', 'service_resubmit_days', 'warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
         $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label'];
         $urls = ['portal_url', 'register_url', 'privacy_url', 'sms_url', 'logo_url'];
         $values = [];
         foreach ($in as $k => $v) {
-            if (!array_key_exists($k, $defaults) || $k === 'templates') continue;
+            if (!array_key_exists($k, $defaults) || $k === 'templates' || strpos($k, 'ip_') === 0) continue; // IP lock: wp-admin only
             if (in_array($k, $numbers, true)) $values[$k] = max(0, (int) $v);
             elseif (in_array($k, $urls, true)) $values[$k] = esc_url_raw(trim($v));
             elseif (in_array($k, $multiline, true)) $values[$k] = sanitize_textarea_field($v);
             elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
             elseif ($k === 'invoice_mode') $values[$k] = in_array($v, ['required', 'optional', 'off'], true) ? $v : 'required';
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
+            elseif ($k === 'otp_minutes') $values[$k] = in_array((int) $v, TW_OTP::MINUTE_CHOICES, true) ? (int) $v : 2;
             elseif ($k === 'staff_session_minutes') $values[$k] = in_array((int) $v, TW_Staff_Auth::SESSION_CHOICES, true) ? (int) $v : 120;
             elseif ($k === 'pdf_watermark') $values[$k] = in_array($v, ['text', 'logo', 'none'], true) ? $v : 'text';
             elseif ($k === 'pdf_watermark_opacity') $values[$k] = max(0, min(100, (int) $v));
@@ -1654,7 +1677,7 @@ final class TW_Admin {
             $newkey = trim(self::post('brevo_api_key_new'));
             if ($newkey !== '') $values['brevo_api_key'] = sanitize_text_field($newkey);
             unset($values['brevo_webhook_token']);
-            if (!empty($values['brevo_email']) && !is_email($values['brevo_sender_email'] ?? '')) {
+            if (!empty($values['brevo_email']) && !is_email($values['brevo_sender_email'] ?? '') && !is_email(TW_Settings::get('email_from_address'))) {
                 $msg .= ' Προσοχή: συμπληρώστε email αποστολέα επιβεβαιωμένο στο Brevo.';
             }
         }
@@ -1974,7 +1997,7 @@ final class TW_Admin {
             'purchase_date' => TW_Schedule::today(), 'warranty_end' => TW_Schedule::warranty_end(TW_Schedule::today()), 'partner_email' => 'partner@example.com',
         ];
         $vars = TW_Messenger::warranty_vars($fake, ['due_date' => TW_Util::date_label(TW_Schedule::add_days(TW_Schedule::today(), 30)), 'days' => 30, 'years' => 3,
-            'milestone_no' => 1, 'grace_end_date' => '—', 'lock_date' => '—', 'code' => '123456', 'minutes' => TW_OTP::TTL_MINUTES]);
+            'milestone_no' => 1, 'grace_end_date' => '—', 'lock_date' => '—', 'code' => '123456', 'minutes' => TW_OTP::ttl_minutes()]);
         $out = [];
         if (is_email($fake->email)) {
             $r = TW_Messenger::send_template_email($fake->email, $key, $vars);

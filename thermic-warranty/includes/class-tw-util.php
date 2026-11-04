@@ -40,7 +40,8 @@ final class TW_Util {
 
     public static function client_ip() {
         // REMOTE_ADDR only: forwarded headers are spoofable unless the site sits behind a known proxy.
-        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        // Behind Cloudflare / a reverse proxy (wp-admin → Πρόσβαση με IP) the visitor's IP comes from the proxy's header.
+        $ip = class_exists('TW_Access') ? TW_Access::visitor_ip() : (isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '');
         $ip = apply_filters('tw_client_ip', $ip);
         return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
     }

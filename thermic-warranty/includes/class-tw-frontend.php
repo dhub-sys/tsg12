@@ -38,7 +38,8 @@ final class TW_Frontend {
         wp_register_style('tw-fonts', TW_URL . 'assets/css/fonts.css', [], TW_VERSION);
         wp_register_style('tw-front', TW_URL . 'assets/css/frontend.css', ['tw-fonts'], TW_VERSION);
         wp_add_inline_style('tw-front', TW_App::brand_vars());
-        wp_register_script('tw-front', TW_URL . 'assets/js/frontend.js', [], TW_VERSION, true);
+        wp_register_script('tw-otp', TW_URL . 'assets/js/otp-input.js', [], TW_VERSION, true);
+        wp_register_script('tw-front', TW_URL . 'assets/js/frontend.js', ['tw-otp'], TW_VERSION, true);
         wp_localize_script('tw-front', 'TW', [
             'ajax' => admin_url('admin-ajax.php'),
             'maxMb' => (int) TW_Settings::get('invoice_max_mb'),
@@ -127,7 +128,7 @@ final class TW_Frontend {
             'company_contact' => TW_Settings::get('company_contact'),
             'serial' => $serial->serial,
             'code' => $code,
-            'minutes' => TW_OTP::TTL_MINUTES,
+            'minutes' => TW_OTP::ttl_minutes(),
         ];
         $sent = TW_Messenger::send_template_email($email, 'registration_otp', $vars);
         if ($sent !== true) {
@@ -136,9 +137,10 @@ final class TW_Frontend {
         }
         TW_DB::log_event('otp_sent', ['email' => TW_Util::mask_email($email)], 0, $serial->id, 'customer:' . $email);
         wp_send_json_success([
-            'message' => sprintf('Στείλαμε έναν 6ψήφιο κωδικό επαλήθευσης στο %s. Ισχύει για %d λεπτά.', TW_Util::mask_email($email), TW_OTP::TTL_MINUTES),
+            'message' => sprintf('Στείλαμε έναν 6ψήφιο κωδικό επαλήθευσης στο %s. Ισχύει για %d λεπτά.', TW_Util::mask_email($email), TW_OTP::ttl_minutes()),
             'serial' => $serial->serial,
             'pass' => TW_Guard::pass($subject),
+            'ttl' => TW_OTP::ttl_minutes() * MINUTE_IN_SECONDS,
         ]);
     }
 
@@ -275,16 +277,16 @@ final class TW_Frontend {
             // Same answer whether or not the email exists, so the form can't be used to discover customers.
             // A throwaway row keeps the rate limit counting for unknown addresses too.
             TW_OTP::create('login_unknown', $email, 0);
-            wp_send_json_success(['message' => $generic]);
+            wp_send_json_success(['message' => $generic, 'ttl' => TW_OTP::ttl_minutes() * MINUTE_IN_SECONDS]);
         }
         [, $code] = TW_OTP::create('login', $email, 0);
         TW_Messenger::send_template_email($email, 'login_otp', [
             'company_name' => TW_Settings::get('company_name'),
             'company_contact' => TW_Settings::get('company_contact'),
             'code' => $code,
-            'minutes' => TW_OTP::TTL_MINUTES,
+            'minutes' => TW_OTP::ttl_minutes(),
         ]);
-        wp_send_json_success(['message' => $generic]);
+        wp_send_json_success(['message' => $generic, 'ttl' => TW_OTP::ttl_minutes() * MINUTE_IN_SECONDS]);
     }
 
     public static function ajax_login_verify() {

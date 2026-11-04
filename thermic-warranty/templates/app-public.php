@@ -42,6 +42,7 @@ $config = [
     </div>
 </footer>
 <script>var TW = <?php echo wp_json_encode($config); ?>;</script>
+<script src="<?php echo esc_url(TW_App::asset('assets/js/otp-input.js')); ?>"></script>
 <script src="<?php echo esc_url(TW_App::asset('assets/js/frontend.js')); ?>"></script>
 <?php if (TW_Guard::on('public')) : ?><script src="<?php echo esc_url(TW_Guard::explicit_script_url()); ?>" async defer></script><?php endif; ?>
 </body>

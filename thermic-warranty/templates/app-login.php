@@ -4,6 +4,11 @@ if (!defined('ABSPATH')) exit;
 $step = $view['step'] ?? 'login';
 $email = $view['email'] ?? '';
 $action = TW_App::admin_url();
+// Seconds left on the code just sent (countdown under the digit boxes).
+$otp_user = $email ? get_user_by('email', $email) : null;
+$ttl = function ($purpose) use ($otp_user, $email) {
+    return $otp_user ? TW_OTP::seconds_left($purpose, strtolower($email), $otp_user->ID) : 0;
+};
 $fields = function () {
     wp_nonce_field('tw_staff_auth');
     echo TW_Guard::fields(); // phpcs:ignore -- built from escaped parts
@@ -32,7 +37,7 @@ $fields = function () {
         <h1>Επαλήθευση</h1>
         <form method="post" action="<?php echo esc_url($action); ?>">
             <?php $fields(); ?><input type="hidden" name="action" value="tw_staff_otp"><input type="hidden" name="email" value="<?php echo esc_attr($email); ?>">
-            <label>Κωδικός μίας χρήσης<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required autofocus class="tw-otp"></label>
+            <label>Κωδικός μίας χρήσης<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required autofocus class="tw-otp" data-ttl="<?php echo (int) $ttl('staff'); ?>" data-expired-text="Ο κωδικός έληξε. Πατήστε «Επιστροφή» και συνδεθείτε ξανά για νέο κωδικό."></label>
             <button class="button button-primary button-hero">Σύνδεση</button>
         </form>
         <p class="tw-auth-links"><a href="<?php echo esc_url($action); ?>">← Επιστροφή</a></p>
@@ -52,7 +57,7 @@ $fields = function () {
         <h1>Ορισμός κωδικού πρόσβασης</h1>
         <form method="post" action="<?php echo esc_url($action); ?>">
             <?php $fields(); ?><input type="hidden" name="action" value="tw_staff_reset"><input type="hidden" name="email" value="<?php echo esc_attr($email); ?>">
-            <label>Κωδικός από το email<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required autofocus class="tw-otp"></label>
+            <label>Κωδικός από το email<input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}" required autofocus class="tw-otp" data-ttl="<?php echo (int) $ttl('staff_reset'); ?>" data-no-autosubmit></label>
             <label>Νέος κωδικός πρόσβασης (τουλάχιστον <?php echo (int) TW_Staff_Auth::MIN_PASSWORD; ?> χαρακτήρες)<input type="password" name="password" autocomplete="new-password" minlength="<?php echo (int) TW_Staff_Auth::MIN_PASSWORD; ?>" required></label>
             <label>Επανάληψη<input type="password" name="password2" autocomplete="new-password" required></label>
             <button class="button button-primary button-hero">Αποθήκευση &amp; σύνδεση</button>
@@ -71,6 +76,7 @@ $fields = function () {
         <p class="tw-auth-links"><a href="<?php echo esc_url(add_query_arg('forgot', 1, $action)); ?>">Πρώτη σύνδεση / ξέχασα τον κωδικό</a></p>
     <?php endif; ?>
 </main>
+<script src="<?php echo esc_url(TW_App::asset('assets/js/otp-input.js')); ?>"></script>
 <p class="tw-auth-credit">Έκδοση <?php echo esc_html(TW_VERSION); ?> · Developed by <a href="https://www.dazzlink.gr" target="_blank" rel="noopener">Dazzlink</a></p>
 </body>
 </html>

@@ -82,7 +82,7 @@ final class TW_Staff_Auth {
         [, $code] = TW_OTP::create($purpose, strtolower($user->user_email), $user->ID);
         return TW_Messenger::send_email($user->user_email, $subject,
             sprintf("Γεια σας %s,\n\nο κωδικός σας για το διαχειριστικό εγγυήσεων είναι:\n\n%s\n\nΙσχύει για %d λεπτά. Αν δεν τον ζητήσατε εσείς, αγνοήστε το μήνυμα και ενημερώστε τον υπεύθυνο.",
-                $user->display_name, $code, TW_OTP::TTL_MINUTES));
+                $user->display_name, $code, TW_OTP::ttl_minutes()));
     }
 
     const SESSION_CHOICES = [15, 30, 60, 120, 240, 480, 720, 1440];

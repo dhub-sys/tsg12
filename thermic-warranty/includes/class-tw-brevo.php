@@ -81,14 +81,15 @@ final class TW_Brevo {
         $s = TW_Settings::all();
         $from = is_email($s['brevo_sender_email']) ? $s['brevo_sender_email'] : (is_email($s['email_from_address']) ? $s['email_from_address'] : get_option('admin_email'));
         $body = [
-            'sender' => ['email' => $from, 'name' => $s['brevo_sender_name'] ?: ($s['email_from_name'] ?: $s['company_name'])],
+            'sender' => ['email' => $from, 'name' => $s['brevo_sender_name'] ?: TW_Messenger::sender()['name']],
             'to' => [['email' => $to]],
             'subject' => $subject,
             'htmlContent' => $html,
             'textContent' => $text,
             'tags' => ['thermic-warranty'],
         ];
-        if (is_email($s['brevo_reply_to'])) $body['replyTo'] = ['email' => $s['brevo_reply_to']];
+        $reply = is_email($s['brevo_reply_to']) ? $s['brevo_reply_to'] : TW_Messenger::sender()['reply_to'];
+        if ($reply) $body['replyTo'] = ['email' => $reply];
         $r = self::request('POST', 'smtp/email', $body);
         if (is_wp_error($r)) return $r->get_error_message();
         TW_Messenger::$last_id = self::norm_id($r['messageId'] ?? '');

@@ -8,10 +8,27 @@ if (!defined('ABSPATH')) exit;
  * Codes and continuation tokens are stored as HMAC hashes only.
  */
 final class TW_OTP {
-    const TTL_MINUTES = 15;
+    const MINUTE_CHOICES = [2, 3, 5, 10, 15];
     const MAX_ATTEMPTS = 5;
     const TOKEN_TTL_MINUTES = 60;
-    const MAX_SENDS_PER_HOUR_EMAIL = 5;
+    const MAX_SENDS_PER_HOUR_EMAIL = 8; // short-lived codes mean a few more "send a new code"
+
+    /** How long an emailed code is valid (Settings → Ασφάλεια, default 2 minutes). */
+    public static function ttl_minutes() {
+        $m = (int) TW_Settings::get('otp_minutes');
+        return in_array($m, self::MINUTE_CHOICES, true) ? $m : 2;
+    }
+
+    /** Seconds left on the newest open code (for the countdown on the code screen). */
+    public static function seconds_left($purpose, $email, $serial_id = 0) {
+        global $wpdb;
+        $t = TW_DB::table('otps');
+        $exp = $wpdb->get_var($wpdb->prepare(
+            "SELECT expires_at FROM $t WHERE purpose = %s AND email = %s AND serial_id = %d AND verified_at IS NULL ORDER BY id DESC LIMIT 1",
+            $purpose, $email, (int) $serial_id
+        ));
+        return $exp ? max(0, strtotime($exp) - current_time('timestamp')) : 0;
+    }
     const MAX_SENDS_PER_HOUR_IP = 20;
 
     public static function hash($value) {
@@ -55,7 +72,7 @@ final class TW_OTP {
             'email' => $email,
             'serial_id' => (int) $serial_id,
             'code_hash' => self::hash($code),
-            'expires_at' => date('Y-m-d H:i:s', current_time('timestamp') + self::TTL_MINUTES * MINUTE_IN_SECONDS),
+            'expires_at' => date('Y-m-d H:i:s', current_time('timestamp') + self::ttl_minutes() * MINUTE_IN_SECONDS),
             'ip' => TW_Util::client_ip(),
             'created_at' => $now,
         ]);

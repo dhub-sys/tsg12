@@ -44,13 +44,20 @@ final class TW_Messenger {
         return array_merge($vars, $extra);
     }
 
+    /** Sender shown on every email (Settings → Αποστολέας); the name falls back to the company name. */
+    public static function sender() {
+        $s = TW_Settings::all();
+        $name = trim((string) $s['email_from_name']) ?: trim((string) $s['company_name']);
+        $addr = is_email($s['email_from_address']) ? $s['email_from_address'] : '';
+        $reply = is_email($s['email_reply_to']) ? $s['email_reply_to'] : '';
+        return ['name' => str_replace(['"', "\r", "\n"], '', $name), 'email' => $addr, 'reply_to' => $reply];
+    }
+
     public static function from_headers() {
-        $name = (string) TW_Settings::get('email_from_name');
-        $addr = (string) TW_Settings::get('email_from_address');
+        $snd = self::sender();
         $h = ['Content-Type: text/html; charset=UTF-8'];
-        if ($addr && is_email($addr)) {
-            $h[] = 'From: ' . ($name ? '"' . str_replace('"', '', $name) . '" ' : '') . '<' . $addr . '>';
-        }
+        if ($snd['email']) $h[] = 'From: ' . ($snd['name'] !== '' ? '"' . $snd['name'] . '" ' : '') . '<' . $snd['email'] . '>';
+        if ($snd['reply_to']) $h[] = 'Reply-To: ' . $snd['reply_to'];
         return $h;
     }
 
@@ -76,9 +83,17 @@ final class TW_Messenger {
         }
         $err = '';
         $catch = function ($e) use (&$err) { $err = $e->get_error_message(); };
+        // Without a sender address WordPress uses wordpress@domain with the name "WordPress": at least show our name.
+        $snd = self::sender();
+        $name = function ($n) use ($snd) { return $snd['name'] !== '' && ($n === 'WordPress' || $n === '') ? $snd['name'] : $n; };
         add_action('wp_mail_failed', $catch);
-        $ok = wp_mail($to, $subject, self::html_wrap($subject, $body_text), self::from_headers());
-        remove_action('wp_mail_failed', $catch);
+        add_filter('wp_mail_from_name', $name, 20);
+        try {
+            $ok = wp_mail($to, $subject, self::html_wrap($subject, $body_text), self::from_headers());
+        } finally {
+            remove_filter('wp_mail_from_name', $name, 20);
+            remove_action('wp_mail_failed', $catch);
+        }
         return $ok ? true : ($err ?: 'wp_mail failed');
     }
 

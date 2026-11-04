@@ -115,6 +115,8 @@ final class TW_App {
     }
 
     private static function route_admin() {
+        // Office-only access (if a WordPress administrator turned it on): before anything else, sign-in included.
+        TW_Access::enforce();
         // Sign-in, 2FA, password set/reset and sign-out.
         $login_view = TW_Staff_Auth::handle();
         if (!is_user_logged_in() || !current_user_can(TW_Admin::cap())) {
