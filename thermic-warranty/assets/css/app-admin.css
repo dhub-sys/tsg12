@@ -367,3 +367,16 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 /* 1.12.3: app name in bold, normal case, no mark */
 .tw-brand-sub { display: block; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 700; color: var(--tw-side-strong); opacity: .85; margin-top: 6px; }
 .tw-auth-app { display: block !important; text-transform: none !important; letter-spacing: 0 !important; font-size: 15px !important; font-weight: 700; color: var(--tw-ink-2) !important; margin-top: 6px !important; }
+
+/* 1.14: session countdown */
+.tw-session { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 0 -10px; border-radius: 10px; background: var(--tw-side-hover); color: var(--tw-side-ink); font-size: 12.5px; }
+.tw-session > .tw-icon { width: 16px; height: 16px; flex: none; opacity: .8; }
+.tw-session-text { flex: 1; min-width: 0; }
+.tw-session-left { color: var(--tw-side-strong); font-variant-numeric: tabular-nums; font-weight: 700; }
+.tw-session-refresh { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--tw-side-strong); cursor: pointer; }
+.tw-session-refresh:hover { background: var(--tw-side-hover); }
+.tw-session-refresh .tw-icon { width: 16px; height: 16px; }
+.tw-session-refresh.is-spinning .tw-icon { animation: tw-spin .6s linear infinite; }
+.tw-session.is-low { background: color-mix(in srgb, #ef4444 22%, transparent); }
+.tw-session.is-low .tw-session-left { color: #ef4444; }
+@keyframes tw-spin { to { transform: rotate(360deg); } }

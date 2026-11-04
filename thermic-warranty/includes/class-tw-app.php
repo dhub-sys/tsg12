@@ -122,6 +122,14 @@ final class TW_App {
             return;
         }
 
+        // Session refresh from the sidebar countdown (JSON).
+        if (($_POST['action'] ?? '') === 'tw_session_refresh') {
+            if (!wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'] ?? '')), 'tw_session_refresh')) {
+                wp_send_json_error(['message' => 'expired'], 403);
+            }
+            wp_send_json_success(TW_Staff_Auth::refresh());
+        }
+
         // Actions: forms post here with `action=tw_xxx`; downloads use GET + nonce.
         $action = isset($_REQUEST['action']) ? sanitize_key(wp_unslash($_REQUEST['action'])) : '';
         if ($action && strpos($action, 'tw_') === 0) {

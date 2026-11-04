@@ -53,6 +53,8 @@ final class TW_Admin {
             'settings' => '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
             'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
             'menu' => '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+            'refresh' => '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+            'clock' => '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
             'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
             'printer' => '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
             'cloud' => '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
@@ -172,7 +174,7 @@ final class TW_Admin {
             'marketing_granted' => 'Συγκατάθεση για ενημερώσεις', 'marketing_withdrawn' => 'Ανάκληση συγκατάθεσης για ενημερώσεις',
             'service_submitted' => 'Υποβολή Service από τον πελάτη', 'service_recorded' => 'Καταχώρηση Service από την εταιρεία', 'service_approved' => 'Service: ελέγχθηκε',
             'service_rejected' => 'Service: απορρίφθηκε', 'service_deleted' => 'Διαγραφή καταχώρησης Service', 'receipt_downloaded' => 'Προβολή απόδειξης Service',
-            'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'card_printed' => 'Εκτύπωση καρτέλας', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
+            'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'card_printed' => 'Εκτύπωση καρτέλας', 'staff_login' => 'Σύνδεση στο διαχειριστικό', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
             'status_void' => 'Κατάσταση: Ακυρωμένη', 'status_locked' => 'Κατάσταση: Κλειδωμένη', 'customer_corrected' => 'Διόρθωση στοιχείων πελάτη', 'anonymized' => 'Ανωνυμοποίηση στοιχείων',
             'email_undeliverable' => 'Το email δεν παραδόθηκε', 'sms_undeliverable' => 'Το SMS δεν παραδόθηκε', 'fallback_sent' => 'Αποστολή από εναλλακτικό κανάλι',
             'erasure_requested' => 'Αίτημα διαγραφής από τον πελάτη', 'erasure_processed' => 'Εκτέλεση αιτήματος διαγραφής',
@@ -914,6 +916,14 @@ final class TW_Admin {
                         </script>
                     </td></tr>
                     <?php
+                    ?>
+                    <tr><th><label for="tw-session">Διάρκεια σύνδεσης</label></th><td>
+                        <select id="tw-session" name="s[staff_session_minutes]">
+                            <?php foreach (TW_Staff_Auth::SESSION_CHOICES as $m) printf('<option value="%d"%s>%s</option>', $m, selected(TW_Staff_Auth::session_minutes(), $m, false), esc_html($m < 60 ? $m . ' λεπτά' : ($m < 1440 ? ($m / 60) . ($m === 60 ? ' ώρα' : ' ώρες') : '1 ημέρα'))); ?>
+                        </select>
+                        <p class="description">Μετά από τόσο χρόνο από τη σύνδεση, το μέλος της ομάδας αποσυνδέεται αυτόματα. Στο αριστερό μενού φαίνεται ο χρόνος που απομένει, με κουμπί ανανέωσης που τον ξεκινά από την αρχή. Ισχύει από την επόμενη σύνδεση ή ανανέωση.</p>
+                    </td></tr>
+                    <?php
                     $field('staff_2fa', 'Διπλή επαλήθευση ομάδας', 'checkbox', 'Μετά τον κωδικό πρόσβασης, η ομάδα λαμβάνει κωδικό μίας χρήσης στο email (συνιστάται).');
                 elseif ($tab === 'schedule') :
                     $field('warranty_years', 'Διάρκεια εγγύησης (έτη)', 'number', 'Από την ημερομηνία αγοράς.', 'min="1" max="50"');
@@ -1537,6 +1547,7 @@ final class TW_Admin {
             elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
             elseif ($k === 'invoice_mode') $values[$k] = in_array($v, ['required', 'optional', 'off'], true) ? $v : 'required';
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
+            elseif ($k === 'staff_session_minutes') $values[$k] = in_array((int) $v, TW_Staff_Auth::SESSION_CHOICES, true) ? (int) $v : 120;
             elseif ($k === 'pdf_watermark') $values[$k] = in_array($v, ['text', 'logo', 'none'], true) ? $v : 'text';
             elseif ($k === 'pdf_watermark_opacity') $values[$k] = max(0, min(100, (int) $v));
             elseif ($k === 'brand_color' || $k === 'brand_color_2') $values[$k] = sanitize_hex_color($v) ?: $defaults[$k];

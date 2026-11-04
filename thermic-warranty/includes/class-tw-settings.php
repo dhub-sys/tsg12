@@ -48,6 +48,8 @@ final class TW_Settings {
             'pdf_watermark_text' => '',
             'pdf_watermark_opacity' => 6,
             'staff_2fa' => 1,
+            // How long a sign-in to the console lasts (minutes); the sidebar shows a countdown with a refresh button.
+            'staff_session_minutes' => 120,
             'portal_url' => '',
             'register_url' => '',
             'privacy_url' => '',

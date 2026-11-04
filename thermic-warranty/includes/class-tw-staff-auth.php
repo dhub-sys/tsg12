@@ -81,9 +81,49 @@ final class TW_Staff_Auth {
                 $user->display_name, $code, TW_OTP::TTL_MINUTES));
     }
 
+    const SESSION_CHOICES = [15, 30, 60, 120, 240, 480, 720, 1440];
+
+    public static function session_minutes() {
+        $m = (int) TW_Settings::get('staff_session_minutes');
+        return in_array($m, self::SESSION_CHOICES, true) ? $m : 120;
+    }
+
+    /**
+     * Issues the WordPress auth cookie with this platform's session length. WordPress stores the
+     * expiry with the session token, so the server ends the session even if the page stays open.
+     * @return int expiry timestamp
+     */
+    public static function issue_cookie($user_id) {
+        $len = self::session_minutes() * MINUTE_IN_SECONDS;
+        $f = function () use ($len) { return $len; };
+        // Keep $_COOKIE in step so nonces made later in this request use the new session token.
+        $c = function ($cookie) { $_COOKIE[LOGGED_IN_COOKIE] = $cookie; };
+        add_filter('auth_cookie_expiration', $f, 999);
+        add_action('set_logged_in_cookie', $c, 10, 1);
+        wp_set_auth_cookie($user_id, true, is_ssl());
+        remove_filter('auth_cookie_expiration', $f, 999);
+        remove_action('set_logged_in_cookie', $c, 10);
+        return time() + $len;
+    }
+
+    /** Expiry of the current sign-in (from the logged-in cookie). */
+    public static function session_expires() {
+        $p = wp_parse_auth_cookie('', 'logged_in');
+        return $p && !empty($p['expiration']) ? (int) $p['expiration'] : 0;
+    }
+
+    /** Starts a fresh session of the configured length and ends the current one. @return array */
+    public static function refresh() {
+        $user = wp_get_current_user();
+        $old = wp_get_session_token();
+        $exp = self::issue_cookie($user->ID);
+        if ($old) WP_Session_Tokens::get_instance($user->ID)->destroy($old);
+        return ['expires' => $exp, 'nonce' => wp_create_nonce('tw_session_refresh')];
+    }
+
     private static function sign_in($user) {
         wp_set_current_user($user->ID);
-        wp_set_auth_cookie($user->ID, false, is_ssl());
+        self::issue_cookie($user->ID);
         update_user_meta($user->ID, 'tw_last_login', TW_DB::now());
         delete_transient(self::fail_key());
         TW_DB::log_event('staff_login', ['ip' => TW_Util::client_ip()], 0, 0, 'admin:' . $user->user_login);

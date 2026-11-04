@@ -32,6 +32,13 @@ $user = wp_get_current_user();
         <?php endforeach; ?>
     </nav>
     <div class="tw-sidebar-foot">
+        <?php $tw_exp = TW_Staff_Auth::session_expires(); if ($tw_exp) : ?>
+        <div class="tw-session" data-expires="<?php echo (int) $tw_exp; ?>" data-now="<?php echo (int) time(); ?>" data-nonce="<?php echo esc_attr(wp_create_nonce('tw_session_refresh')); ?>" data-url="<?php echo esc_url(TW_App::admin_url()); ?>">
+            <?php echo TW_Admin::icon('clock'); // phpcs:ignore ?>
+            <span class="tw-session-text">Η σύνδεση λήγει σε <strong class="tw-session-left">–</strong></span>
+            <button type="button" class="tw-session-refresh" title="Ανανέωση σύνδεσης" aria-label="Ανανέωση σύνδεσης"><?php echo TW_Admin::icon('refresh'); // phpcs:ignore ?></button>
+        </div>
+        <?php endif; ?>
         <div class="tw-user">
             <span class="tw-avatar" aria-hidden="true"><?php $parts = preg_split('/\s+/u', trim($user->display_name ?: $user->user_email)); echo esc_html(mb_strtoupper(mb_substr($parts[0], 0, 1) . (isset($parts[1]) ? mb_substr($parts[1], 0, 1) : ''))); ?></span>
             <span class="tw-user-text"><strong><?php echo esc_html($user->display_name); ?></strong><span><?php echo esc_html($user->user_email); ?></span></span>
@@ -59,6 +66,38 @@ $user = wp_get_current_user();
     function set(open) { document.body.classList.toggle('tw-nav-open', open); b.setAttribute('aria-expanded', open ? 'true' : 'false'); bd.hidden = !open; }
     b.addEventListener('click', function () { set(!document.body.classList.contains('tw-nav-open')); });
     bd.addEventListener('click', function () { set(false); });
+    // Session countdown with refresh (the server ends the session at the same moment).
+    (function () {
+        var box = document.querySelector('.tw-session'); if (!box) return;
+        var left = box.querySelector('.tw-session-left'), btn = box.querySelector('.tw-session-refresh');
+        var skew = Date.now() / 1000 - parseInt(box.getAttribute('data-now'), 10); // server vs. browser clock
+        var exp = parseInt(box.getAttribute('data-expires'), 10);
+        function fmt(s) {
+            if (s >= 86400) { var d = Math.floor(s / 86400); return d + (d === 1 ? ' ημέρα' : ' ημέρες'); }
+            var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+            return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0');
+        }
+        function tick() {
+            var s = Math.max(0, Math.round(exp - (Date.now() / 1000 - skew)));
+            left.textContent = fmt(s);
+            box.classList.toggle('is-low', s <= 300);
+            if (s <= 0) { clearInterval(timer); location.href = box.getAttribute('data-url'); }
+        }
+        var timer = setInterval(tick, 1000); tick();
+        btn.addEventListener('click', function () {
+            btn.disabled = true; btn.classList.add('is-spinning');
+            var fd = new FormData(); fd.append('action', 'tw_session_refresh'); fd.append('_wpnonce', box.getAttribute('data-nonce'));
+            fetch(box.getAttribute('data-url'), { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (r) {
+                    if (!r.success) { location.href = box.getAttribute('data-url'); return; }
+                    exp = r.data.expires; skew = 0; box.setAttribute('data-nonce', r.data.nonce); tick();
+                })
+                .catch(function () {})
+                .finally(function () { setTimeout(function () { btn.disabled = false; btn.classList.remove('is-spinning'); }, 400); });
+        });
+    })();
+
     // File inputs: Greek, styled picker with drag & drop (replaces the browser's "Choose file").
     var up = <?php echo wp_json_encode(TW_Admin::icon('upload')); ?>;
     document.querySelectorAll('input[type=file]').forEach(function (inp) {
