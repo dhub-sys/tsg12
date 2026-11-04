@@ -71,8 +71,13 @@ final class TW_Admin {
 
     /** wp-admin only gets a launcher that opens the standalone app. */
     public static function init() {
+        // The mark has fine detail: show it a little larger than WordPress' 20px menu icons.
+        add_action('admin_head', function () {
+            echo '<style>#adminmenu #toplevel_page_tw-app .wp-menu-image{background-size:26px auto!important;background-position:center!important;opacity:1}'
+                . '#adminmenu #toplevel_page_tw-app .wp-menu-name{white-space:nowrap}</style>';
+        });
         add_action('admin_menu', function () {
-            $hook = add_menu_page(TW_App::APP_NAME, TW_App::APP_NAME . ' ↗', self::cap(), 'tw-app', '__return_null', TW_App::menu_icon(), 56);
+            $hook = add_menu_page(TW_App::APP_NAME, TW_App::APP_NAME, self::cap(), 'tw-app', '__return_null', TW_App::menu_icon(), 56);
             add_action('load-' . $hook, function () {
                 wp_safe_redirect(TW_App::admin_url());
                 exit;
