@@ -69,6 +69,7 @@ $s = TW_Settings::all();
                     <p class="tw-hint">Μόλις γίνει το Service, καταχωρήστε το εδώ έως <strong><?php echo esc_html(TW_Util::date_label($m['lock_date'])); ?></strong>, ώστε η εγγύηση να συνεχίσει να ισχύει μέχρι το επόμενο Service.</p>
                 <?php endif; ?>
                 <input type="hidden" name="milestone_no" value="<?php echo (int) $m['no']; ?>">
+                <?php echo TW_Guard::fields(); // phpcs:ignore ?>
                 <div class="tw-grid">
                     <div class="tw-field">
                         <label>Ημερομηνία Service <span class="tw-req">*</span></label>

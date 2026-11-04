@@ -16,6 +16,39 @@
             .catch(function () { return { success: false, data: { message: 'Δεν υπάρχει σύνδεση. Δοκιμάστε ξανά.' } }; });
     }
 
+    // ------------------------------------------------------------ bot protection
+    // Every form carries a honeypot and a signed timestamp (TW_Guard::fields); the forms that start an
+    // activation or sign-in also carry a Cloudflare Turnstile box (.tw-ts), rendered here once its script loads.
+    var tsQueue = [];
+    function tsRender(el) {
+        if (!TW.turnstile || !el || el.getAttribute('data-ts-id')) return;
+        if (!window.turnstile) { tsQueue.push(el); return; }
+        var id = window.turnstile.render(el, { sitekey: TW.turnstile, action: el.getAttribute('data-action') || 'public', language: 'el', size: 'flexible' });
+        el.setAttribute('data-ts-id', id);
+    }
+    window.twTurnstileReady = function () { tsQueue.splice(0).forEach(tsRender); };
+    function tsBox(form) { return form.querySelector('.tw-ts'); }
+    function tsToken(form) {
+        var el = tsBox(form);
+        if (!TW.turnstile || !el) return null; // not needed here
+        var id = el.getAttribute('data-ts-id');
+        return id && window.turnstile ? (window.turnstile.getResponse(id) || '') : '';
+    }
+    function tsReset(form) {
+        var el = tsBox(form), id = el && el.getAttribute('data-ts-id');
+        if (id && window.turnstile) window.turnstile.reset(id);
+    }
+    /** Guard fields of a form, plus its Turnstile token; false (with a message shown) if the challenge isn't done yet. */
+    function guard(form, root) {
+        var g = {};
+        ['tw_website', 'tw_t'].forEach(function (k) { if (form[k]) g[k] = form[k].value; });
+        var t = tsToken(form);
+        if (t === '') { alertBox(root, 'Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.'); return false; }
+        if (t) g['cf-turnstile-response'] = t;
+        return g;
+    }
+    function extend(a, b) { Object.keys(b).forEach(function (k) { a[k] = b[k]; }); return a; }
+
     function alertBox(root, msg, type) {
         var el = root.querySelector('.tw-alert');
         if (!msg) { el.hidden = true; return; }
@@ -80,7 +113,8 @@
     // ------------------------------------------------------------ registration
     function Register(root) {
         enhanceFiles(root);
-        var state = { serial: '', email: '', token: '' };
+        root.querySelectorAll('.tw-ts').forEach(tsRender);
+        var state = { serial: '', email: '', token: '', pass: '' };
         var steps = root.querySelectorAll('.tw-step');
         var labels = root.querySelectorAll('.tw-steps li');
 
@@ -95,7 +129,7 @@
         }
 
         function restart() {
-            state = { serial: '', email: '', token: '' };
+            state = { serial: '', email: '', token: '', pass: '' };
             try { sessionStorage.removeItem('tw_reg'); } catch (e) {}
             root.querySelectorAll('form').forEach(function (f) { f.reset(); });
             alertBox(root, '');
@@ -108,15 +142,26 @@
 
         function sendCode(form) {
             alertBox(root, '');
+            var data = { serial: state.serial, email: state.email };
+            if (form === f1) {
+                var g = guard(f1, root);
+                if (!g) return Promise.resolve(false);
+                extend(data, g);
+            } else {
+                // A new code for the same serial and email: the pass from the first send stands in for the challenge.
+                extend(data, { tw_website: f1.tw_website.value, tw_t: f1.tw_t.value, pass: state.pass });
+            }
             busy(form, true);
-            return post('reg_start', { serial: state.serial, email: state.email }).then(function (r) {
+            return post('reg_start', data).then(function (r) {
                 busy(form, false);
+                if (form === f1) tsReset(f1);
                 if (!r.success) {
                     alertBox(root, r.data.message);
                     if (form === f1) markField(f1, r.data.field);
                     return false;
                 }
                 state.serial = r.data.serial;
+                state.pass = r.data.pass || '';
                 f2.querySelector('.tw-step-info').textContent = r.data.message;
                 return true;
             });
@@ -136,7 +181,7 @@
             var code = f2.code.value.replace(/\D/g, '');
             if (code.length !== 6) { alertBox(root, 'Ο κωδικός έχει 6 ψηφία.'); markField(f2, 'code'); return; }
             busy(f2, true);
-            post('reg_verify', { serial: state.serial, email: state.email, code: code }).then(function (r) {
+            post('reg_verify', extend({ serial: state.serial, email: state.email, code: code }, guard(f2, root) || {})).then(function (r) {
                 busy(f2, false);
                 if (!r.success) { alertBox(root, r.data.message); markField(f2, 'code'); return; }
                 alertBox(root, '');
@@ -186,7 +231,8 @@
             if (file && file.size > TW.maxMb * 1024 * 1024) {
                 alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f3, 'invoice_file'); return;
             }
-            var fd = new FormData(f3);
+            if (tsToken(f3) === '') { alertBox(root, 'Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.'); return; }
+            var fd = new FormData(f3); // includes the honeypot, timestamp and Turnstile token
             ['consent_terms', 'consent_accuracy', 'consent_marketing'].forEach(function (k) {
                 fd.set(k, f3[k].checked ? '1' : '0');
             });
@@ -194,6 +240,7 @@
             busy(f3, true);
             post('reg_submit', fd).then(function (r) {
                 busy(f3, false);
+                tsReset(f3);
                 if (!r.success) {
                     alertBox(root, r.data.message);
                     markField(f3, r.data.field);
@@ -229,6 +276,7 @@
         var l2 = root.querySelector('[data-step="login-2"]');
         var email = '';
         var csrf = '';
+        root.querySelectorAll('.tw-ts').forEach(tsRender);
 
         function load() {
             post('portal', {}).then(function (r) {
@@ -251,9 +299,12 @@
             e.preventDefault();
             email = l1.email.value.trim();
             if (!email || !l1.email.checkValidity()) { alertBox(root, 'Συμπληρώστε ένα έγκυρο email.'); markField(l1, 'email'); return; }
+            var g = guard(l1, root);
+            if (!g) return;
             busy(l1, true);
-            post('login_start', { email: email }).then(function (r) {
+            post('login_start', extend({ email: email }, g)).then(function (r) {
                 busy(l1, false);
+                tsReset(l1);
                 if (!r.success) { alertBox(root, r.data.message); return; }
                 alertBox(root, '');
                 l2.querySelector('.tw-step-info').textContent = r.data.message;
@@ -265,7 +316,7 @@
         l2.addEventListener('submit', function (e) {
             e.preventDefault();
             busy(l2, true);
-            post('login_verify', { email: email, code: l2.code.value }).then(function (r) {
+            post('login_verify', extend({ email: email, code: l2.code.value }, guard(l2, root) || {})).then(function (r) {
                 busy(l2, false);
                 if (!r.success) { alertBox(root, r.data.message); markField(l2, 'code'); return; }
                 alertBox(root, '');

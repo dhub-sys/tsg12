@@ -380,3 +380,6 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .tw-session.is-low { background: color-mix(in srgb, #ef4444 22%, transparent); }
 .tw-session.is-low .tw-session-left { color: #ef4444; }
 @keyframes tw-spin { to { transform: rotate(360deg); } }
+
+/* 1.15 – Turnstile on the sign-in card */
+.tw-auth-card .tw-ts { margin: 2px 0 14px; min-height: 65px; }

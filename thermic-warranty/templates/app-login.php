@@ -6,7 +6,7 @@ $email = $view['email'] ?? '';
 $action = TW_App::admin_url();
 $fields = function () {
     wp_nonce_field('tw_staff_auth');
-    echo '<div class="tw-hp" aria-hidden="true"><label>Website<input type="text" name="tw_website" tabindex="-1" autocomplete="off"></label></div>';
+    echo TW_Guard::fields(); // phpcs:ignore -- built from escaped parts
 };
 ?><!doctype html>
 <html lang="el">
@@ -19,6 +19,7 @@ $fields = function () {
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/app-admin.css')); ?>">
     <?php echo TW_App::brand_style(); // phpcs:ignore ?>
+    <?php echo TW_Guard::script_tag('staff'); // phpcs:ignore ?>
 </head>
 <body class="tw-auth">
 <main class="tw-auth-card">
@@ -42,6 +43,7 @@ $fields = function () {
         <form method="post" action="<?php echo esc_url($action); ?>">
             <?php $fields(); ?><input type="hidden" name="action" value="tw_staff_forgot">
             <label>Email<input type="email" name="email" value="<?php echo esc_attr($email); ?>" autocomplete="username" required autofocus></label>
+            <?php echo TW_Guard::widget('staff', 'staff_forgot'); // phpcs:ignore ?>
             <button class="button button-primary button-hero">Αποστολή κωδικού</button>
         </form>
         <p class="tw-auth-links"><a href="<?php echo esc_url($action); ?>">← Σύνδεση</a></p>
@@ -63,6 +65,7 @@ $fields = function () {
             <?php $fields(); ?><input type="hidden" name="action" value="tw_staff_login">
             <label>Email<input type="email" name="email" value="<?php echo esc_attr($email); ?>" autocomplete="username" required autofocus></label>
             <label>Κωδικός πρόσβασης<input type="password" name="password" autocomplete="current-password" required></label>
+            <?php echo TW_Guard::widget('staff', 'staff_login'); // phpcs:ignore ?>
             <button class="button button-primary button-hero">Συνέχεια</button>
         </form>
         <p class="tw-auth-links"><a href="<?php echo esc_url(add_query_arg('forgot', 1, $action)); ?>">Πρώτη σύνδεση / ξέχασα τον κωδικό</a></p>

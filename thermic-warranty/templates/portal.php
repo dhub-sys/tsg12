@@ -9,16 +9,19 @@ $register_url = (string) TW_Settings::get('register_url') ?: TW_App::public_url(
 
     <div data-portal="login" hidden>
         <form class="tw-step" data-step="login-1" novalidate>
+            <?php echo TW_Guard::fields(); // phpcs:ignore ?>
             <h3>Οι εγγυήσεις μου</h3>
             <p>Συνδεθείτε με το email που δηλώσατε κατά την ενεργοποίηση. Θα σας στείλουμε έναν κωδικό μίας χρήσης, χωρίς κωδικό πρόσβασης.</p>
             <div class="tw-field">
                 <label for="tw-login-email">Email</label>
                 <input id="tw-login-email" name="email" type="email" autocomplete="email" required maxlength="190">
             </div>
+            <?php echo TW_Guard::widget('public', 'portal_login'); // phpcs:ignore ?>
             <button type="submit" class="tw-btn">Αποστολή κωδικού</button>
             <?php if ($register_url) : ?><p class="tw-hint">Δεν έχετε ενεργοποιήσει ακόμη την εγγύηση; <a href="<?php echo esc_url($register_url); ?>">Ενεργοποίηση εγγύησης</a></p><?php endif; ?>
         </form>
         <form class="tw-step" data-step="login-2" novalidate hidden>
+            <?php echo TW_Guard::fields(); // phpcs:ignore ?>
             <h3>Κωδικός σύνδεσης</h3>
             <p class="tw-step-info"></p>
             <div class="tw-field">

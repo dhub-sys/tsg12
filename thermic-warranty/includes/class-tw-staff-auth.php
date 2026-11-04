@@ -35,8 +35,12 @@ final class TW_Staff_Auth {
         if (!isset($_POST['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'tw_staff_auth')) {
             return ['step' => 'login', 'error' => 'Η φόρμα έληξε. Δοκιμάστε ξανά.'];
         }
-        if (!empty($_POST['tw_website'])) { // honeypot
-            return ['step' => 'login', 'error' => 'Μη έγκυρο αίτημα.'];
+        // Honeypot everywhere; time trap and Turnstile on the forms that start a sign-in or a password reset.
+        $guard = TW_Guard::check('staff', in_array($action, ['tw_staff_login', 'tw_staff_forgot'], true));
+        if ($guard !== true) {
+            $back = ['tw_staff_otp' => 'otp', 'tw_staff_forgot' => 'forgot', 'tw_staff_reset' => 'reset'][$action] ?? 'login';
+            $email = isset($_POST['email']) ? strtolower(sanitize_email(wp_unslash($_POST['email']))) : '';
+            return ['step' => $back, 'email' => $email, 'error' => $guard];
         }
         if (self::blocked()) {
             return ['step' => 'login', 'error' => 'Πάρα πολλές αποτυχημένες προσπάθειες. Δοκιμάστε ξανά σε 15 λεπτά.'];

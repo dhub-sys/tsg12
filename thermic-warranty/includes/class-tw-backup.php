@@ -17,7 +17,7 @@ final class TW_Backup {
     const DIR = 'backups';
     const TABLES = ['serials', 'warranties', 'services', 'consents', 'notifications', 'events', 'otps'];
     /** Never written to a backup and never overwritten by a restore. */
-    const SECRET_SETTINGS = ['brevo_api_key', 'brevo_webhook_token', 'backup_password', 'backup_gdrive_client_secret', 'backup_onedrive_client_secret', 'backup_dropbox_app_secret', 'backup_ftp_password'];
+    const SECRET_SETTINGS = ['brevo_api_key', 'turnstile_secret', 'brevo_webhook_token', 'backup_password', 'backup_gdrive_client_secret', 'backup_onedrive_client_secret', 'backup_dropbox_app_secret', 'backup_ftp_password'];
 
     /** Automatic backups per day → hours between them. */
     const PER_DAY = [1 => 24, 2 => 12, 3 => 8, 4 => 6, 6 => 4];

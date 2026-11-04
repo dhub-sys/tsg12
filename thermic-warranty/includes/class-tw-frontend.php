@@ -43,13 +43,16 @@ final class TW_Frontend {
             'ajax' => admin_url('admin-ajax.php'),
             'maxMb' => (int) TW_Settings::get('invoice_max_mb'),
             'invoiceMode' => TW_Settings::invoice_mode(),
+            'turnstile' => TW_Guard::on('public') ? TW_Guard::site_key() : '',
         ]);
+        if (TW_Guard::on('public')) wp_register_script('tw-turnstile', TW_Guard::explicit_script_url(), ['tw-front'], null, true);
     }
 
     private static function enqueue() {
         if (!wp_script_is('tw-front', 'registered')) self::register_assets();
         wp_enqueue_style('tw-front');
         wp_enqueue_script('tw-front');
+        if (wp_script_is('tw-turnstile', 'registered')) wp_enqueue_script('tw-turnstile');
     }
 
     // ------------------------------------------------------------------ shortcodes
@@ -102,8 +105,18 @@ final class TW_Frontend {
 
     // ------------------------------------------------------------------ registration
 
+    /** Honeypot (always), time trap and Turnstile (when $challenge). */
+    private static function guard($challenge, $skip_turnstile = false) {
+        $g = TW_Guard::check('public', $challenge, $skip_turnstile);
+        if ($g !== true) self::fail($g, 'guard', 403);
+    }
+
     public static function ajax_reg_start() {
         $email = self::email_input();
+        // Checked before the serial lookup, so the form can't be used to probe serial numbers.
+        // "Send a new code" carries the pass from the first send, so the customer isn't challenged twice.
+        $subject = 'reg|' . $email . '|' . TW_Util::normalize_serial(self::input('serial'));
+        self::guard(true, TW_Guard::pass_ok(self::input('pass'), $subject));
         $serial = self::usable_serial(self::input('serial'));
         $rl = TW_OTP::rate_limit_ok($email);
         if (is_wp_error($rl)) self::fail($rl->get_error_message(), '', 429);
@@ -125,10 +138,12 @@ final class TW_Frontend {
         wp_send_json_success([
             'message' => sprintf('Στείλαμε έναν 6ψήφιο κωδικό επαλήθευσης στο %s. Ισχύει για %d λεπτά.', TW_Util::mask_email($email), TW_OTP::TTL_MINUTES),
             'serial' => $serial->serial,
+            'pass' => TW_Guard::pass($subject),
         ]);
     }
 
     public static function ajax_reg_verify() {
+        self::guard(false);
         $email = self::email_input();
         $serial = self::usable_serial(self::input('serial'));
         $res = TW_OTP::verify('register', $email, self::input('code'), $serial->id);
@@ -144,6 +159,7 @@ final class TW_Frontend {
     }
 
     public static function ajax_reg_submit() {
+        self::guard(true);
         $otp = TW_OTP::token_row('register', self::input('token'));
         if (!$otp) self::fail('Η επαλήθευση έληξε. Ξεκινήστε ξανά από τον σειριακό αριθμό.', 'token', 401);
         $serial = TW_Warranty::serial_by_id($otp->serial_id);
@@ -251,6 +267,7 @@ final class TW_Frontend {
 
     public static function ajax_login_start() {
         $email = self::email_input();
+        self::guard(true);
         $generic = sprintf('Αν υπάρχουν εγγυήσεις με το email %s, θα λάβετε σε λίγο έναν κωδικό σύνδεσης.', TW_Util::mask_email($email));
         $rl = TW_OTP::rate_limit_ok($email);
         if (is_wp_error($rl)) self::fail($rl->get_error_message(), '', 429);
@@ -271,6 +288,7 @@ final class TW_Frontend {
     }
 
     public static function ajax_login_verify() {
+        self::guard(false);
         $email = self::email_input();
         $res = TW_OTP::verify('login', $email, self::input('code'), 0);
         if (is_wp_error($res)) self::fail($res->get_error_message(), 'code');
@@ -348,6 +366,7 @@ final class TW_Frontend {
     /** Customer submits the Service of a milestone: date, technician ΑΦΜ, receipt. */
     public static function ajax_portal_service() {
         $s = self::require_session();
+        self::guard(false);
         $w = self::owned_warranty($s);
         $no = (int) self::input('milestone_no');
         $m = null;

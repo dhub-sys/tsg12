@@ -17,6 +17,7 @@ $terms = TW_Settings::current_terms();
 
     <!-- Step 1 -->
     <form class="tw-step" data-step="1" novalidate>
+        <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3>Ενεργοποίηση εγγύησης</h3>
         <p>Πληκτρολογήστε τον σειριακό αριθμό, όπως αναγράφεται στην ετικέτα του προϊόντος, και το email σας. Θα σας στείλουμε έναν κωδικό επαλήθευσης.</p>
         <div class="tw-field">
@@ -27,11 +28,13 @@ $terms = TW_Settings::current_terms();
             <label for="tw-email">Email <span class="tw-req">*</span></label>
             <input id="tw-email" name="email" type="email" autocomplete="email" required maxlength="190">
         </div>
+        <?php echo TW_Guard::widget('public', 'register_start'); // phpcs:ignore ?>
         <button type="submit" class="tw-btn">Αποστολή κωδικού</button>
     </form>
 
     <!-- Step 2 -->
     <form class="tw-step" data-step="2" novalidate hidden>
+        <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3>Επαλήθευση email</h3>
         <p class="tw-step-info"></p>
         <div class="tw-field">
@@ -45,6 +48,7 @@ $terms = TW_Settings::current_terms();
 
     <!-- Step 3 -->
     <form class="tw-step" data-step="3" novalidate hidden enctype="multipart/form-data">
+        <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3>Στοιχεία κατόχου</h3>
         <p class="tw-product"></p>
 
@@ -129,6 +133,7 @@ $terms = TW_Settings::current_terms();
             <?php if ($privacy) : ?> Δείτε πώς επεξεργαζόμαστε τα στοιχεία σας στην <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener">Πολιτική Απορρήτου</a>.<?php endif; ?></p>
         </fieldset>
 
+        <?php echo TW_Guard::widget('public', 'register_submit'); // phpcs:ignore ?>
         <button type="submit" class="tw-btn">Ενεργοποίηση εγγύησης</button>
     </form>
 

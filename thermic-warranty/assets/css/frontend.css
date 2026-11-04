@@ -100,3 +100,8 @@
 .tw-file-btn { padding: 10px 16px; font-size: 15px; }
 .tw-file { flex-wrap: nowrap; }
 .tw-file-btn { flex: none; }
+
+/* Bot protection: honeypot is off-screen for people and screen readers; Turnstile box above the button */
+.tw-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.tw-ts { margin: 4px 0 14px; min-height: 65px; }
+.tw-ts:empty { min-height: 0; margin: 0; }

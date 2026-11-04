@@ -50,6 +50,11 @@ final class TW_Settings {
             'staff_2fa' => 1,
             // How long a sign-in to the console lasts (minutes); the sidebar shows a countdown with a refresh button.
             'staff_session_minutes' => 120,
+            // Cloudflare Turnstile on the console sign-in and/or the customer forms (honeypot is always on).
+            'turnstile_site_key' => '',
+            'turnstile_secret' => '',
+            'turnstile_staff' => 0,
+            'turnstile_public' => 0,
             'portal_url' => '',
             'register_url' => '',
             'privacy_url' => '',

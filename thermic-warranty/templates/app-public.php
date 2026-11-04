@@ -6,6 +6,7 @@ $config = [
     'ajax' => admin_url('admin-ajax.php'),
     'maxMb' => (int) $s['invoice_max_mb'],
     'invoiceMode' => TW_Settings::invoice_mode(),
+    'turnstile' => TW_Guard::on('public') ? TW_Guard::site_key() : '',
 ];
 ?><!doctype html>
 <html lang="el">
@@ -42,5 +43,6 @@ $config = [
 </footer>
 <script>var TW = <?php echo wp_json_encode($config); ?>;</script>
 <script src="<?php echo esc_url(TW_App::asset('assets/js/frontend.js')); ?>"></script>
+<?php if (TW_Guard::on('public')) : ?><script src="<?php echo esc_url(TW_Guard::explicit_script_url()); ?>" async defer></script><?php endif; ?>
 </body>
 </html>

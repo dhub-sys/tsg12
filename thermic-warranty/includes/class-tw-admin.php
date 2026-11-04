@@ -792,7 +792,7 @@ final class TW_Admin {
         $tpl = TW_Settings::template_defaults();
         $post = self::url();
         $tab = self::q('tab') ?: 'general';
-        $tabs = ['general' => 'Γενικά', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo (email & SMS)', 'sms' => 'Άλλος πάροχος SMS', 'privacy' => 'GDPR'];
+        $tabs = ['general' => 'Γενικά', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo (email & SMS)', 'sms' => 'Άλλος πάροχος SMS', 'security' => 'Προστασία φορμών', 'privacy' => 'GDPR'];
         $field = function ($key, $label, $type = 'text', $desc = '', $attrs = '') use ($s) {
             echo '<tr><th><label for="tw-' . esc_attr($key) . '">' . esc_html($label) . '</label></th><td>';
             if ($type === 'checkbox') {
@@ -986,6 +986,49 @@ final class TW_Admin {
                     $field('sms_method', 'Μέθοδος HTTP', 'text', 'POST ή GET.');
                     $field('sms_headers', 'Headers', 'textarea', 'Ένα ανά γραμμή, π.χ. <code>Authorization: Bearer …</code>.');
                     $field('sms_body', 'Σώμα αιτήματος', 'textarea', 'Για POST. Πεδία: <code>{to} {to_no_plus} {text} {sender}</code>. Για JSON οι τιμές μπαίνουν με σωστό escaping.');
+                elseif ($tab === 'security') :
+                    $st = TW_Guard::stats(30);
+                    ?>
+                    <tr><td colspan="2"><p class="description">Προστασία από bots και αυτόματες υποβολές σε όλες τις φόρμες: σύνδεση ομάδας, ενεργοποίηση εγγύησης, σύνδεση πελάτη στο «Οι εγγυήσεις μου» και υποβολή Service.</p>
+                        <?php if (TW_Guard::disabled_by_constant()) : ?><div class="notice notice-warning inline"><p>Το Turnstile είναι απενεργοποιημένο από το <code>wp-config.php</code> (<code>TW_DISABLE_TURNSTILE</code>). Το honeypot παραμένει ενεργό.</p></div><?php endif; ?></td></tr>
+                    <tr><th>Honeypot</th><td><p><strong>Πάντα ενεργό.</strong> Κάθε φόρμα έχει ένα κρυφό πεδίο που δεν βλέπει ο άνθρωπος· τα bots το συμπληρώνουν και η υποβολή απορρίπτεται. Επίσης απορρίπτονται φόρμες που στάλθηκαν σε λιγότερο από <?php echo (int) TW_Guard::MIN_SECONDS; ?> δευτερόλεπτα από το άνοιγμά τους.</p>
+                        <p class="description">Τελευταίες 30 ημέρες: <?php echo (int) $st['honeypot']; ?> μπλοκαρίστηκαν από το honeypot · <?php echo (int) $st['too_fast']; ?> ως πολύ γρήγορες · <?php echo (int) $st['turnstile']; ?> από το Turnstile.</p></td></tr>
+                    <tr><td colspan="2"><h2 style="margin:8px 0 0">Cloudflare Turnstile</h2>
+                        <p class="description">Δωρεάν έλεγχος «δεν είμαι ρομπότ» της Cloudflare, συνήθως χωρίς καμία ενέργεια από τον χρήστη (χωρίς εικόνες, χωρίς cookies διαφήμισης). Δημιουργήστε widget στο <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener">Cloudflare → Turnstile</a> → «Add widget», δηλώστε το domain <code><?php echo esc_html(wp_parse_url(home_url(), PHP_URL_HOST)); ?></code>, Widget mode «Managed», και αντιγράψτε εδώ τα δύο κλειδιά. Δεν χρειάζεται το site να είναι στο Cloudflare.</p></td></tr>
+                    <?php
+                    $field('turnstile_site_key', 'Site key', 'text', '', 'autocomplete="off" spellcheck="false"');
+                    ?>
+                    <tr><th><label for="tw-ts-secret">Secret key</label></th><td>
+                        <input type="password" id="tw-ts-secret" name="turnstile_secret_new" class="regular-text" autocomplete="off" placeholder="<?php echo $s['turnstile_secret'] ? esc_attr('Αποθηκευμένο: …' . substr($s['turnstile_secret'], -6)) : '0x4AAA…'; ?>">
+                        <p class="description">Αφήστε κενό για να κρατήσετε το αποθηκευμένο.</p></td></tr>
+                    <?php
+                    $field('turnstile_staff', 'Σύνδεση ομάδας', 'checkbox', 'Έλεγχος στη «Σύνδεση» και στην «Πρώτη σύνδεση / ξέχασα τον κωδικό» του διαχειριστικού.');
+                    $field('turnstile_public', 'Φόρμες πελατών', 'checkbox', 'Έλεγχος στην ενεργοποίηση εγγύησης (1ο και 3ο βήμα) και στη σύνδεση στο «Οι εγγυήσεις μου».');
+                    ?>
+                    <tr><th>Δοκιμή κλειδιών</th><td>
+                        <div id="tw-ts-test" style="max-width:340px"></div>
+                        <p class="description" id="tw-ts-test-msg">Για να ενεργοποιηθεί το Turnstile, αυτός ο έλεγχος πρέπει να ολοκληρωθεί (✔) πριν πατήσετε «Αποθήκευση». Έτσι επιβεβαιώνεται ότι τα κλειδιά δουλεύουν σε αυτό το domain και κανείς δεν κλειδώνεται έξω. Αν ο έλεγχος αποτύχει, τα κλειδιά αποθηκεύονται αλλά η προστασία μένει ανενεργή.</p>
+                        <script>
+                        (function () {
+                            var key = document.getElementById('tw-turnstile_site_key'), box = document.getElementById('tw-ts-test'), msg = document.getElementById('tw-ts-test-msg'), id = null, shown = '';
+                            function draw() {
+                                var k = key.value.trim();
+                                if (!window.turnstile || k === shown) return;
+                                if (id !== null) { window.turnstile.remove(id); id = null; }
+                                shown = k;
+                                if (k) id = window.turnstile.render(box, { sitekey: k, action: 'settings_test', language: 'el', 'error-callback': function () { msg.style.color = '#b32d2e'; } });
+                            }
+                            window.twTsSettings = draw;
+                            key.addEventListener('change', draw);
+                            var sc = document.createElement('script');
+                            sc.src = <?php echo wp_json_encode(TW_Guard::SCRIPT . '?render=explicit&onload=twTsSettings'); ?>;
+                            sc.async = true;
+                            document.head.appendChild(sc);
+                        })();
+                        </script>
+                    </td></tr>
+                    <tr><td colspan="2"><p class="description">Αν κάτι πάει στραβά και δεν μπορείτε να συνδεθείτε, προσθέστε στο <code>wp-config.php</code> τη γραμμή <code>define('TW_DISABLE_TURNSTILE', true);</code> – το Turnstile σταματά αμέσως, το honeypot μένει.</p></td></tr>
+                    <?php
                 elseif ($tab === 'privacy') :
                     $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Σύνδεσμος στη φόρμα ενεργοποίησης. Κενό = η Πολιτική Απορρήτου της ιστοσελίδας.');
                     $field('retention_months_after_end', 'Αυτόματη ανωνυμοποίηση (μήνες)', 'number', 'Μήνες μετά τη λήξη ή το κλείδωμα για αυτόματη ανωνυμοποίηση των προσωπικών στοιχείων. Το ιστορικό του προϊόντος μένει. 0 = απενεργοποιημένο. Ορίστε το σε συνεννόηση με τον νομικό σύμβουλο / DPO.', 'min="0"');
@@ -1534,6 +1577,7 @@ final class TW_Admin {
             'brevo' => ['brevo_email', 'brevo_sms', 'fallback_channel'],
             'schedule' => ['lock_on_missed_service', 'lock_on_expiry', 'notify_partner', 'service_notify_company'],
             'sms' => ['sms_enabled'],
+            'security' => ['turnstile_staff', 'turnstile_public'],
         ];
         $numbers = ['service_submit_window_days', 'service_resubmit_days', 'warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
         $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label'];
@@ -1578,6 +1622,32 @@ final class TW_Admin {
                 if (is_wp_error($logo)) { self::flash(esc_html($logo->get_error_message()), 'error'); self::back('tw-settings', ['tab' => $tab]); }
                 $values['logo_url'] = $logo;
                 $msg .= ' Το λογότυπο ανέβηκε.';
+            }
+        }
+        if ($tab === 'security') {
+            $newsecret = trim(self::post('turnstile_secret_new'));
+            if ($newsecret !== '') $values['turnstile_secret'] = sanitize_text_field($newsecret);
+            unset($values['turnstile_secret_new']);
+            if (!empty($values['turnstile_staff']) || !empty($values['turnstile_public'])) {
+                $site = $values['turnstile_site_key'] ?? '';
+                $secret = $values['turnstile_secret'] ?? TW_Settings::get('turnstile_secret');
+                $token = sanitize_text_field(self::post('cf-turnstile-response'));
+                if ($site === '' || $secret === '') $err = 'Συμπληρώστε Site key και Secret key.';
+                elseif ($token === '') $err = 'Η «Δοκιμή κλειδιών» δεν ολοκληρώθηκε. Ελέγξτε ότι το Site key είναι σωστό και ότι το domain έχει δηλωθεί στο widget της Cloudflare.';
+                else {
+                    $r = TW_Guard::siteverify($secret, $token);
+                    $err = $r === true ? '' : ($r === 'invalid-input-secret' ? 'Το Secret key δεν είναι σωστό.'
+                        : ($r === 'network' ? 'Δεν ήταν δυνατή η επικοινωνία με την Cloudflare. Δοκιμάστε ξανά.'
+                        : 'Ο έλεγχος απέτυχε (' . esc_html($r) . '). Ελέγξτε ότι Site key και Secret key ανήκουν στο ίδιο widget.'));
+                }
+                if ($err !== '') {
+                    $values['turnstile_staff'] = 0;
+                    $values['turnstile_public'] = 0;
+                    TW_Settings::update($values);
+                    self::flash('Τα κλειδιά αποθηκεύτηκαν, αλλά το Turnstile δεν ενεργοποιήθηκε: ' . $err, 'error');
+                    self::back('tw-settings', ['tab' => $tab]);
+                }
+                $msg .= ' Το Turnstile επιβεβαιώθηκε και είναι ενεργό.';
             }
         }
         if ($tab === 'brevo') {
