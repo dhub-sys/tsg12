@@ -279,6 +279,9 @@ final class TW_Admin {
                 <div class="tw-stat"><span><?php echo $last30; ?></span>Ενεργοποιήσεις 30 ημερών</div>
                 <div class="tw-stat"><span><?php echo count($recent_sv); ?></span>Υποβολές Service 30 ημερών</div>
             </div>
+            <?php $nx_check = wp_next_scheduled(TW_Cron::HOOK); if ($nx_check && $nx_check < time() - 2 * HOUR_IN_SECONDS) : ?>
+                <div class="notice notice-error"><p><strong>Οι αυτόματες εργασίες καθυστερούν</strong> (ο έλεγχος των <?php echo esc_html(wp_date('d/m H:i', $nx_check)); ?> δεν έχει γίνει): υπενθυμίσεις, αναφορές και αντίγραφα μπορεί να μη στέλνονται. Δείτε <a href="<?php echo esc_url(self::url('help')); ?>#cron">Οδηγός χρήσης → Αυτόματες εργασίες (cron)</a>.</p></div>
+            <?php endif; ?>
             <p class="description">Τελευταία εκτέλεση ειδοποιήσεων: <?php echo $last ? esc_html(TW_Util::datetime_label($last['at']) . ' – ' . (int) $last['count'] . ' ενέργειες') : 'καμία ακόμη'; ?>.
                 Επόμενη: <?php $nx = wp_next_scheduled(TW_Cron::HOOK); echo $nx ? esc_html(wp_date('d/m/Y H:i', $nx)) : '—'; ?>.</p>
 
@@ -820,7 +823,7 @@ final class TW_Admin {
                     $field('email_from_name', 'Όνομα αποστολέα email');
                     $field('email_from_address', 'Email αποστολέα', 'email', 'Προτείνεται SMTP plugin (π.χ. WP Mail SMTP) με SPF/DKIM για τον τομέα, ώστε τα μηνύματα να μην πηγαίνουν στα ανεπιθύμητα.');
                     $field('admin_emails', 'Email εταιρείας για ειδοποιήσεις', 'text', 'Ένα ή περισσότερα, χωρισμένα με κόμμα.');
-                    $field('admin_digest', 'Ημερήσια σύνοψη', 'checkbox', 'Αποστολή σύνοψης στην εταιρεία κάθε μέρα που υπάρχουν ειδοποιήσεις, λήξεις ή κλειδώματα.');
+                    $field('admin_digest', 'Ημερήσια αναφορά', 'checkbox', 'Κάθε πρωί (περίπου 09:00) email στα «Email εταιρείας για ειδοποιήσεις» με όσα έγιναν τις τελευταίες 24 ώρες: υπενθυμίσεις, αποτυχίες, μηνύματα που δεν παραδόθηκαν, λήξεις και κλειδώματα, νέες ενεργοποιήσεις, υποβολές Service. Στέλνεται μόνο αν υπάρχει κάτι.');
                     self::select_row('invoice_mode', 'Αρχείο παραστατικού αγοράς (ενεργοποίηση)', TW_Settings::invoice_mode(), [
                         'required' => 'Υποχρεωτικό ανέβασμα αρχείου',
                         'optional' => 'Προαιρετικό ανέβασμα αρχείου',

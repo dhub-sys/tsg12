@@ -25,6 +25,8 @@ $sections = [
     'claim' => 'Όταν έρθει αίτημα εγγύησης',
     'warranties' => 'Εγγυήσεις & πελάτες',
     'notifications' => 'Ειδοποιήσεις & παράδοση',
+    'report' => 'Ημερήσια αναφορά',
+    'cron' => 'Αυτόματες εργασίες (cron)',
 ];
 if ($is_admin) { $sections['team'] = 'Ομάδα'; $sections['backups'] = 'Αντίγραφα ασφαλείας'; }
 $sections += ['settings' => 'Ρυθμίσεις', 'gdpr' => 'Προσωπικά δεδομένα (GDPR)', 'faq' => 'Συχνές ερωτήσεις'];
@@ -152,7 +154,65 @@ $sections += ['settings' => 'Ρυθμίσεις', 'gdpr' => 'Προσωπικά 
                     <li><strong>✘ Δεν παραδόθηκε</strong> – π.χ. λάθος email ή ανενεργό κινητό. Στην καρτέλα του πελάτη εμφανίζεται προειδοποίηση· επικοινωνήστε μαζί του για να διορθωθεί.</li>
                     <li>Αν μια υπενθύμιση δεν παραδοθεί με email, στέλνεται αυτόματα με SMS (και το αντίστροφο), εφόσον είναι ενεργό.</li>
                 </ul>
-                <p>Κάθε μέρα που υπάρχει κάτι, η εταιρεία λαμβάνει μια <strong>σύνοψη</strong> με ό,τι στάλθηκε, ό,τι έληξε ή κλείδωσε και ό,τι δεν παραδόθηκε. Το κουμπί «Εκτέλεση ελέγχου ειδοποιήσεων τώρα» κάνει τον ίδιο έλεγχο αμέσως.</p>
+                <p>Το κουμπί «Εκτέλεση ελέγχου ειδοποιήσεων τώρα» κάνει αμέσως τον ίδιο έλεγχο που γίνεται αυτόματα κάθε πρωί.</p>
+            </section>
+
+            <?php
+            $tz_now = current_time('timestamp');
+            $last_run = get_option('tw_last_run');
+            $last_report = (string) get_option('tw_last_report', '');
+            $last_backup = get_option('tw_last_backup');
+            $next_check = wp_next_scheduled(TW_Cron::HOOK);
+            $next_backup = wp_next_scheduled(TW_Backup::HOOK);
+            $real_cron = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+            $late = $next_check && $next_check < time() - 2 * HOUR_IN_SECONDS;
+            $cron_url = site_url('wp-cron.php?doing_wp_cron');
+            $recipients = TW_Messenger::admin_recipients();
+            ?>
+            <section class="tw-help-card" id="report">
+                <h2>Ημερήσια αναφορά</h2>
+                <p>Κάθε πρωί, μαζί με τον αυτόματο έλεγχο (περίπου στις <strong>09:00</strong>), η εταιρεία λαμβάνει ένα email με <strong>όλα όσα έγιναν από την προηγούμενη αναφορά</strong> – δηλαδή τις τελευταίες 24 ώρες:</p>
+                <ul>
+                    <li>υπενθυμίσεις που στάλθηκαν σε πελάτες – και όσες απέτυχαν,</li>
+                    <li>μηνύματα που <strong>δεν παραδόθηκαν</strong> (π.χ. λάθος email, ανενεργό κινητό) και όσα στάλθηκαν από το εναλλακτικό κανάλι,</li>
+                    <li>εγγυήσεις που <strong>έληξαν ή κλείδωσαν</strong>,</li>
+                    <li>νέες ενεργοποιήσεις εγγυήσεων,</li>
+                    <li>υποβολές Service από πελάτες,</li>
+                    <li>διορθώσεις στοιχείων, αλλαγές κατάστασης και αιτήματα διαγραφής.</li>
+                </ul>
+                <p>Αποστέλλεται στα <strong>«Email εταιρείας για ειδοποιήσεις»</strong> (<?php echo $link('settings', 'Ρυθμίσεις → Γενικά'); ?>)<?php echo $recipients ? ': <code>' . esc_html(implode(', ', $recipients)) . '</code>' : ' – <strong class="tw-danger">δεν έχει οριστεί κανένα email</strong>'; ?>. Τις ημέρες που δεν έγινε τίποτα δεν στέλνεται email. Απενεργοποιείται από το «Ημερήσια αναφορά» στην ίδια καρτέλα (η αποστολή υπενθυμίσεων στους πελάτες συνεχίζει κανονικά).</p>
+                <p class="description">Τελευταία αναφορά: <?php echo $last_report ? esc_html(TW_Util::datetime_label($last_report)) : 'καμία ακόμη'; ?><?php echo $s['admin_digest'] ? '' : ' · <strong>η αναφορά είναι απενεργοποιημένη</strong>'; ?>.</p>
+            </section>
+
+            <section class="tw-help-card" id="cron">
+                <h2>Αυτόματες εργασίες (cron)</h2>
+                <p>Η πλατφόρμα κάνει μόνη της, χωρίς να πατήσει κανείς κουμπί:</p>
+                <ul>
+                    <li><strong>Κάθε πρωί, περίπου στις 09:00:</strong> έλεγχος εγγυήσεων – αποστολή υπενθυμίσεων Service και λήξης, λήξεις και κλειδώματα, η ημερήσια αναφορά και ο καθαρισμός παλιών κωδικών μίας χρήσης.</li>
+                    <li><strong>Αντίγραφα ασφαλείας:</strong> <?php echo (int) TW_Backup::per_day(); ?> φορά/ές την ημέρα (<?php echo esc_html(implode(', ', TW_Backup::times())); ?>)<?php echo $s['backup_daily'] ? '' : ' – <strong>απενεργοποιημένα</strong>'; ?>, και αποστολή εκτός server αν έχει οριστεί.</li>
+                </ul>
+                <table class="widefat" style="margin:14px 0">
+                    <tbody>
+                        <tr><td style="width:46%">Τελευταίος έλεγχος εγγυήσεων</td><td><?php echo $last_run ? esc_html(TW_Util::datetime_label($last_run['at'])) : '—'; ?></td></tr>
+                        <tr><td>Επόμενος έλεγχος</td><td><?php echo $next_check ? esc_html(wp_date('d/m/Y H:i', $next_check)) : '—'; ?><?php echo $late ? ' <strong class="tw-danger">(καθυστερεί)</strong>' : ''; ?></td></tr>
+                        <tr><td>Τελευταίο αντίγραφο ασφαλείας</td><td><?php echo $last_backup ? esc_html(TW_Util::datetime_label($last_backup['at'])) : '—'; ?></td></tr>
+                        <tr><td>Επόμενο αντίγραφο</td><td><?php echo $next_backup ? esc_html(wp_date('d/m/Y H:i', $next_backup)) : '—'; ?></td></tr>
+                        <tr><td>Πραγματικό cron στον server</td><td><?php
+                            if ($real_cron && !$late) echo '<span class="tw-ok">✔ Ενεργό</span>';
+                            elseif ($real_cron) echo '<strong class="tw-danger">✘ Το WP-Cron είναι απενεργοποιημένο, αλλά δεν τρέχει καμία εργασία στον server – οι αυτόματες εργασίες έχουν σταματήσει. Χρειάζεται το βήμα 2 παρακάτω.</strong>';
+                            else echo '<span class="tw-warn">Όχι – οι εργασίες τρέχουν με τις επισκέψεις στο site</span>' . ($late ? ' <strong class="tw-danger">(και καθυστερούν)</strong>' : '');
+                        ?></td></tr>
+                    </tbody>
+                </table>
+                <h3>Γιατί χρειάζεται «πραγματικό cron»</h3>
+                <p>Το WordPress εκτελεί τις προγραμματισμένες εργασίες μόνο όταν κάποιος επισκέπτεται το site. Αν το πρωί δεν μπει κανείς, ο έλεγχος των 09:00 γίνεται με την πρώτη επίσκεψη – μπορεί και ώρες αργότερα. Με πραγματικό cron, ο server «χτυπά» το site κάθε λίγα λεπτά και οι εργασίες γίνονται στην ώρα τους.</p>
+                <h3>Ρύθμιση (για όποιον διαχειρίζεται τη φιλοξενία)</h3>
+                <ol class="tw-steps">
+                    <li>Στο αρχείο <code>wp-config.php</code> του site, πριν από τη γραμμή «That's all, stop editing», προστίθεται:<br><code>define('DISABLE_WP_CRON', true);</code></li>
+                    <li>Στον πίνακα ελέγχου της φιλοξενίας (cPanel → <em>Cron Jobs</em>, Plesk → <em>Scheduled Tasks</em> ή αντίστοιχο) δημιουργείται εργασία <strong>κάθε 15 λεπτά</strong> με την εντολή:<br><code style="word-break:break-all">wget -q -O - "<?php echo esc_html($cron_url); ?>" &gt;/dev/null 2&gt;&amp;1</code></li>
+                    <li>Μετά από 15 λεπτά, σε αυτή τη σελίδα η γραμμή «Πραγματικό cron στον server» γράφει <span class="tw-ok">✔ Ενεργό</span> και ο «Τελευταίος έλεγχος» ενημερώνεται κάθε πρωί.</li>
+                </ol>
+                <div class="tw-tip tw-tip--warn"><span>⚠️</span><span>Το βήμα 1 χωρίς το βήμα 2 <strong>σταματά</strong> όλες τις αυτόματες εργασίες. Γίνονται πάντα και τα δύο μαζί.</span></div>
             </section>
 
             <?php if ($is_admin) : ?>

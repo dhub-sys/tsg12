@@ -170,27 +170,89 @@ final class TW_Cron {
             }
         }
 
-        // Messages that Brevo reported as not delivered since the last run.
-        $since = (string) (get_option('tw_last_run')['at'] ?? date('Y-m-d H:i:s', current_time('timestamp') - DAY_IN_SECONDS));
-        $bad = $wpdb->get_results($wpdb->prepare(
-            "SELECT n.*, s.serial_no FROM " . TW_DB::table('notifications') . " n JOIN " . TW_DB::table('warranties') . " w ON w.id = n.warranty_id JOIN " . TW_DB::table('serials') . " s ON s.id = w.serial_id
-             WHERE n.delivery_status IN ('failed','complaint') AND n.delivery_at >= %s ORDER BY n.id", $since));
-        foreach ($bad as $b) {
-            $digest[] = sprintf('ΔΕΝ ΠΑΡΑΔΟΘΗΚΕ (%s): %s – %s – %s%s', $b->channel === 'sms' ? 'SMS' : 'email', $b->serial_no, self::row_label($b), $b->recipient, $b->delivery_detail ? ' – ' . $b->delivery_detail : '');
-        }
-
         self::retention($today);
         TW_OTP::purge();
 
-        if ($digest && $s['admin_digest']) {
-            $body = "Ειδοποιήσεις εγγυήσεων " . TW_Util::date_label($today) . ":\n\n- " . implode("\n- ", $digest)
-                . "\n\nΔιαχείριση: " . TW_App::admin_url('warranties');
-            foreach (TW_Messenger::admin_recipients() as $to) {
-                TW_Messenger::send_email($to, sprintf('[Εγγυήσεις] %d ειδοποιήσεις – %s', count($digest), TW_Util::date_label($today)), $body);
-            }
-        }
+        if ($s['admin_digest']) self::send_daily_report();
         update_option('tw_last_run', ['at' => TW_DB::now(), 'today' => $today, 'count' => count($digest)], false);
         return $digest;
+    }
+
+    /**
+     * Daily report to the company: everything that happened since the previous report
+     * (normally the last 24 hours). Sent only when there is something to report.
+     * @return int number of items reported
+     */
+    public static function send_daily_report() {
+        $now = TW_DB::now();
+        $since = (string) get_option('tw_last_report', '');
+        if ($since === '' || $since > $now) $since = date('Y-m-d H:i:s', current_time('timestamp') - DAY_IN_SECONDS);
+        $r = self::daily_report($since, $now);
+        update_option('tw_last_report', $now, false);
+        if (!$r['count']) return 0;
+        $body = sprintf("Αναφορά Warranty Manager για το διάστημα %s – %s.\n", TW_Util::datetime_label($since), TW_Util::datetime_label($now));
+        foreach ($r['sections'] as $title => $lines) {
+            if (!$lines) continue;
+            $body .= "\n■ " . $title . ' (' . count($lines) . ")\n- " . implode("\n- ", $lines) . "\n";
+        }
+        $body .= "\nΔιαχειριστικό: " . TW_App::admin_url();
+        foreach (TW_Messenger::admin_recipients() as $to) {
+            TW_Messenger::send_email($to, sprintf('[%s] Αναφορά 24ώρου – %s – %d %s', TW_App::APP_NAME, TW_Util::date_label(substr($now, 0, 10)), $r['count'], $r['count'] === 1 ? 'ενημέρωση' : 'ενημερώσεις'), $body);
+        }
+        return $r['count'];
+    }
+
+    /** @return array ['sections' => [title => lines], 'count' => int] */
+    public static function daily_report($since, $until) {
+        global $wpdb;
+        $n = TW_DB::table('notifications'); $w = TW_DB::table('warranties'); $sr = TW_DB::table('serials'); $e = TW_DB::table('events'); $sv = TW_DB::table('services');
+        $who = function ($row) { return trim($row->serial_no . ' (' . $row->warranty_code . ') – ' . $row->customer_name); };
+        $sections = [
+            'Υπενθυμίσεις που στάλθηκαν' => [],
+            'Αποτυχίες αποστολής' => [],
+            'Μηνύματα που δεν παραδόθηκαν' => [],
+            'Εγγυήσεις που έληξαν ή κλείδωσαν' => [],
+            'Νέες ενεργοποιήσεις' => [],
+            'Υποβολές Service από πελάτες' => [],
+            'Άλλες ενέργειες' => [],
+        ];
+        // Reminders (and one-off messages) sent in the period.
+        foreach ($wpdb->get_results($wpdb->prepare(
+            "SELECT n.*, s.serial_no, w.warranty_code, w.customer_name FROM $n n JOIN $w w ON w.id = n.warranty_id JOIN $sr s ON s.id = w.serial_id
+             WHERE n.created_at >= %s AND n.created_at < %s ORDER BY n.id", $since, $until)) as $row) {
+            $ch = ['email' => 'email', 'sms' => 'SMS', 'partner' => 'email συνεργάτη'][$row->channel] ?? $row->channel;
+            $line = sprintf('%s (%s): %s – %s', self::row_label($row), $ch, $who($row), $row->recipient);
+            if ($row->status === 'failed') $sections['Αποτυχίες αποστολής'][] = $line . ($row->error ? ' – ' . $row->error : '');
+            elseif ($row->status === 'sent' && $row->milestone_key !== 'activation') $sections['Υπενθυμίσεις που στάλθηκαν'][] = $line;
+        }
+        // Delivery reports (Brevo) received in the period.
+        foreach ($wpdb->get_results($wpdb->prepare(
+            "SELECT n.*, s.serial_no, w.warranty_code, w.customer_name FROM $n n JOIN $w w ON w.id = n.warranty_id JOIN $sr s ON s.id = w.serial_id
+             WHERE n.delivery_status IN ('failed','complaint') AND n.delivery_at >= %s AND n.delivery_at < %s ORDER BY n.id", $since, $until)) as $row) {
+            $sections['Μηνύματα που δεν παραδόθηκαν'][] = sprintf('%s (%s): %s – %s%s', self::row_label($row), $row->channel === 'sms' ? 'SMS' : 'email', $who($row), $row->recipient, $row->delivery_detail ? ' – ' . $row->delivery_detail : '');
+        }
+        // Events in the period.
+        $map = ['locked' => 'Εγγυήσεις που έληξαν ή κλείδωσαν', 'status_expired' => 'Εγγυήσεις που έληξαν ή κλείδωσαν', 'activated' => 'Νέες ενεργοποιήσεις',
+            'fallback_sent' => 'Μηνύματα που δεν παραδόθηκαν', 'erasure_requested' => 'Άλλες ενέργειες', 'customer_corrected' => 'Άλλες ενέργειες', 'status_active' => 'Άλλες ενέργειες', 'status_void' => 'Άλλες ενέργειες'];
+        $in = implode(',', array_fill(0, count($map), '%s'));
+        foreach ($wpdb->get_results($wpdb->prepare(
+            "SELECT e.*, s.serial_no, w.warranty_code, w.customer_name FROM $e e LEFT JOIN $w w ON w.id = e.warranty_id LEFT JOIN $sr s ON s.id = w.serial_id
+             WHERE e.action IN ($in) AND e.created_at >= %s AND e.created_at < %s ORDER BY e.id", array_merge(array_keys($map), [$since, $until]))) as $row) {
+            $label = TW_Admin::event_label($row->action);
+            $target = $row->serial_no ? $who($row) : TW_Admin::actor_label($row->actor);
+            $details = TW_Admin::event_details($row->details);
+            if ($row->action === 'activated') $details = '';
+            $sections[$map[$row->action]][] = $label . ': ' . $target . ($details !== '' ? ' – ' . $details : '');
+        }
+        // Service submitted by customers.
+        foreach ($wpdb->get_results($wpdb->prepare(
+            "SELECT v.*, s.serial_no, w.warranty_code, w.customer_name FROM $sv v JOIN $w w ON w.id = v.warranty_id JOIN $sr s ON s.id = w.serial_id
+             WHERE v.source = 'customer' AND v.created_at >= %s AND v.created_at < %s ORDER BY v.id", $since, $until)) as $row) {
+            $sections['Υποβολές Service από πελάτες'][] = sprintf('%dο Service: %s – ημ/νία %s – ΑΦΜ τεχνικού %s – απόδειξη: %s', $row->milestone_no, $who($row), TW_Util::date_label($row->performed_date), $row->technician_vat ?: '—', TW_Warranty::receipt_text($row));
+        }
+        $count = 0;
+        foreach ($sections as $l) $count += count($l);
+        return ['sections' => $sections, 'count' => $count];
     }
 
     private static function send_sms_step($w, $m, $offset, $key, $vars) {
