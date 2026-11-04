@@ -223,8 +223,16 @@ final class TW_App {
         return 'data:image/svg+xml;base64,' . base64_encode(self::mark_svg('#a7aaad'));
     }
 
-    /** Browser-tab icon: the mark on a rounded tile in the primary colour. */
+    /**
+     * Browser-tab icon: the WordPress Site Icon (Appearance → Customize → Site Identity) when one is set,
+     * otherwise the Warranty Manager mark on a rounded tile in the primary colour.
+     */
     public static function favicon_tag() {
+        if (function_exists('has_site_icon') && has_site_icon()) {
+            return '<link rel="icon" href="' . esc_url(get_site_icon_url(32)) . '" sizes="32x32">'
+                . '<link rel="icon" href="' . esc_url(get_site_icon_url(192)) . '" sizes="192x192">'
+                . '<link rel="apple-touch-icon" href="' . esc_url(get_site_icon_url(180)) . '">';
+        }
         [$p] = self::colors();
         $inner = preg_replace(['/^<svg[^>]*>/', '/<\/svg>$/'], '', self::mark_svg(self::is_light($p) ? '#111827' : '#ffffff'));
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="' . $p . '"/>'

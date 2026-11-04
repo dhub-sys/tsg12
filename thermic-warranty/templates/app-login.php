@@ -22,7 +22,7 @@ $fields = function () {
 </head>
 <body class="tw-auth">
 <main class="tw-auth-card">
-    <div class="tw-auth-brand"><?php echo TW_App::logo_html('tw-brand-logo'); // phpcs:ignore ?><span class="tw-auth-app"><?php echo TW_App::mark_svg('currentColor', 'class="tw-mark" aria-hidden="true"'); // phpcs:ignore ?><?php echo esc_html(TW_App::APP_NAME); ?></span></div>
+    <div class="tw-auth-brand"><?php echo TW_App::logo_html('tw-brand-logo'); // phpcs:ignore ?><span class="tw-auth-app"><?php echo esc_html(TW_App::APP_NAME); ?></span></div>
 
     <?php if (!empty($view['error'])) : ?><div class="notice notice-error" role="alert"><p><?php echo esc_html($view['error']); ?></p></div><?php endif; ?>
     <?php if (!empty($view['info'])) : ?><div class="notice notice-info" role="status"><p><?php echo esc_html($view['info']); ?></p></div><?php endif; ?>

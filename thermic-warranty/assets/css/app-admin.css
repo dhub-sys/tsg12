@@ -363,3 +363,7 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .tw-mark { width: 22px; height: auto; flex: none; }
 .tw-auth-app { display: inline-flex !important; align-items: center; gap: 8px; color: var(--tw-muted); }
 .tw-auth-app .tw-mark { color: var(--tw-brand); width: 24px; }
+
+/* 1.12.3: app name in bold, normal case, no mark */
+.tw-brand-sub { display: block; text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 700; color: var(--tw-side-strong); opacity: .85; margin-top: 6px; }
+.tw-auth-app { display: block !important; text-transform: none !important; letter-spacing: 0 !important; font-size: 15px !important; font-weight: 700; color: var(--tw-ink-2) !important; margin-top: 6px !important; }

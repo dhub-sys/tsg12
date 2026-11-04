@@ -22,7 +22,7 @@ $user = wp_get_current_user();
 <aside class="tw-sidebar" id="tw-sidebar">
     <div class="tw-brand">
         <?php echo TW_App::logo_html('tw-brand-logo'); // phpcs:ignore ?>
-        <span class="tw-brand-sub"><?php echo TW_App::mark_svg('currentColor', 'class="tw-mark" aria-hidden="true"'); // phpcs:ignore ?><?php echo esc_html(TW_App::APP_NAME); ?></span>
+        <span class="tw-brand-sub"><?php echo esc_html(TW_App::APP_NAME); ?></span>
     </div>
     <nav class="tw-nav" aria-label="Κύριο μενού">
         <?php foreach ($screens as $key => $def) : ?>
