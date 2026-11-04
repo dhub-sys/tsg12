@@ -162,7 +162,7 @@ final class TW_Cron {
                         $pc = self::claim($w->id, $m['key'], $offset, 'partner', $w->partner_email);
                         if ($pc) self::finish($pc, TW_Messenger::send_email($w->partner_email,
                             '[Κοινοποίηση] ' . TW_Messenger::render(TW_Settings::template($key)['subject'], $vars),
-                            TW_Messenger::render(TW_Settings::template($key)['body'], $vars)));
+                            TW_Messenger::render(TW_Settings::template($key)['body'], $vars), 'service'));
                     }
                     $digest[] = sprintf('%s: %s (%s) – %s – %s%s', self::step_label($m, $offset), $w->serial, $w->warranty_code,
                         $w->customer_name, $w->email, $res === true ? '' : ' [ΑΠΟΤΥΧΙΑ: ' . $res . ']');

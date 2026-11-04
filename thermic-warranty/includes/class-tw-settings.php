@@ -32,6 +32,9 @@ final class TW_Settings {
             'notify_partner' => 0,
             'email_from_name' => '',
             'email_reply_to' => '',
+            // Note at the bottom of customer emails ({company_name} allowed; empty = no note). Team emails have none.
+            'email_footer_login' => 'Το μήνυμα που λαμβάνετε αφορά την ασφαλή σας σύνδεση στο περιβάλλον καταχώρησης, επεξεργασίας και προβολής των εγγυήσεών σας για προϊόντα της {company_name}, και δεν αποτελεί εμπορική επικοινωνία.',
+            'email_footer_service' => 'Το μήνυμα αφορά την εγγύηση και τη συντήρηση του προϊόντος σας και δεν αποτελεί εμπορική επικοινωνία.',
             'email_from_address' => '',
             'invoice_required' => 1, // legacy (≤1.3): replaced by invoice_mode
             // Purchase invoice file at activation: required | optional | off

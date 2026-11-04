@@ -948,7 +948,10 @@ final class TW_Admin {
                     $field('marketing_label', 'Checkbox εμπορικών ενημερώσεων (προαιρετικό, αρχικά αποεπιλεγμένο)', 'textarea');
                 elseif ($tab === 'messages') : ?>
                     <tr><td colspan="2"><p class="description">Διαθέσιμα πεδία: <code>{customer_name} {serial} {warranty_code} {product_name} {product_code} {purchase_date} {warranty_end} {due_date} {days} {years} {milestone_no} {grace_end_date} {lock_date} {partner_email} {company_name} {company_contact} {portal_url} {service_schedule}</code>, και για τους κωδικούς επαλήθευσης <code>{code} {minutes}</code>. Αφήστε ένα πεδίο κενό για το προεπιλεγμένο κείμενο. Κενό SMS = δεν στέλνεται SMS σε αυτό το βήμα.</p></td></tr>
-                    <?php foreach ($tpl as $key => $def) : $cur = TW_Settings::template($key); $saved = $s['templates'][$key] ?? []; ?>
+                    <?php
+                    $field('email_footer_login', 'Υποσέλιδο: κωδικοί σύνδεσης πελατών', 'textarea', 'Κάτω από τα email με κωδικό επαλήθευσης/σύνδεσης προς τους πελάτες. Δεκτό το <code>{company_name}</code>. Κενό = χωρίς υποσέλιδο.');
+                    $field('email_footer_service', 'Υποσέλιδο: μηνύματα εγγύησης & Service', 'textarea', 'Κάτω από τα υπόλοιπα email προς τους πελάτες (ενεργοποίηση, υπενθυμίσεις, Service, λήξη). Κενό = χωρίς υποσέλιδο. Τα email προς την ομάδα δεν έχουν υποσέλιδο.');
+                    foreach ($tpl as $key => $def) : $cur = TW_Settings::template($key); $saved = $s['templates'][$key] ?? []; ?>
                         <tr><th><?php echo esc_html($def['label']); ?><br><code><?php echo esc_html($key); ?></code></th><td>
                             <p><input type="text" class="large-text" name="tpl[<?php echo esc_attr($key); ?>][subject]" value="<?php echo esc_attr($saved['subject'] ?? ''); ?>" placeholder="<?php echo esc_attr($def['subject']); ?>"></p>
                             <p><textarea class="large-text" rows="6" name="tpl[<?php echo esc_attr($key); ?>][body]" placeholder="<?php echo esc_attr($def['body']); ?>"><?php echo esc_textarea($saved['body'] ?? ''); ?></textarea></p>
@@ -1602,7 +1605,7 @@ final class TW_Admin {
             'sender' => [],
         ];
         $numbers = ['service_submit_window_days', 'service_resubmit_days', 'warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
-        $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label'];
+        $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label', 'email_footer_login', 'email_footer_service'];
         $urls = ['portal_url', 'register_url', 'privacy_url', 'sms_url', 'logo_url'];
         $values = [];
         foreach ($in as $k => $v) {

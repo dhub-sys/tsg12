@@ -61,7 +61,17 @@ final class TW_Messenger {
         return $h;
     }
 
-    public static function html_wrap($subject, $body_text) {
+    /**
+     * Note at the bottom of an email, by kind: 'login' (customer one-time codes), 'service' (warranty and
+     * Service messages to customers), 'none' (messages to the team: codes, invitations, reports, alerts).
+     */
+    public static function footer_text($kind) {
+        if ($kind !== 'login' && $kind !== 'service') return '';
+        $text = (string) TW_Settings::get($kind === 'login' ? 'email_footer_login' : 'email_footer_service');
+        return trim(self::render($text, ['company_name' => TW_Settings::get('company_name')]));
+    }
+
+    public static function html_wrap($subject, $body_text, $footer = 'service') {
         $company = esc_html((string) TW_Settings::get('company_name'));
         $body = nl2br(make_clickable(esc_html($body_text)));
         // Codes on their own line are shown large.
@@ -71,15 +81,15 @@ final class TW_Messenger {
             . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:8px">'
             . '<tr><td style="padding:20px 28px;border-bottom:3px solid ' . esc_attr(TW_App::colors()[0]) . ';font-size:20px;font-weight:bold">' . $company . '</td></tr>'
             . '<tr><td style="padding:24px 28px;font-size:15px;line-height:1.55">' . $body . '</td></tr>'
-            . '<tr><td style="padding:16px 28px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb">Το μήνυμα αφορά την εγγύηση και τη συντήρηση του προϊόντος σας και δεν αποτελεί εμπορική επικοινωνία.</td></tr>'
+            . (($note = self::footer_text($footer)) !== '' ? '<tr><td style="padding:16px 28px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb">' . esc_html($note) . '</td></tr>' : '')
             . '</table></td></tr></table></body></html>';
     }
 
     /** @return true|string true or error message */
-    public static function send_email($to, $subject, $body_text) {
+    public static function send_email($to, $subject, $body_text, $footer = 'none') {
         self::$last_id = null;
         if (TW_Brevo::email_enabled()) {
-            return TW_Brevo::send_email($to, $subject, self::html_wrap($subject, $body_text), $body_text);
+            return TW_Brevo::send_email($to, $subject, self::html_wrap($subject, $body_text, $footer), $body_text);
         }
         $err = '';
         $catch = function ($e) use (&$err) { $err = $e->get_error_message(); };
@@ -89,7 +99,7 @@ final class TW_Messenger {
         add_action('wp_mail_failed', $catch);
         add_filter('wp_mail_from_name', $name, 20);
         try {
-            $ok = wp_mail($to, $subject, self::html_wrap($subject, $body_text), self::from_headers());
+            $ok = wp_mail($to, $subject, self::html_wrap($subject, $body_text, $footer), self::from_headers());
         } finally {
             remove_filter('wp_mail_from_name', $name, 20);
             remove_action('wp_mail_failed', $catch);
@@ -99,7 +109,8 @@ final class TW_Messenger {
 
     public static function send_template_email($to, $key, array $vars) {
         $t = TW_Settings::template($key);
-        return self::send_email($to, self::render($t['subject'], $vars), self::render($t['body'], $vars));
+        $footer = in_array($key, ['registration_otp', 'login_otp'], true) ? 'login' : 'service';
+        return self::send_email($to, self::render($t['subject'], $vars), self::render($t['body'], $vars), $footer);
     }
 
     /** @return true|string|null null when SMS is disabled or the template is empty */
