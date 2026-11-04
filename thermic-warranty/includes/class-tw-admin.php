@@ -76,6 +76,12 @@ final class TW_Admin {
             echo '<style>#adminmenu #toplevel_page_tw-app .wp-menu-image{background-size:26px auto!important;background-position:center!important;opacity:1}'
                 . '#adminmenu #toplevel_page_tw-app .wp-menu-name{white-space:nowrap}</style>';
         });
+        // Open the standalone app in a new tab straight from the wp-admin menu.
+        add_action('admin_footer', function () {
+            if (!current_user_can(self::cap())) return;
+            echo '<script>(function(){var a=document.querySelector("#toplevel_page_tw-app > a");if(!a)return;'
+                . 'a.href=' . wp_json_encode(TW_App::admin_url()) . ';a.target="_blank";a.rel="noopener";})();</script>';
+        });
         add_action('admin_menu', function () {
             $hook = add_menu_page(TW_App::APP_NAME, TW_App::APP_NAME, self::cap(), 'tw-app', '__return_null', TW_App::menu_icon(), 56);
             add_action('load-' . $hook, function () {
