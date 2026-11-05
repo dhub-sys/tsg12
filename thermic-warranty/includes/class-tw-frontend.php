@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 /**
  * Public side:
- *  [thermic_warranty_register] – serial → email → email code → details, terms, consents → warranty code + printable card
+ *  [thermic_warranty_register] – serial → email → email code → details, terms, consents → warranty code (printable as a card)
  *  [thermic_warranty_portal]   – email code sign-in → the customer's warranties, Service dates, consents, own data
  *
  * Everything runs through admin-ajax so full-page caches never serve stale personal data;
@@ -275,31 +275,13 @@ final class TW_Frontend {
         wp_send_json_success([
             'warranty_code' => $w->warranty_code,
             'serial' => $w->serial,
-            'product' => $w->product_name,
+            'product' => $w->product_name ?: $w->product_code,
+            'customer_name' => $w->customer_name,
             'warranty_end' => TW_Util::date_label($w->warranty_end),
             'next_service' => $next ? TW_Util::date_label($next['due']) : '',
             'email' => TW_Util::mask_email($w->email),
             'portal_url' => (string) TW_Settings::get('portal_url') ?: TW_App::public_url('my'),
-            'card_url' => add_query_arg(['card' => self::card_token($w->id), 'print' => 1], TW_App::public_url()),
         ]);
-    }
-
-    // ------------------------------------------------------------------ printable card after activation
-
-    const CARD_TTL = 2 * HOUR_IN_SECONDS;
-
-    /** Signed, short-lived link to the printable card of a warranty just activated in this browser. */
-    public static function card_token($warranty_id) {
-        $exp = time() + self::CARD_TTL;
-        return (int) $warranty_id . '.' . $exp . '.' . substr(hash_hmac('sha256', 'tw-card|' . (int) $warranty_id . '|' . $exp, wp_salt('auth')), 0, 32);
-    }
-
-    /** @return int warranty id, or 0 if the link is invalid or expired */
-    public static function card_warranty_id($token) {
-        $p = explode('.', (string) $token);
-        if (count($p) !== 3 || !ctype_digit($p[0]) || !ctype_digit($p[1]) || (int) $p[1] < time()) return 0;
-        $expect = substr(hash_hmac('sha256', 'tw-card|' . (int) $p[0] . '|' . (int) $p[1], wp_salt('auth')), 0, 32);
-        return hash_equals($expect, $p[2]) ? (int) $p[0] : 0;
     }
 
     // ------------------------------------------------------------------ portal sign-in

@@ -122,3 +122,18 @@
 .tw-product--found code { background: transparent; }
 .tw-done-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .tw-done-actions .tw-btn { margin: 0; }
+
+/* 1.17.1 – "Print warranty card": only the completion card, as it looks on screen */
+@media print {
+    html.tw-printing-card body * { visibility: hidden !important; }
+    html.tw-printing-card, html.tw-printing-card body, html.tw-printing-card .tw-pub-main { background: #fff !important; }
+    html.tw-printing-card .tw-register,
+    html.tw-printing-card .tw-register .tw-done,
+    html.tw-printing-card .tw-register .tw-done * { visibility: visible !important; }
+    html.tw-printing-card .tw-register { position: absolute !important; left: 0; top: 0; width: 100% !important; max-width: 170mm !important; margin: 0 !important; box-shadow: none !important; }
+    html.tw-printing-card .tw-register .tw-steps,
+    html.tw-printing-card .tw-register .tw-alert,
+    html.tw-printing-card .tw-register .tw-done-actions { display: none !important; }
+    html.tw-printing-card .tw-register, html.tw-printing-card .tw-register * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { margin: 15mm; }
+}

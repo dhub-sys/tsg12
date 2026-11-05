@@ -233,6 +233,20 @@
         });
         root.querySelectorAll('[data-action="restart"]').forEach(function (b) { b.addEventListener('click', restart); });
 
+        // Prints the completion card exactly as shown (print styles hide everything else on the page).
+        // The title becomes the PDF file name: "warranty code - customer".
+        root.querySelectorAll('[data-action="print-card"]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var title = document.title;
+                if (state.done) document.title = state.done.warranty_code + (state.done.customer_name ? ' - ' + state.done.customer_name : '');
+                document.documentElement.classList.add('tw-printing-card');
+                var undo = function () { document.title = title; document.documentElement.classList.remove('tw-printing-card'); window.removeEventListener('afterprint', undo); };
+                window.addEventListener('afterprint', undo);
+                window.print();
+                setTimeout(undo, 1000);
+            });
+        });
+
         // Step 4: details, terms, consents → warranty code
         f4.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -272,6 +286,7 @@
                     return;
                 }
                 try { sessionStorage.removeItem('tw_reg'); } catch (e3) {}
+                state.done = r.data;
                 bind(root.querySelector('[data-step="5"]'), r.data);
                 show(5);
                 root.scrollIntoView({ behavior: 'smooth', block: 'start' });

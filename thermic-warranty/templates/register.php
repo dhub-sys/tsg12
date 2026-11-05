@@ -14,7 +14,7 @@ $terms = TW_Settings::current_terms();
         <li data-step-label="5">Ολοκλήρωση</li>
     </ol>
 
-    <div class="tw-alert<?php echo !empty($card_expired) ? ' tw-alert--error' : ''; ?>" role="alert"<?php echo !empty($card_expired) ? '' : ' hidden'; ?>><?php if (!empty($card_expired)) : ?>Ο σύνδεσμος εκτύπωσης έληξε. Την καρτέλα της εγγύησής σας τη βρίσκετε πάντα στο «Οι εγγυήσεις μου» → «Αντίγραφο των στοιχείων μου».<?php endif; ?></div>
+    <div class="tw-alert" role="alert" hidden></div>
 
     <!-- Step 1: serial only -->
     <form class="tw-step" data-step="1" novalidate>
@@ -160,7 +160,7 @@ $terms = TW_Settings::current_terms();
             <dt>Επόμενο Service</dt><dd data-bind="next_service"></dd>
         </dl>
         <p>Στείλαμε επιβεβαίωση στο <strong data-bind="email"></strong>.</p>
-        <p class="tw-done-actions"><a class="tw-btn" data-bind-href="card_url" target="_blank" rel="noopener" hidden>🖨 Εκτύπωση καρτέλας εγγύησης</a>
+        <p class="tw-done-actions"><button type="button" class="tw-btn" data-action="print-card">🖨 Εκτύπωση κάρτας εγγύησης</button>
            <a class="tw-btn tw-btn--ghost" data-bind-href="portal_url" hidden>Μετάβαση στις εγγυήσεις μου</a>
            <button type="button" class="tw-link" data-action="restart">Ενεργοποίηση άλλου προϊόντος</button></p>
     </div>

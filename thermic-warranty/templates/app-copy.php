@@ -12,7 +12,6 @@ $privacy = $s['privacy_url'] ?: get_privacy_policy_url();
 $consent_labels = ['terms' => 'Αποδοχή όρων εγγύησης', 'data_accuracy' => 'Επιβεβαίωση ορθότητας στοιχείων', 'marketing' => 'Ενημερώσεις και προσφορές (email/SMS)'];
 $source_labels = ['registration' => 'κατά την ενεργοποίηση', 'portal' => 'από «Οι εγγυήσεις μου»', 'erasure_request' => 'με αίτημα διαγραφής'];
 $channel_labels = ['email' => 'Email', 'sms' => 'SMS', 'partner' => 'Email συνεργάτη'];
-$card = !empty($card); // single warranty card printed right after activation
 $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Καταχωρήθηκε – ελέγχθηκε από την εταιρεία', 'rejected' => 'Απορρίφθηκε'];
 ?><!doctype html>
 <html lang="el">
@@ -21,7 +20,7 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <?php echo TW_App::favicon_tag(); // phpcs:ignore ?>
-    <title><?php echo esc_html($card ? $warranties[0]->warranty_code . ' - ' . $warranties[0]->customer_name : 'Αντίγραφο στοιχείων – ' . $s['company_name']); ?></title>
+    <title>Αντίγραφο στοιχείων – <?php echo esc_html($s['company_name']); ?></title>
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
     <link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/app-copy.css')); ?>">
     <?php echo TW_App::brand_style(); // phpcs:ignore ?>
@@ -29,27 +28,18 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
 <body class="tw-copy">
 <div class="tw-copy-bar">
     <button type="button" onclick="window.print()">🖨 Εκτύπωση / Αποθήκευση ως PDF</button>
-    <?php if ($card) : ?>
-        <a href="<?php echo esc_url(TW_App::public_url()); ?>">← Ενεργοποίηση άλλου προϊόντος</a>
-        <a href="<?php echo esc_url(TW_App::public_url('my')); ?>">Οι εγγυήσεις μου</a>
-    <?php else : ?>
-        <a href="<?php echo esc_url(TW_App::public_url('my')); ?>">← Οι εγγυήσεις μου</a>
-    <?php endif; ?>
+    <a href="<?php echo esc_url(TW_App::public_url('my')); ?>">← Οι εγγυήσεις μου</a>
 </div>
 <main class="tw-copy-page">
     <header class="tw-copy-head">
         <div><?php echo TW_App::logo_html('tw-copy-logo'); // phpcs:ignore ?></div>
         <div class="tw-copy-meta">
-            <h1><?php echo $card ? 'Καρτέλα εγγύησης' : 'Αντίγραφο στοιχείων εγγύησης'; ?></h1>
+            <h1>Αντίγραφο στοιχείων εγγύησης</h1>
             <p>Για: <strong><?php echo esc_html($email); ?></strong><br>Ημερομηνία: <?php echo esc_html(TW_Util::datetime_label(TW_DB::now())); ?></p>
         </div>
     </header>
 
-    <?php if ($card) : ?>
-    <p class="tw-copy-intro">Η εγγύηση του προϊόντος σας ενεργοποιήθηκε. Φυλάξτε την καρτέλα μαζί με το παραστατικό αγοράς. Για να συνεχίσει να ισχύει η εγγύηση, καταχωρήστε κάθε Service στο «Οι εγγυήσεις μου»: <?php echo esc_html(TW_App::public_url('my')); ?></p>
-    <?php else : ?>
     <p class="tw-copy-intro">Το έγγραφο περιέχει όλα τα στοιχεία που διατηρεί η <?php echo esc_html($s['company_name']); ?> για τις εγγυήσεις των προϊόντων σας, όπως καταχωρήθηκαν στην πλατφόρμα εγγυήσεων. Μπορείτε να το φυλάξετε ως βεβαίωση της εγγύησης.</p>
-    <?php endif; ?>
 
     <?php if (!$warranties) : ?><p>Δεν βρέθηκαν εγγυήσεις.</p><?php endif; ?>
 
@@ -60,7 +50,7 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
         $sent = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('notifications') . " WHERE warranty_id = %d AND status = 'sent' AND channel <> 'partner' ORDER BY id", $w->id));
         ?>
         <section class="tw-copy-warranty">
-            <h2><?php echo $card ? '' : (int) ($i + 1) . '. '; ?><?php echo esc_html($w->product_name ?: $w->product_code ?: 'Προϊόν'); ?>
+            <h2><?php echo (int) ($i + 1); ?>. <?php echo esc_html($w->product_name ?: $w->product_code ?: 'Προϊόν'); ?>
                 <span class="tw-copy-status tw-copy-status--<?php echo esc_attr($w->status); ?>"><?php echo esc_html($labels[$w->status] ?? $w->status); ?></span></h2>
 
             <h3>Εγγύηση</h3>
@@ -133,7 +123,6 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
             </table>
             <p class="tw-copy-muted">Σήμερα: ενημερώσεις και προσφορές <strong><?php echo $w->marketing_opt_in ? 'ΝΑΙ' : 'ΟΧΙ'; ?></strong>. Τα μηνύματα για το Service και την εγγύηση αποστέλλονται ανεξάρτητα από αυτή την επιλογή.</p>
 
-            <?php if (!$card) : ?>
             <h3>Μηνύματα που σας στάλθηκαν</h3>
             <?php if (!$sent) : ?><p class="tw-copy-muted">Κανένα μήνυμα ακόμη.</p><?php else : ?>
             <table class="tw-copy-table">
@@ -144,7 +133,6 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
                 <?php endforeach; ?>
                 </tbody>
             </table>
-            <?php endif; ?>
             <?php endif; ?>
         </section>
     <?php endforeach; ?>
@@ -162,6 +150,5 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
     </section>
     <footer class="tw-copy-foot"><?php echo esc_html($s['company_name'] . ' – ' . $s['company_contact']); ?></footer>
 </main>
-<?php if ($card && isset($_GET['print'])) : ?><script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });</script><?php endif; ?>
 </body>
 </html>
