@@ -33,6 +33,23 @@ $s = TW_Settings::all();
                 <dt>Κλείδωμα</dt><dd><?php echo esc_html(TW_Util::datetime_label($w->locked_at)); ?> – <?php echo esc_html($w->lock_reason); ?></dd>
             <?php endif; ?>
         </dl>
+        <p><button type="button" class="tw-btn tw-btn--ghost tw-btn--sm" data-action="show-card" aria-expanded="false">🪪 Κάρτα εγγύησης</button></p>
+        <?php $next = TW_Warranty::next_service($w); ?>
+        <div class="tw-done tw-card-view" hidden data-print-title="<?php echo esc_attr($w->warranty_code . ' - ' . $w->customer_name); ?>">
+            <div class="tw-card-logo" hidden><?php echo TW_App::logo_html('tw-card-logo-img'); // phpcs:ignore -- shown only on the printed card ?></div>
+            <h3>Κάρτα εγγύησης</h3>
+            <p>Ο κωδικός εγγύησής σας:</p>
+            <p class="tw-warranty-code"><?php echo esc_html($w->warranty_code); ?></p>
+            <dl class="tw-dl">
+                <dt>Σειριακός αριθμός</dt><dd><?php echo esc_html($w->serial); ?></dd>
+                <dt>Προϊόν</dt><dd><?php echo esc_html($w->product_name ?: ($w->product_code ?: '—')); ?></dd>
+                <dt>Λήξη εγγύησης</dt><dd><?php echo esc_html(TW_Util::date_label($w->warranty_end)); ?></dd>
+                <dt>Επόμενο Service</dt><dd><?php echo esc_html($next ? TW_Util::date_label($next['due']) : '—'); ?></dd>
+                <?php if ($w->status !== 'active') : ?><dt>Κατάσταση</dt><dd><?php echo esc_html($labels[$w->status] ?? $w->status); ?></dd><?php endif; ?>
+            </dl>
+            <p class="tw-done-actions"><button type="button" class="tw-btn" data-action="print-card">🖨 Εκτύπωση κάρτας εγγύησης</button>
+                <button type="button" class="tw-link" data-action="hide-card">Κλείσιμο</button></p>
+        </div>
 
         <h5>Πρόγραμμα Service</h5>
         <table class="tw-table">
@@ -126,16 +143,47 @@ $s = TW_Settings::all();
             </dl>
             <p class="tw-hint">Για διόρθωση στοιχείων επικοινωνήστε μαζί μας: <?php echo esc_html($s['company_contact']); ?>.</p>
         </details>
-
-        <label class="tw-check">
-            <input type="checkbox" data-action="marketing" data-warranty="<?php echo (int) $w->id; ?>" <?php checked((int) $w->marketing_opt_in, 1); ?>>
-            <span><?php echo esc_html($s['marketing_label']); ?></span>
-        </label>
     </article>
 <?php endforeach; ?>
 
-<section class="tw-card tw-privacy-box">
+<?php
+$mk = TW_Warranty::marketing_status($email);
+$terms_rows = [];
+foreach ($warranties as $w) {
+    $c = $GLOBALS['wpdb']->get_row($GLOBALS['wpdb']->prepare("SELECT * FROM " . TW_DB::table('consents') . " WHERE warranty_id = %d AND consent_type = 'terms' ORDER BY id DESC LIMIT 1", $w->id));
+    if ($c) $terms_rows[] = $c;
+}
+?>
+<section class="tw-card tw-privacy-box" id="tw-my-data">
     <h4>Τα δεδομένα μου</h4>
+
+    <div class="tw-consents">
+        <h5>Οι άδειές μου</h5>
+        <div class="tw-consent-row">
+            <div><strong>Όροι εγγύησης</strong><br><span class="tw-hint">Απαραίτητοι για την εγγύηση. Τους αποδεχθήκατε κατά την ενεργοποίηση<?php echo $terms_rows ? ' (τελευταία φορά ' . esc_html(TW_Util::date_label(substr(max(array_map(function ($c) { return $c->created_at; }, $terms_rows)), 0, 10))) . ')' : ''; ?>.</span></div>
+            <span class="tw-consent-state tw-consent-state--fixed">Απαραίτητο</span>
+        </div>
+        <div class="tw-consent-row">
+            <div><strong>Μηνύματα για Service και εγγύηση</strong><br><span class="tw-hint">Υπενθυμίσεις Service, λήξης και επιβεβαιώσεις. Στέλνονται πάντα, γιατί αφορούν την εγγύηση που έχετε.</span></div>
+            <span class="tw-consent-state tw-consent-state--fixed">Απαραίτητο</span>
+        </div>
+        <form class="tw-consent-row tw-consent-marketing" data-action="marketing-form" novalidate>
+            <div>
+                <strong>Ενημερώσεις και προσφορές</strong> <span class="tw-hint">(προαιρετικό)</span><br>
+                <span class="tw-hint"><?php echo esc_html($s['marketing_label']); ?> Ισχύει για όλα τα προϊόντα σας<?php echo $mk['changed_at'] ? ' · τελευταία αλλαγή ' . esc_html(TW_Util::datetime_label($mk['changed_at'])) : ''; ?>.</span>
+                <?php if ($mk['state'] === 'mixed') : ?><p class="tw-alert tw-alert--warn">Μέχρι σήμερα η επιλογή σας διέφερε ανά προϊόν. Επιλέξτε και αποθηκεύστε, για να ισχύει μία επιλογή για όλα.</p><?php endif; ?>
+                <div class="tw-choice" role="radiogroup" aria-label="Ενημερώσεις και προσφορές">
+                    <label><input type="radio" name="marketing" value="1" <?php checked($mk['state'], 'yes'); ?>> Ναι, θέλω να λαμβάνω</label>
+                    <label><input type="radio" name="marketing" value="0" <?php checked($mk['state'], 'no'); ?>> Όχι</label>
+                </div>
+            </div>
+            <div class="tw-consent-side">
+                <span class="tw-consent-state tw-consent-state--<?php echo esc_attr($mk['state']); ?>"><?php echo esc_html(['yes' => 'Ενεργή', 'no' => 'Ανενεργή', 'mixed' => 'Μερική'][$mk['state']]); ?></span>
+                <button type="submit" class="tw-btn" disabled>Αποθήκευση επιλογής</button>
+            </div>
+        </form>
+    </div>
+
     <p>Δείτε, εκτυπώστε ή αποθηκεύστε ως PDF όλα τα στοιχεία που έχουμε για εσάς και τις εγγυήσεις σας. Χρησιμεύει και ως βεβαίωση της εγγύησης.</p>
     <a class="tw-btn" href="<?php echo esc_url(add_query_arg('copy', '1', TW_App::public_url('my'))); ?>" target="_blank" rel="noopener">📄 Αντίγραφο των στοιχείων μου</a>
     <button type="button" class="tw-btn tw-btn--ghost" data-action="erase">Αίτημα διαγραφής</button>

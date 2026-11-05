@@ -210,6 +210,7 @@ final class TW_Admin {
             if ($k === 'genuine_parts') $v = $v ? 'ναι' : 'όχι';
             if ($k === 'milestone') $v = (int) $v . 'ο';
             if ($k === 'date' && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $v)) $v = TW_Util::date_label($v);
+            if ($k === 'source') $v = ['portal' => '«Οι εγγυήσεις μου»', 'registration' => 'ενεργοποίηση (ισχύει για όλα τα προϊόντα του πελάτη)', 'inherited' => 'ενεργοποίηση – ισχύουσα συγκατάθεση του πελάτη', 'erasure_request' => 'αίτημα διαγραφής'][$v] ?? $v;
             if ($k === 'by') $v = ['partner' => 'συνεργάτη', 'thermic' => 'εταιρεία', 'customer' => 'πελάτη'][$v] ?? $v;
             $out[] = ($names[$k] ?? $k) . ': ' . (is_scalar($v) ? $v : wp_json_encode($v, JSON_UNESCAPED_UNICODE));
         }

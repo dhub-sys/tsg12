@@ -100,7 +100,32 @@ final class TW_Warranty {
         global $wpdb;
         $wpdb->update(TW_DB::table('warranties'), ['marketing_opt_in' => $granted ? 1 : 0, 'updated_at' => TW_DB::now()], ['id' => $warranty->id]);
         self::record_consent($warranty->id, 'marketing', $granted, (string) TW_Settings::get('marketing_label'), $source);
-        TW_DB::log_event($granted ? 'marketing_granted' : 'marketing_withdrawn', ['source' => $source], $warranty->id, $warranty->serial_id, $source === 'portal' ? 'customer:' . $warranty->email : null);
+        TW_DB::log_event($granted ? 'marketing_granted' : 'marketing_withdrawn', ['source' => $source], $warranty->id, $warranty->serial_id, in_array($source, ['portal', 'registration', 'inherited'], true) ? 'customer:' . $warranty->email : null);
+    }
+
+    /**
+     * Marketing consent belongs to the person, not to a product: applies the choice to every warranty of this
+     * email (each change is recorded as its own consent entry, with date and source). @return int warranties changed
+     */
+    public static function set_marketing_for_email($email, $granted, $source) {
+        $n = 0;
+        foreach (self::by_email($email) as $w) {
+            if ((bool) $w->marketing_opt_in === (bool) $granted) continue;
+            self::set_marketing($w, $granted, $source);
+            $n++;
+        }
+        return $n;
+    }
+
+    /** @return array ['state' => 'yes'|'no'|'mixed', 'changed_at' => 'Y-m-d H:i:s'|''] for this person */
+    public static function marketing_status($email) {
+        global $wpdb;
+        $ws = self::by_email($email);
+        $yes = count(array_filter($ws, function ($w) { return (int) $w->marketing_opt_in === 1; }));
+        $state = !$ws || $yes === 0 ? 'no' : ($yes === count($ws) ? 'yes' : 'mixed');
+        $ids = array_map(function ($w) { return (int) $w->id; }, $ws);
+        $at = $ids ? (string) $wpdb->get_var("SELECT MAX(created_at) FROM " . TW_DB::table('consents') . " WHERE consent_type = 'marketing' AND warranty_id IN (" . implode(',', $ids) . ")") : '';
+        return ['state' => $state, 'changed_at' => $at];
     }
 
     public static function lock($warranty, $reason, $actor = 'system') {

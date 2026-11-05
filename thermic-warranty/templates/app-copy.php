@@ -10,7 +10,7 @@ global $wpdb;
 $labels = TW_Util::status_labels();
 $privacy = $s['privacy_url'] ?: get_privacy_policy_url();
 $consent_labels = ['terms' => 'Αποδοχή όρων εγγύησης', 'data_accuracy' => 'Επιβεβαίωση ορθότητας στοιχείων', 'marketing' => 'Ενημερώσεις και προσφορές (email/SMS)'];
-$source_labels = ['registration' => 'κατά την ενεργοποίηση', 'portal' => 'από «Οι εγγυήσεις μου»', 'erasure_request' => 'με αίτημα διαγραφής'];
+$source_labels = ['registration' => 'κατά την ενεργοποίηση', 'portal' => 'από «Οι εγγυήσεις μου»', 'erasure_request' => 'με αίτημα διαγραφής', 'inherited' => 'κατά την ενεργοποίηση, από την ήδη ισχύουσα συγκατάθεσή σας'];
 $channel_labels = ['email' => 'Email', 'sms' => 'SMS', 'partner' => 'Email συνεργάτη'];
 $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Καταχωρήθηκε – ελέγχθηκε από την εταιρεία', 'rejected' => 'Απορρίφθηκε'];
 ?><!doctype html>

@@ -110,6 +110,39 @@
         });
     }
 
+    // ------------------------------------------------------------ printed warranty card
+    // Prints a card as shown, with the logo on top, on a single page: a copy is put straight under <body>
+    // and the print styles show only that copy. The title becomes the PDF file name ("code - customer").
+    function printCard(src, title) {
+        var old = document.getElementById('tw-print-card');
+        if (old) old.remove();
+        var holder = document.createElement('div');
+        holder.id = 'tw-print-card';
+        holder.className = 'tw-app tw-register';
+        var card = src.cloneNode(true);
+        card.hidden = false;
+        card.removeAttribute('data-step');
+        card.querySelectorAll('.tw-done-actions').forEach(function (e) { e.remove(); });
+        card.querySelectorAll('.tw-card-logo').forEach(function (e) { e.hidden = false; });
+        holder.appendChild(card);
+        document.body.appendChild(holder);
+        var oldTitle = document.title;
+        if (title) document.title = title;
+        document.documentElement.classList.add('tw-printing-card');
+        var done = false;
+        var undo = function () {
+            if (done) return; done = true;
+            document.title = oldTitle;
+            document.documentElement.classList.remove('tw-printing-card');
+            holder.remove();
+            window.removeEventListener('afterprint', undo);
+        };
+        window.addEventListener('afterprint', undo);
+        var img = holder.querySelector('img');
+        var go = function () { window.print(); setTimeout(undo, 1500); };
+        if (img && !img.complete) { img.addEventListener('load', go, { once: true }); img.addEventListener('error', go, { once: true }); } else go();
+    }
+
     // ------------------------------------------------------------ registration
     function Register(root) {
         enhanceFiles(root);
@@ -233,39 +266,9 @@
         });
         root.querySelectorAll('[data-action="restart"]').forEach(function (b) { b.addEventListener('click', restart); });
 
-        // Prints the completion card as shown, with the logo on top, on a single page: a copy of the card is put
-        // straight under <body> and the print styles show only that copy (the rest takes no space on paper).
-        // The title becomes the PDF file name: "warranty code - customer".
         root.querySelectorAll('[data-action="print-card"]').forEach(function (b) {
             b.addEventListener('click', function () {
-                var old = document.getElementById('tw-print-card');
-                if (old) old.remove();
-                var holder = document.createElement('div');
-                holder.id = 'tw-print-card';
-                holder.className = 'tw-app tw-register';
-                var card = root.querySelector('[data-step="5"]').cloneNode(true);
-                card.hidden = false;
-                card.removeAttribute('data-step');
-                card.querySelectorAll('.tw-done-actions').forEach(function (e) { e.remove(); });
-                card.querySelectorAll('.tw-card-logo').forEach(function (e) { e.hidden = false; });
-                holder.appendChild(card);
-                document.body.appendChild(holder);
-                var title = document.title;
-                if (state.done) document.title = state.done.warranty_code + (state.done.customer_name ? ' - ' + state.done.customer_name : '');
-                document.documentElement.classList.add('tw-printing-card');
-                var done = false;
-                var undo = function () {
-                    if (done) return; done = true;
-                    document.title = title;
-                    document.documentElement.classList.remove('tw-printing-card');
-                    holder.remove();
-                    window.removeEventListener('afterprint', undo);
-                };
-                window.addEventListener('afterprint', undo);
-                // Let the logo load before the print dialog takes its snapshot.
-                var img = holder.querySelector('img');
-                var go = function () { window.print(); setTimeout(undo, 1500); };
-                if (img && !img.complete) { img.addEventListener('load', go, { once: true }); img.addEventListener('error', go, { once: true }); } else go();
+                printCard(root.querySelector('[data-step="5"]'), state.done ? state.done.warranty_code + (state.done.customer_name ? ' - ' + state.done.customer_name : '') : '');
             });
         });
 
@@ -337,7 +340,7 @@
         var csrf = '';
         root.querySelectorAll('.tw-ts').forEach(tsRender);
 
-        function load() {
+        function load(after) {
             post('portal', {}).then(function (r) {
                 loading.hidden = true;
                 if (r.success && r.data.signed_in) {
@@ -346,6 +349,7 @@
                     content.hidden = false;
                     login.hidden = true;
                     wire();
+                    if (typeof after === 'function') after();
                 } else {
                     content.hidden = true;
                     login.hidden = false;
@@ -394,14 +398,44 @@
             var out = content.querySelector('[data-action="logout"]');
             if (out) out.addEventListener('click', function () { post('logout', {}).then(load); });
 
-            content.querySelectorAll('[data-action="marketing"]').forEach(function (cb) {
-                cb.addEventListener('change', function () {
-                    cb.disabled = true;
-                    post('portal_marketing', { csrf: csrf, warranty_id: cb.getAttribute('data-warranty'), granted: cb.checked ? '1' : '0' }).then(function (r) {
-                        cb.disabled = false;
-                        if (!r.success) { cb.checked = !cb.checked; alertBox(root, r.data.message); return; }
-                        alertBox(root, r.data.message, 'success');
+            // Marketing consent: one choice for all products, saved explicitly.
+            var mf = content.querySelector('[data-action="marketing-form"]');
+            if (mf) {
+                var btn = mf.querySelector('button[type=submit]');
+                var initial = (mf.querySelector('input[name=marketing]:checked') || {}).value || '';
+                mf.addEventListener('change', function () {
+                    var v = (mf.querySelector('input[name=marketing]:checked') || {}).value || '';
+                    btn.disabled = !v || v === initial;
+                });
+                mf.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var v = (mf.querySelector('input[name=marketing]:checked') || {}).value;
+                    if (!v) return;
+                    if (v === '0' && !window.confirm('Να ανακληθεί η συγκατάθεσή σας για ενημερώσεις και προσφορές, για όλα τα προϊόντα σας;')) return;
+                    btn.disabled = true;
+                    post('portal_marketing', { csrf: csrf, granted: v }).then(function (r) {
+                        if (!r.success) { btn.disabled = false; alertBox(root, r.data.message); return; }
+                        load(function () { alertBox(root, r.data.message, 'success'); var box = content.querySelector('#tw-my-data'); if (box) box.scrollIntoView({ block: 'center' }); });
                     });
+                });
+            }
+
+            // Warranty card: show / hide / print, per product.
+            content.querySelectorAll('[data-action="show-card"]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var view = b.closest('article').querySelector('.tw-card-view');
+                    view.hidden = !view.hidden;
+                    b.setAttribute('aria-expanded', String(!view.hidden));
+                    if (!view.hidden) view.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+            });
+            content.querySelectorAll('.tw-card-view').forEach(function (view) {
+                view.querySelector('[data-action="hide-card"]').addEventListener('click', function () {
+                    view.hidden = true;
+                    view.closest('article').querySelector('[data-action="show-card"]').setAttribute('aria-expanded', 'false');
+                });
+                view.querySelector('[data-action="print-card"]').addEventListener('click', function () {
+                    printCard(view, view.getAttribute('data-print-title'));
                 });
             });
 

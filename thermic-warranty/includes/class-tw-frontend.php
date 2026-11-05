@@ -261,6 +261,14 @@ final class TW_Frontend {
             self::fail($w->get_error_message(), 'serial', 409);
         }
         TW_OTP::mark_used($otp->id);
+        // Marketing consent is per person: a "yes" now covers the customer's other products too; no tick leaves
+        // an existing consent of the same person in place (and the new product follows it).
+        $others = array_filter(TW_Warranty::by_email($w->email), function ($o) use ($w) { return (int) $o->id !== (int) $w->id; });
+        if ($consents['marketing']) {
+            TW_Warranty::set_marketing_for_email($w->email, true, 'registration');
+        } elseif ($others && TW_Warranty::marketing_status($w->email)['state'] !== 'no') {
+            foreach ($others as $o) { if ((int) $o->marketing_opt_in === 1) { TW_Warranty::set_marketing($w, true, 'inherited'); break; } }
+        }
 
         $vars = TW_Messenger::warranty_vars($w);
         $sent = TW_Messenger::send_template_email($w->email, 'activation', $vars);
@@ -374,14 +382,16 @@ final class TW_Frontend {
         return $w;
     }
 
+    /** One choice for the person: applies to all their warranties. */
     public static function ajax_portal_marketing() {
         $s = self::require_session();
-        $w = self::owned_warranty($s);
-        $granted = self::input('granted') === '1';
-        if ((bool) $w->marketing_opt_in !== $granted) {
-            TW_Warranty::set_marketing($w, $granted, 'portal');
-        }
-        wp_send_json_success(['message' => $granted ? 'Η συγκατάθεσή σας καταχωρήθηκε.' : 'Η συγκατάθεσή σας ανακλήθηκε. Δεν θα λαμβάνετε εμπορικές ενημερώσεις.']);
+        $choice = self::input('granted');
+        if ($choice !== '1' && $choice !== '0') self::fail('Επιλέξτε «Ναι» ή «Όχι».', 'marketing');
+        $granted = $choice === '1';
+        TW_Warranty::set_marketing_for_email($s->email, $granted, 'portal');
+        wp_send_json_success(['message' => $granted
+            ? 'Η επιλογή σας αποθηκεύτηκε: θα λαμβάνετε ενημερώσεις και προσφορές. Μπορείτε να την αλλάξετε οποτεδήποτε.'
+            : 'Η επιλογή σας αποθηκεύτηκε: η συγκατάθεσή σας ανακλήθηκε και δεν θα λαμβάνετε ενημερώσεις και προσφορές. Τα μηνύματα για το Service και την εγγύηση συνεχίζουν κανονικά.']);
     }
 
     /** Customer submits the Service of a milestone: date, technician ΑΦΜ, receipt. */

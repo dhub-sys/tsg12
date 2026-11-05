@@ -22,7 +22,7 @@ $title = trim($w->warranty_code . ' - ' . $w->customer_name);
 $ms_labels = ['done' => 'Καταχωρήθηκε – ελέγχθηκε', 'submitted' => 'Καταχωρήθηκε από τον πελάτη', 'rejected' => 'Απορρίφθηκε – αναμένεται νέα υποβολή', 'due' => 'Εκκρεμεί καταχώρηση',
     'missed' => 'Δεν καταχωρήθηκε', 'upcoming' => 'Προσεχώς', 'before_registration' => 'Πριν από την ενεργοποίηση', 'expired' => 'Έληξε'];
 $consent_labels = ['terms' => 'Αποδοχή όρων εγγύησης', 'data_accuracy' => 'Ορθότητα στοιχείων', 'marketing' => 'Ενημερώσεις & προσφορές'];
-$source_labels = ['registration' => 'Ενεργοποίηση', 'portal' => 'Πύλη πελάτη', 'erasure_request' => 'Αίτημα διαγραφής'];
+$source_labels = ['registration' => 'Ενεργοποίηση', 'portal' => 'Πύλη πελάτη', 'erasure_request' => 'Αίτημα διαγραφής', 'inherited' => 'Ενεργοποίηση (ισχύουσα συγκατάθεση πελάτη)'];
 $channels = ['email' => 'Email', 'sms' => 'SMS', 'partner' => 'Email συνεργάτη'];
 $delivery = TW_Brevo::status_labels();
 $wm_type = $s['pdf_watermark'];
