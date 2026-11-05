@@ -150,6 +150,7 @@ $terms = TW_Settings::current_terms();
 
     <!-- Step 4 -->
     <div class="tw-step tw-done" data-step="5" hidden>
+        <div class="tw-card-logo" hidden><?php echo TW_App::logo_html('tw-card-logo-img'); // phpcs:ignore -- shown only on the printed card ?></div>
         <h3>Η εγγύηση ενεργοποιήθηκε</h3>
         <p>Ο κωδικός εγγύησής σας:</p>
         <p class="tw-warranty-code" data-bind="warranty_code"></p>

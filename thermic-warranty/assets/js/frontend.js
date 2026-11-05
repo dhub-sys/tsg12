@@ -233,17 +233,39 @@
         });
         root.querySelectorAll('[data-action="restart"]').forEach(function (b) { b.addEventListener('click', restart); });
 
-        // Prints the completion card exactly as shown (print styles hide everything else on the page).
+        // Prints the completion card as shown, with the logo on top, on a single page: a copy of the card is put
+        // straight under <body> and the print styles show only that copy (the rest takes no space on paper).
         // The title becomes the PDF file name: "warranty code - customer".
         root.querySelectorAll('[data-action="print-card"]').forEach(function (b) {
             b.addEventListener('click', function () {
+                var old = document.getElementById('tw-print-card');
+                if (old) old.remove();
+                var holder = document.createElement('div');
+                holder.id = 'tw-print-card';
+                holder.className = 'tw-app tw-register';
+                var card = root.querySelector('[data-step="5"]').cloneNode(true);
+                card.hidden = false;
+                card.removeAttribute('data-step');
+                card.querySelectorAll('.tw-done-actions').forEach(function (e) { e.remove(); });
+                card.querySelectorAll('.tw-card-logo').forEach(function (e) { e.hidden = false; });
+                holder.appendChild(card);
+                document.body.appendChild(holder);
                 var title = document.title;
                 if (state.done) document.title = state.done.warranty_code + (state.done.customer_name ? ' - ' + state.done.customer_name : '');
                 document.documentElement.classList.add('tw-printing-card');
-                var undo = function () { document.title = title; document.documentElement.classList.remove('tw-printing-card'); window.removeEventListener('afterprint', undo); };
+                var done = false;
+                var undo = function () {
+                    if (done) return; done = true;
+                    document.title = title;
+                    document.documentElement.classList.remove('tw-printing-card');
+                    holder.remove();
+                    window.removeEventListener('afterprint', undo);
+                };
                 window.addEventListener('afterprint', undo);
-                window.print();
-                setTimeout(undo, 1000);
+                // Let the logo load before the print dialog takes its snapshot.
+                var img = holder.querySelector('img');
+                var go = function () { window.print(); setTimeout(undo, 1500); };
+                if (img && !img.complete) { img.addEventListener('load', go, { once: true }); img.addEventListener('error', go, { once: true }); } else go();
             });
         });
 
