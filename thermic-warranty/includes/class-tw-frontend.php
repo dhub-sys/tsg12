@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 /**
  * Public side:
- *  [thermic_warranty_register] – serial + email → email code → details, terms, consents → warranty code
+ *  [thermic_warranty_register] – serial → email → email code → details, terms, consents → warranty code + printable card
  *  [thermic_warranty_portal]   – email code sign-in → the customer's warranties, Service dates, consents, own data
  *
  * Everything runs through admin-ajax so full-page caches never serve stale personal data;
@@ -18,7 +18,7 @@ final class TW_Frontend {
         add_action('template_redirect', [__CLASS__, 'no_cache_on_our_pages']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
 
-        $public = ['reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_service', 'portal_export', 'portal_erase', 'logout'];
+        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_service', 'portal_export', 'portal_erase', 'logout'];
         foreach ($public as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
@@ -112,12 +112,31 @@ final class TW_Frontend {
         if ($g !== true) self::fail($g, 'guard', 403);
     }
 
+    /**
+     * Step 1: the serial alone. Bot checks (honeypot, time trap, Turnstile) and a per-IP limit come first,
+     * so the form can't be used to sweep serial numbers. A valid, unregistered serial gets a signed pass
+     * that lets the next steps (email, "send a new code") go ahead without a second challenge.
+     */
+    public static function ajax_reg_check() {
+        self::guard(true);
+        if (!TW_Guard::throttle('serial_check', 30, HOUR_IN_SECONDS)) {
+            self::fail('Πάρα πολλές αναζητήσεις σειριακών αριθμών. Δοκιμάστε ξανά σε λίγο.', '', 429);
+        }
+        $serial = self::usable_serial(self::input('serial'));
+        wp_send_json_success([
+            'serial' => $serial->serial,
+            'product' => trim($serial->product_name . ($serial->product_code ? ' (' . $serial->product_code . ')' : '')),
+            'pass' => TW_Guard::pass('serial|' . TW_Util::normalize_serial($serial->serial)),
+        ]);
+    }
+
     public static function ajax_reg_start() {
         $email = self::email_input();
-        // Checked before the serial lookup, so the form can't be used to probe serial numbers.
-        // "Send a new code" carries the pass from the first send, so the customer isn't challenged twice.
-        $subject = 'reg|' . $email . '|' . TW_Util::normalize_serial(self::input('serial'));
-        self::guard(true, TW_Guard::pass_ok(self::input('pass'), $subject));
+        // Only after step 1: the pass proves the serial was checked (with the bot checks) in the last 30 minutes.
+        if (!TW_Guard::pass_ok(self::input('pass'), 'serial|' . TW_Util::normalize_serial(self::input('serial')))) {
+            self::fail('Η σελίδα έμεινε ανοιχτή πολύ ώρα. Ξεκινήστε ξανά από τον σειριακό αριθμό.', 'restart', 403);
+        }
+        self::guard(true, true); // honeypot and form stamp
         $serial = self::usable_serial(self::input('serial'));
         $rl = TW_OTP::rate_limit_ok($email);
         if (is_wp_error($rl)) self::fail($rl->get_error_message(), '', 429);
@@ -139,7 +158,6 @@ final class TW_Frontend {
         wp_send_json_success([
             'message' => sprintf('Στείλαμε έναν 6ψήφιο κωδικό επαλήθευσης στο %s. Ισχύει για %d λεπτά.', TW_Util::mask_email($email), TW_OTP::ttl_minutes()),
             'serial' => $serial->serial,
-            'pass' => TW_Guard::pass($subject),
             'ttl' => TW_OTP::ttl_minutes() * MINUTE_IN_SECONDS,
         ]);
     }
@@ -262,7 +280,26 @@ final class TW_Frontend {
             'next_service' => $next ? TW_Util::date_label($next['due']) : '',
             'email' => TW_Util::mask_email($w->email),
             'portal_url' => (string) TW_Settings::get('portal_url') ?: TW_App::public_url('my'),
+            'card_url' => add_query_arg(['card' => self::card_token($w->id), 'print' => 1], TW_App::public_url()),
         ]);
+    }
+
+    // ------------------------------------------------------------------ printable card after activation
+
+    const CARD_TTL = 2 * HOUR_IN_SECONDS;
+
+    /** Signed, short-lived link to the printable card of a warranty just activated in this browser. */
+    public static function card_token($warranty_id) {
+        $exp = time() + self::CARD_TTL;
+        return (int) $warranty_id . '.' . $exp . '.' . substr(hash_hmac('sha256', 'tw-card|' . (int) $warranty_id . '|' . $exp, wp_salt('auth')), 0, 32);
+    }
+
+    /** @return int warranty id, or 0 if the link is invalid or expired */
+    public static function card_warranty_id($token) {
+        $p = explode('.', (string) $token);
+        if (count($p) !== 3 || !ctype_digit($p[0]) || !ctype_digit($p[1]) || (int) $p[1] < time()) return 0;
+        $expect = substr(hash_hmac('sha256', 'tw-card|' . (int) $p[0] . '|' . (int) $p[1], wp_salt('auth')), 0, 32);
+        return hash_equals($expect, $p[2]) ? (int) $p[0] : 0;
     }
 
     // ------------------------------------------------------------------ portal sign-in

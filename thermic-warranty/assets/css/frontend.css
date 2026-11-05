@@ -116,3 +116,9 @@
 .tw-otp-timer.is-low { color: #b45309; font-weight: 600; }
 .tw-otp-timer.is-expired { color: #b91c1c; font-weight: 600; }
 @media (max-width: 380px) { .tw-otp-boxes { gap: 6px; } .tw-otp-box { width: 40px !important; height: 50px; font-size: 21px !important; } }
+
+/* 1.17 – serial found (step 2) and actions after activation */
+.tw-product--found { padding: 10px 14px; border-radius: 10px; background: #ecfdf3; border: 1px solid #a6e9c1; color: #14532d; }
+.tw-product--found code { background: transparent; }
+.tw-done-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tw-done-actions .tw-btn { margin: 0; }

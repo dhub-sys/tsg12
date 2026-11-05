@@ -8,32 +8,43 @@ $terms = TW_Settings::current_terms();
 
     <ol class="tw-steps" aria-label="Βήματα ενεργοποίησης">
         <li class="is-current" data-step-label="1">Σειριακός αριθμός</li>
-        <li data-step-label="2">Επαλήθευση email</li>
-        <li data-step-label="3">Στοιχεία &amp; όροι</li>
-        <li data-step-label="4">Ολοκλήρωση</li>
+        <li data-step-label="2">Email</li>
+        <li data-step-label="3">Επαλήθευση</li>
+        <li data-step-label="4">Στοιχεία &amp; όροι</li>
+        <li data-step-label="5">Ολοκλήρωση</li>
     </ol>
 
-    <div class="tw-alert" role="alert" hidden></div>
+    <div class="tw-alert<?php echo !empty($card_expired) ? ' tw-alert--error' : ''; ?>" role="alert"<?php echo !empty($card_expired) ? '' : ' hidden'; ?>><?php if (!empty($card_expired)) : ?>Ο σύνδεσμος εκτύπωσης έληξε. Την καρτέλα της εγγύησής σας τη βρίσκετε πάντα στο «Οι εγγυήσεις μου» → «Αντίγραφο των στοιχείων μου».<?php endif; ?></div>
 
-    <!-- Step 1 -->
+    <!-- Step 1: serial only -->
     <form class="tw-step" data-step="1" novalidate>
         <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3>Ενεργοποίηση εγγύησης</h3>
-        <p>Πληκτρολογήστε τον σειριακό αριθμό, όπως αναγράφεται στην ετικέτα του προϊόντος, και το email σας. Θα σας στείλουμε έναν κωδικό επαλήθευσης.</p>
+        <p>Πληκτρολογήστε τον σειριακό αριθμό, όπως αναγράφεται στην ετικέτα του προϊόντος.</p>
         <div class="tw-field">
             <label for="tw-serial">Σειριακός αριθμός (S/N) <span class="tw-req">*</span></label>
             <input id="tw-serial" name="serial" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required maxlength="64">
         </div>
+        <?php echo TW_Guard::widget('public', 'register_start'); // phpcs:ignore ?>
+        <button type="submit" class="tw-btn">Συνέχεια</button>
+    </form>
+
+    <!-- Step 2: email (only for a serial that is on the list and not yet activated) -->
+    <form class="tw-step" data-step="2" novalidate hidden>
+        <?php echo TW_Guard::fields(); // phpcs:ignore ?>
+        <h3>Email κατόχου</h3>
+        <p class="tw-product tw-product--found"></p>
+        <p>Συμπληρώστε το email σας. Θα σας στείλουμε έναν κωδικό επαλήθευσης και, μετά την ενεργοποίηση, τον κωδικό της εγγύησης.</p>
         <div class="tw-field">
             <label for="tw-email">Email <span class="tw-req">*</span></label>
             <input id="tw-email" name="email" type="email" autocomplete="email" required maxlength="190">
         </div>
-        <?php echo TW_Guard::widget('public', 'register_start'); // phpcs:ignore ?>
         <button type="submit" class="tw-btn">Αποστολή κωδικού</button>
+        <button type="button" class="tw-link" data-action="restart">Αλλαγή σειριακού</button>
     </form>
 
-    <!-- Step 2 -->
-    <form class="tw-step" data-step="2" novalidate hidden>
+    <!-- Step 3: email code -->
+    <form class="tw-step" data-step="3" novalidate hidden>
         <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3>Επαλήθευση email</h3>
         <p class="tw-step-info"></p>
@@ -43,11 +54,11 @@ $terms = TW_Settings::current_terms();
         </div>
         <button type="submit" class="tw-btn">Επαλήθευση</button>
         <button type="button" class="tw-link" data-action="resend">Αποστολή νέου κωδικού</button>
-        <button type="button" class="tw-link" data-action="restart">Αλλαγή σειριακού / email</button>
+        <button type="button" class="tw-link" data-action="change-email">Αλλαγή email</button>
     </form>
 
-    <!-- Step 3 -->
-    <form class="tw-step" data-step="3" novalidate hidden enctype="multipart/form-data">
+    <!-- Step 4: details, terms, consents -->
+    <form class="tw-step" data-step="4" novalidate hidden enctype="multipart/form-data">
         <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3>Στοιχεία κατόχου</h3>
         <p class="tw-product"></p>
@@ -138,7 +149,7 @@ $terms = TW_Settings::current_terms();
     </form>
 
     <!-- Step 4 -->
-    <div class="tw-step tw-done" data-step="4" hidden>
+    <div class="tw-step tw-done" data-step="5" hidden>
         <h3>Η εγγύηση ενεργοποιήθηκε</h3>
         <p>Ο κωδικός εγγύησής σας:</p>
         <p class="tw-warranty-code" data-bind="warranty_code"></p>
@@ -149,7 +160,8 @@ $terms = TW_Settings::current_terms();
             <dt>Επόμενο Service</dt><dd data-bind="next_service"></dd>
         </dl>
         <p>Στείλαμε επιβεβαίωση στο <strong data-bind="email"></strong>.</p>
-        <p><a class="tw-btn tw-btn--ghost" data-bind-href="portal_url" hidden>Μετάβαση στις εγγυήσεις μου</a>
+        <p class="tw-done-actions"><a class="tw-btn" data-bind-href="card_url" target="_blank" rel="noopener" hidden>🖨 Εκτύπωση καρτέλας εγγύησης</a>
+           <a class="tw-btn tw-btn--ghost" data-bind-href="portal_url" hidden>Μετάβαση στις εγγυήσεις μου</a>
            <button type="button" class="tw-link" data-action="restart">Ενεργοποίηση άλλου προϊόντος</button></p>
     </div>
 </div>

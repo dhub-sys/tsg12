@@ -114,9 +114,15 @@
     function Register(root) {
         enhanceFiles(root);
         root.querySelectorAll('.tw-ts').forEach(tsRender);
-        var state = { serial: '', email: '', token: '', pass: '' };
+        // Steps: 1 serial · 2 email · 3 code · 4 details & terms · 5 done
+        var state = { serial: '', email: '', token: '', pass: '', product: '' };
         var steps = root.querySelectorAll('.tw-step');
         var labels = root.querySelectorAll('.tw-steps li');
+        var f1 = root.querySelector('[data-step="1"]');
+        var f2 = root.querySelector('[data-step="2"]');
+        var f3 = root.querySelector('[data-step="3"]');
+        var f4 = root.querySelector('[data-step="4"]');
+        var ASK = 'Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.';
 
         function show(n) {
             steps.forEach(function (s) { s.hidden = s.getAttribute('data-step') !== String(n); });
@@ -129,141 +135,156 @@
         }
 
         function restart() {
-            state = { serial: '', email: '', token: '', pass: '' };
+            state = { serial: '', email: '', token: '', pass: '', product: '' };
             try { sessionStorage.removeItem('tw_reg'); } catch (e) {}
             root.querySelectorAll('form').forEach(function (f) { f.reset(); });
+            tsReset(f1);
             alertBox(root, '');
             show(1);
         }
 
-        var f1 = root.querySelector('[data-step="1"]');
-        var f2 = root.querySelector('[data-step="2"]');
-        var f3 = root.querySelector('[data-step="3"]');
+        function productLine(el, prefix) {
+            el.innerHTML = '';
+            el.appendChild(document.createTextNode(prefix));
+            var b = document.createElement('strong'); b.textContent = (state.product || '—'); el.appendChild(b);
+            el.appendChild(document.createTextNode(' · S/N: '));
+            var c = document.createElement('code'); c.textContent = state.serial; el.appendChild(c);
+        }
+
+        // Step 1: is the serial on the list and still free?
+        f1.addEventListener('submit', function (e) {
+            e.preventDefault();
+            alertBox(root, '');
+            var serial = f1.serial.value.trim();
+            if (!serial) { alertBox(root, 'Συμπληρώστε τον σειριακό αριθμό.'); markField(f1, 'serial'); return; }
+            var g = guard(f1, root);
+            if (!g) return;
+            busy(f1, true);
+            post('reg_check', extend({ serial: serial }, g)).then(function (r) {
+                busy(f1, false);
+                tsReset(f1);
+                if (!r.success) { alertBox(root, r.data.message); markField(f1, r.data.field); return; }
+                state.serial = r.data.serial;
+                state.product = r.data.product;
+                state.pass = r.data.pass;
+                productLine(f2.querySelector('.tw-product'), '✔ Βρέθηκε: ');
+                show(2);
+            });
+        });
 
         function sendCode(form) {
             alertBox(root, '');
-            var data = { serial: state.serial, email: state.email };
-            if (form === f1) {
-                var g = guard(f1, root);
-                if (!g) return Promise.resolve(false);
-                extend(data, g);
-            } else {
-                // A new code for the same serial and email: the pass from the first send stands in for the challenge.
-                extend(data, { tw_website: f1.tw_website.value, tw_t: f1.tw_t.value, pass: state.pass });
-            }
             busy(form, true);
+            var data = { serial: state.serial, email: state.email, pass: state.pass, tw_website: form.tw_website.value, tw_t: form.tw_t.value };
             return post('reg_start', data).then(function (r) {
                 busy(form, false);
-                if (form === f1) tsReset(f1);
                 if (!r.success) {
                     alertBox(root, r.data.message);
-                    if (form === f1) markField(f1, r.data.field);
+                    if (r.data.field === 'restart') { setTimeout(restart, 3000); return false; }
+                    if (form === f2) markField(f2, r.data.field);
                     return false;
                 }
-                state.serial = r.data.serial;
-                state.pass = r.data.pass || '';
-                f2.querySelector('.tw-step-info').textContent = r.data.message;
-                if (window.TWOtp) { TWOtp.clear(f2.code); TWOtp.timer(f2.code, r.data.ttl); }
+                f3.querySelector('.tw-step-info').textContent = r.data.message;
+                if (window.TWOtp) { TWOtp.clear(f3.code); TWOtp.timer(f3.code, r.data.ttl); }
                 return true;
             });
         }
 
-        f1.addEventListener('submit', function (e) {
-            e.preventDefault();
-            state.serial = f1.serial.value.trim();
-            state.email = f1.email.value.trim();
-            if (!state.serial) { alertBox(root, 'Συμπληρώστε τον σειριακό αριθμό.'); markField(f1, 'serial'); return; }
-            if (!f1.email.checkValidity() || !state.email) { alertBox(root, 'Συμπληρώστε ένα έγκυρο email.'); markField(f1, 'email'); return; }
-            sendCode(f1).then(function (ok) { if (ok) show(2); });
-        });
-
+        // Step 2: email → code
         f2.addEventListener('submit', function (e) {
             e.preventDefault();
-            var code = f2.code.value.replace(/\D/g, '');
-            if (code.length !== 6) { alertBox(root, 'Ο κωδικός έχει 6 ψηφία.'); markField(f2, 'code'); return; }
-            busy(f2, true);
-            post('reg_verify', extend({ serial: state.serial, email: state.email, code: code }, guard(f2, root) || {})).then(function (r) {
-                busy(f2, false);
-                if (!r.success) { alertBox(root, r.data.message); if (window.TWOtp) TWOtp.clear(f2.code); markField(f2, 'code'); return; }
+            state.email = f2.email.value.trim();
+            if (!f2.email.checkValidity() || !state.email) { alertBox(root, 'Συμπληρώστε ένα έγκυρο email.'); markField(f2, 'email'); return; }
+            sendCode(f2).then(function (ok) { if (ok) show(3); });
+        });
+
+        // Step 3: verify the code
+        f3.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var code = f3.code.value.replace(/\D/g, '');
+            if (code.length !== 6) { alertBox(root, 'Ο κωδικός έχει 6 ψηφία.'); markField(f3, 'code'); return; }
+            busy(f3, true);
+            post('reg_verify', extend({ serial: state.serial, email: state.email, code: code }, guard(f3, root) || {})).then(function (r) {
+                busy(f3, false);
+                if (!r.success) { alertBox(root, r.data.message); if (window.TWOtp) TWOtp.clear(f3.code); markField(f3, 'code'); return; }
                 alertBox(root, '');
                 state.token = r.data.token;
                 state.product = r.data.product;
                 state.verifiedEmail = r.data.email;
                 state.serial = r.data.serial;
                 try { sessionStorage.setItem('tw_reg', JSON.stringify(state)); } catch (e2) {}
-                fillStep3();
-                show(3);
+                fillDetails();
+                show(4);
             });
         });
 
-        function fillStep3() {
-            var p = f3.querySelector('.tw-product');
-            p.innerHTML = '';
-            p.appendChild(document.createTextNode('Προϊόν: '));
-            var b = document.createElement('strong'); b.textContent = (state.product || '—'); p.appendChild(b);
-            p.appendChild(document.createTextNode(' · S/N: '));
-            var c = document.createElement('code'); c.textContent = state.serial; p.appendChild(c);
-            bind(f3, { email: state.verifiedEmail });
+        function fillDetails() {
+            productLine(f4.querySelector('.tw-product'), 'Προϊόν: ');
+            bind(f4, { email: state.verifiedEmail });
         }
 
         root.querySelectorAll('[data-action="resend"]').forEach(function (b) {
             b.addEventListener('click', function () {
-                sendCode(f2).then(function (ok) { if (ok) alertBox(root, 'Στάλθηκε νέος κωδικός.', 'success'); });
+                sendCode(f3).then(function (ok) { if (ok) { alertBox(root, 'Στάλθηκε νέος κωδικός.', 'success'); f3.code.focus(); } });
             });
+        });
+        root.querySelectorAll('[data-action="change-email"]').forEach(function (b) {
+            b.addEventListener('click', function () { alertBox(root, ''); show(2); });
         });
         root.querySelectorAll('[data-action="restart"]').forEach(function (b) { b.addEventListener('click', restart); });
 
-        f3.addEventListener('submit', function (e) {
+        // Step 4: details, terms, consents → warranty code
+        f4.addEventListener('submit', function (e) {
             e.preventDefault();
             alertBox(root, '');
             // Browser-side checks for the obvious; the server validates everything again.
-            var req = f3.querySelectorAll('[required]');
+            var req = f4.querySelectorAll('[required]');
             for (var i = 0; i < req.length; i++) {
                 var el = req[i];
                 var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
                 if (empty || (el.checkValidity && !el.checkValidity())) {
                     var lbl = el.type === 'checkbox' ? 'Πρέπει να επιλέξετε το υποχρεωτικό πεδίο.' : 'Συμπληρώστε σωστά όλα τα υποχρεωτικά πεδία.';
                     alertBox(root, lbl);
-                    markField(f3, el.name);
+                    markField(f4, el.name);
                     return;
                 }
             }
-            var file = f3.invoice_file && f3.invoice_file.files[0];
+            var file = f4.invoice_file && f4.invoice_file.files[0];
             if (file && file.size > TW.maxMb * 1024 * 1024) {
-                alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f3, 'invoice_file'); return;
+                alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f4, 'invoice_file'); return;
             }
-            if (tsToken(f3) === '') { alertBox(root, 'Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.'); return; }
-            var fd = new FormData(f3); // includes the honeypot, timestamp and Turnstile token
+            if (tsToken(f4) === '') { alertBox(root, ASK); return; }
+            var fd = new FormData(f4); // includes the honeypot, timestamp and Turnstile token
             ['consent_terms', 'consent_accuracy', 'consent_marketing'].forEach(function (k) {
-                fd.set(k, f3[k].checked ? '1' : '0');
+                fd.set(k, f4[k].checked ? '1' : '0');
             });
             fd.append('token', state.token);
-            busy(f3, true);
+            busy(f4, true);
             post('reg_submit', fd).then(function (r) {
-                busy(f3, false);
-                tsReset(f3);
+                busy(f4, false);
+                tsReset(f4);
                 if (!r.success) {
                     alertBox(root, r.data.message);
-                    markField(f3, r.data.field);
+                    markField(f4, r.data.field);
                     if (r.data.field === 'token' || r.data.field === 'serial') {
                         setTimeout(restart, 4000);
                     }
                     return;
                 }
                 try { sessionStorage.removeItem('tw_reg'); } catch (e3) {}
-                bind(root.querySelector('[data-step="4"]'), r.data);
-                show(4);
+                bind(root.querySelector('[data-step="5"]'), r.data);
+                show(5);
                 root.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         });
 
-        // Resume step 3 after an accidental reload (the server keeps the verification valid for 60 minutes).
+        // Resume the details step after an accidental reload (the server keeps the verification valid for 60 minutes).
         try {
             var saved = JSON.parse(sessionStorage.getItem('tw_reg') || 'null');
             if (saved && saved.token) {
                 state = saved;
-                fillStep3();
-                show(3);
+                fillDetails();
+                show(4);
             }
         } catch (e4) {}
     }

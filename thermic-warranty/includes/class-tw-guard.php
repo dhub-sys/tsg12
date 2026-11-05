@@ -138,6 +138,15 @@ final class TW_Guard {
         return hash_equals(substr(hash_hmac('sha256', 'tw-pass|' . $subject . '|' . $parts[0], wp_salt('nonce')), 0, 32), $parts[1]);
     }
 
+    /** Simple per-IP counter: false once $max requests of this kind were made within $window seconds. */
+    public static function throttle($bucket, $max, $window) {
+        $key = 'tw_thr_' . $bucket . '_' . md5(TW_Util::client_ip());
+        $n = (int) get_transient($key);
+        if ($n >= $max) return false;
+        set_transient($key, $n + 1, $window);
+        return true;
+    }
+
     // ------------------------------------------------------------------ stats
 
     /** Counts blocked attempts per day (kept for 30 days) for the settings page. */

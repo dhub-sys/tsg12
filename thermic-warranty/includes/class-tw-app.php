@@ -166,6 +166,19 @@ final class TW_App {
             self::render('app-copy', ['email' => $session->email, 'warranties' => TW_Warranty::by_email($session->email)]);
             return;
         }
+        if ($screen === 'register' && isset($_GET['card'])) {
+            // Printable warranty card right after activation (signed link, valid for 2 hours).
+            nocache_headers();
+            $id = TW_Frontend::card_warranty_id(sanitize_text_field(wp_unslash($_GET['card'])));
+            $w = $id ? TW_Warranty::get($id) : null;
+            if (!$w || $w->anonymized_at) {
+                self::render('app-public', ['screen' => $screen, 'card_expired' => true]);
+                return;
+            }
+            TW_DB::log_event('customer_card_printed', '', $w->id, $w->serial_id, 'customer:' . $w->email);
+            self::render('app-copy', ['email' => $w->email, 'warranties' => [$w], 'card' => true]);
+            return;
+        }
         self::render('app-public', ['screen' => $screen]);
     }
 
