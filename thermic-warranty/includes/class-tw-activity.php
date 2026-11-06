@@ -7,6 +7,7 @@ if (!defined('ABSPATH')) exit;
  */
 final class TW_Activity {
     const PER_PAGE = 50;
+    const PER_PAGE_CHOICES = [25, 50, 100, 200];
 
     /** Category => actions (exact names, or prefixes ending in "*"). */
     public static function categories() {
@@ -84,6 +85,7 @@ final class TW_Activity {
             'q' => $g('q'),
             'src' => $g('src') === 'archive' ? 'archive' : '',
             'wid' => (int) $g('wid'),
+            'per' => in_array((int) $g('per'), self::PER_PAGE_CHOICES, true) ? (int) $g('per') : 0,
         ];
         if ($f['from'] > $f['to']) [$f['from'], $f['to']] = [$f['to'], $f['from']];
         // A word search reads the details of every entry in the period: keep it to one year.
@@ -148,19 +150,47 @@ final class TW_Activity {
         [$cwhere, $cp] = self::where($f, false);
         $total = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*)' . $cwhere, $cp));
         $paged = max(1, (int) ($_GET['paged'] ?? 1));
-        $rows = $wpdb->get_results($wpdb->prepare(self::select() . $where . ' ORDER BY e.id DESC LIMIT ' . self::PER_PAGE . ' OFFSET ' . (($paged - 1) * self::PER_PAGE), $p));
+        $per = $f['per'] ?: self::PER_PAGE;
+        $rows = $wpdb->get_results($wpdb->prepare(self::select() . $where . ' ORDER BY e.id DESC LIMIT ' . $per . ' OFFSET ' . (($paged - 1) * $per), $p));
         $team = get_users(['capability' => TW_Admin::cap(), 'orderby' => 'display_name', 'fields' => ['user_login', 'display_name']]);
         $export = wp_nonce_url(add_query_arg(array_merge(['action' => 'tw_log_export'], array_filter($f)), TW_App::admin_url('log')), 'tw_log_export');
-        $pages = max(1, (int) ceil($total / self::PER_PAGE));
+        $pages = max(1, (int) ceil($total / $per));
         $presets = ['Σήμερα' => [0, 0], 'Χθες' => [-1, -1], '7 ημέρες' => [-6, 0], '30 ημέρες' => [-29, 0]];
         ?>
         <div class="wrap tw-wrap">
+            <?php
+            $live_n = (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . self::table());
+            $n_arch = (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . self::table('archive'));
+            $oldest = $wpdb->get_var('SELECT MIN(created_at) FROM ' . self::table());
+            $auto = (int) TW_Settings::get('log_archive_years');
+            ?>
             <h1 class="wp-heading-inline">Ημερολόγιο</h1>
             <a class="page-title-action" href="<?php echo esc_url($export); ?>"><?php echo TW_Admin::icon('download'); // phpcs:ignore ?> Εξαγωγή Excel (με τα τρέχοντα φίλτρα)</a>
             <form method="post" action="<?php echo esc_url(TW_App::admin_url('log', array_filter($f))); ?>" style="display:inline">
                 <?php wp_nonce_field('tw_log_verify'); ?><input type="hidden" name="action" value="tw_log_verify">
                 <button class="page-title-action" type="submit"><?php echo TW_Admin::icon('shield'); // phpcs:ignore ?> Έλεγχος ακεραιότητας</button>
             </form>
+            <button type="button" class="page-title-action" data-tw-dialog="tw-log-archive"><?php echo TW_Admin::icon('database'); // phpcs:ignore ?> Αρχειοθέτηση</button>
+            <dialog class="tw-dialog tw-log-archive" id="tw-log-archive"><div class="tw-dialog-body">
+                <h2>Αρχειοθέτηση ημερολογίου</h2>
+                <p class="description">Οι παλιές καταγραφές μπορούν να μεταφερθούν στο «Αρχείο», ώστε το τρέχον ημερολόγιο να μένει ελαφρύ. Στο αρχείο δεν χάνεται τίποτα: αναζητείται, εξάγεται και ελέγχεται για ακεραιότητα όπως το τρέχον, και περιλαμβάνεται στα αντίγραφα ασφαλείας. Τρέχον ημερολόγιο: <strong><?php echo (int) $live_n; ?></strong> καταγραφές<?php echo $oldest ? ', η παλαιότερη από ' . esc_html(TW_Util::date_label(substr($oldest, 0, 10))) : ''; ?> · Αρχείο: <strong><?php echo (int) $n_arch; ?></strong>.</p>
+                <h3>Αρχειοθέτηση τώρα</h3>
+                <form method="post" action="<?php echo esc_url(TW_App::admin_url('log')); ?>" class="tw-inline-form" onsubmit="return confirm('Μεταφορά στο αρχείο των καταγραφών που είναι παλαιότερες από την επιλογή;');">
+                    <?php wp_nonce_field('tw_log_archive'); ?><input type="hidden" name="action" value="tw_log_archive">
+                    <label>Μεταφορά στο αρχείο των καταγραφών παλαιότερων από
+                        <select name="years"><?php foreach (self::ARCHIVE_YEARS as $y) printf('<option value="%d"%s>%d %s</option>', $y, selected($y, 3, false), $y, $y === 1 ? 'έτος' : 'έτη'); ?></select></label>
+                    <button class="button">Αρχειοθέτηση τώρα</button>
+                </form>
+                <h3>Αυτόματη αρχειοθέτηση</h3>
+                <form method="post" action="<?php echo esc_url(TW_App::admin_url('log')); ?>" class="tw-inline-form">
+                    <?php wp_nonce_field('tw_log_archive_settings'); ?><input type="hidden" name="action" value="tw_log_archive_settings">
+                    <label>Κάθε ημέρα
+                        <select name="auto_years"><option value="0">Ποτέ</option><?php foreach (self::ARCHIVE_YEARS as $y) printf('<option value="%d"%s>Καταγραφές παλαιότερες από %d %s</option>', $y, selected($auto, $y, false), $y, $y === 1 ? 'έτος' : 'έτη'); ?></select></label>
+                    <button class="button">Αποθήκευση</button>
+                </form>
+                <p class="tw-dialog-actions"><button type="button" class="button" data-tw-close>Κλείσιμο</button></p>
+            </div></dialog>
+
             <?php
             $vr = get_transient('tw_log_verify_' . get_current_user_id());
             if ($vr) {
@@ -179,14 +209,15 @@ final class TW_Activity {
             $note = get_transient('tw_log_notice_' . get_current_user_id());
             if ($note) { delete_transient('tw_log_notice_' . get_current_user_id()); echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($note) . '</p></div>'; }
             if (self::$clamped) echo '<div class="notice notice-info"><p>Η αναζήτηση με λέξη γίνεται για έως 1 έτος· περιορίστηκε στο διάστημα ' . esc_html(TW_Util::date_label($f['from']) . ' – ' . TW_Util::date_label($f['to'])) . '. Για παλαιότερο διάστημα αλλάξτε τις ημερομηνίες.</p></div>';
-            $n_arch = (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . self::table('archive'));
             $base = array_filter(array_diff_key($f, ['src' => 1]));
             ?>
-            <nav class="nav-tab-wrapper tw-log-src">
+            <p class="description" style="max-width:820px">Όλες οι ενέργειες που καταγράφονται στην πλατφόρμα, από πελάτες, την ομάδα και το σύστημα (αυτόματες εργασίες, μηνύματα), με ημερομηνία, ώρα και διεύθυνση IP. Τη σελίδα βλέπουν μόνο όσοι διαχειρίζονται την ομάδα.</p>
+            <div class="tw-log-src-row">
+                <nav class="nav-tab-wrapper tw-log-src">
                 <a class="nav-tab<?php echo $f['src'] === '' ? ' nav-tab-active' : ''; ?>" href="<?php echo esc_url(TW_App::admin_url('log', $base)); ?>">Τρέχον ημερολόγιο</a>
                 <a class="nav-tab<?php echo $f['src'] === 'archive' ? ' nav-tab-active' : ''; ?>" href="<?php echo esc_url(TW_App::admin_url('log', array_merge($base, ['src' => 'archive']))); ?>">Αρχείο (<?php echo (int) $n_arch; ?>)</a>
             </nav>
-            <p class="description" style="max-width:820px">Όλες οι ενέργειες που καταγράφονται στην πλατφόρμα, από πελάτες, την ομάδα και το σύστημα (αυτόματες εργασίες, μηνύματα), με ημερομηνία, ώρα και διεύθυνση IP. Τη σελίδα βλέπουν μόνο όσοι διαχειρίζονται την ομάδα.</p>
+            </div>
             <form method="get" class="tw-filters tw-log-filters">
                 <?php foreach (TW_App::admin_base_query() as $k => $v) echo '<input type="hidden" name="' . esc_attr($k) . '" value="' . esc_attr($v) . '">'; ?>
                 <input type="hidden" name="screen" value="log">
@@ -206,6 +237,9 @@ final class TW_Activity {
                     <?php foreach (self::categories() as $k => $c) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($f['cat'], $k, false), esc_html($c[0])); ?>
                 </select>
                 <input type="search" name="q" value="<?php echo esc_attr($f['q']); ?>" placeholder="Σειριακός, κωδικός, email, IP…">
+                <select name="per" aria-label="Ανά σελίδα">
+                    <?php foreach (self::PER_PAGE_CHOICES as $n) printf('<option value="%d"%s>%d ανά σελίδα</option>', $n, selected($per, $n, false), $n); ?>
+                </select>
                 <button class="button">Φιλτράρισμα</button>
                 <a class="button-link" href="<?php echo esc_url(TW_App::admin_url('log', $f['src'] ? ['src' => 'archive'] : [])); ?>">Καθαρισμός</a>
             </form>
@@ -237,27 +271,6 @@ final class TW_Activity {
                     <?php if ($paged < $pages) printf(' <a class="button" href="%s">Παλαιότερες →</a>', esc_url(TW_App::admin_url('log', array_filter(array_merge($f, ['paged' => $paged + 1]))))); ?>
                 </p>
             <?php endif; ?>
-            <?php
-            $live_n = (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . self::table());
-            $oldest = $wpdb->get_var('SELECT MIN(created_at) FROM ' . self::table());
-            $auto = (int) TW_Settings::get('log_archive_years');
-            ?>
-            <section class="tw-panel tw-log-archive">
-                <h2>Αρχειοθέτηση</h2>
-                <p class="description">Οι παλιές καταγραφές μπορούν να μεταφερθούν στο «Αρχείο», ώστε το τρέχον ημερολόγιο να μένει ελαφρύ. Στο αρχείο δεν χάνεται τίποτα: αναζητείται, εξάγεται και ελέγχεται για ακεραιότητα όπως το τρέχον, και περιλαμβάνεται στα αντίγραφα ασφαλείας. Τρέχον ημερολόγιο: <strong><?php echo (int) $live_n; ?></strong> καταγραφές<?php echo $oldest ? ', η παλαιότερη από ' . esc_html(TW_Util::date_label(substr($oldest, 0, 10))) : ''; ?> · Αρχείο: <strong><?php echo (int) $n_arch; ?></strong>.</p>
-                <form method="post" action="<?php echo esc_url(TW_App::admin_url('log')); ?>" class="tw-inline-form" onsubmit="return confirm('Μεταφορά στο αρχείο των καταγραφών που είναι παλαιότερες από την επιλογή;');">
-                    <?php wp_nonce_field('tw_log_archive'); ?><input type="hidden" name="action" value="tw_log_archive">
-                    <label>Μεταφορά στο αρχείο των καταγραφών παλαιότερων από
-                        <select name="years"><?php foreach (self::ARCHIVE_YEARS as $y) printf('<option value="%d"%s>%d %s</option>', $y, selected($y, 3, false), $y, $y === 1 ? 'έτος' : 'έτη'); ?></select></label>
-                    <button class="button">Αρχειοθέτηση τώρα</button>
-                </form>
-                <form method="post" action="<?php echo esc_url(TW_App::admin_url('log')); ?>" class="tw-inline-form">
-                    <?php wp_nonce_field('tw_log_archive_settings'); ?><input type="hidden" name="action" value="tw_log_archive_settings">
-                    <label>Αυτόματη αρχειοθέτηση (κάθε ημέρα)
-                        <select name="auto_years"><option value="0">Ποτέ</option><?php foreach (self::ARCHIVE_YEARS as $y) printf('<option value="%d"%s>Καταγραφές παλαιότερες από %d %s</option>', $y, selected($auto, $y, false), $y, $y === 1 ? 'έτος' : 'έτη'); ?></select></label>
-                    <button class="button">Αποθήκευση</button>
-                </form>
-            </section>
         </div>
         <?php
     }
@@ -266,10 +279,10 @@ final class TW_Activity {
         $raw = json_decode((string) $r->details, true);
         if (is_array($raw) && isset($raw['ip'])) { unset($raw['ip']); $r = clone $r; $r->details = wp_json_encode($raw, JSON_UNESCAPED_UNICODE); } // the IP has its own column
         $d = TW_Admin::event_details($r->details);
-        $map = ['section' => 'Ενότητα', 'message' => 'Μήνυμα', 'channel' => 'Μέσο', 'filters' => 'Φίλτρα', 'columns' => 'Στήλες', 'ips' => 'IP', 'from' => 'Από', 'checked' => 'Ελέγχθηκαν', 'gaps' => 'Κενά', 'count' => 'Πλήθος', 'before' => 'Πριν από'];
+        $map = ['section' => 'Ενότητα', 'message' => 'Μήνυμα', 'channel' => 'Μέσο', 'filters' => 'Φίλτρα', 'columns' => 'Στήλες', 'ips' => 'IP', 'period' => 'Περίοδος', 'checked' => 'Ελέγχθηκαν', 'altered' => 'Αλλοιωμένες', 'gaps' => 'Πιθανές διαγραφές', 'count' => 'Πλήθος', 'before' => 'Πριν από'];
         $sections = ['general' => 'Γενικά', 'sender' => 'Αποστολέας', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις',
             'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo', 'sms' => 'Άλλος πάροχος SMS', 'security' => 'Ασφάλεια', 'privacy' => 'GDPR', 'log' => 'Ημερολόγιο'];
-        $d = preg_replace_callback('/\b(section|message|channel|filters|columns|ips|from|checked|gaps|count|before): /', function ($m) use ($map) { return $map[$m[1]] . ': '; }, $d);
+        $d = preg_replace_callback('/\b(section|message|channel|filters|columns|ips|period|checked|altered|gaps|count|before): /', function ($m) use ($map) { return $map[$m[1]] . ': '; }, $d);
         return preg_replace_callback('/Ενότητα: ([a-z]+)/', function ($m) use ($sections) { return 'Ενότητα: ' . ($sections[$m[1]] ?? $m[1]); }, $d);
     }
 
@@ -318,7 +331,7 @@ final class TW_Activity {
         check_admin_referer('tw_log_verify');
         $f = self::filters();
         $v = self::verify($f['from'], $f['to'], $f['src']);
-        TW_DB::log_event('log_verified', ['source' => $f['src'] === 'archive' ? 'αρχείο' : 'τρέχον', 'from' => $f['from'], 'to' => $f['to'], 'checked' => $v['checked'], 'changed' => count($v['changed']), 'gaps' => count($v['gaps'])]);
+        TW_DB::log_event('log_verified', ['source' => $f['src'] === 'archive' ? 'αρχείο' : 'τρέχον', 'period' => TW_Util::date_label($f['from']) . ' – ' . TW_Util::date_label($f['to']), 'checked' => $v['checked'], 'altered' => count($v['changed']), 'gaps' => count($v['gaps'])]);
         set_transient('tw_log_verify_' . get_current_user_id(), $v + ['from' => $f['from'], 'to' => $f['to']], 300);
         wp_safe_redirect(TW_App::admin_url('log', array_filter($f)));
         exit;

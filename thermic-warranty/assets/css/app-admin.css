@@ -446,9 +446,16 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .tw-who--team { background: #ede9fe; color: #5b21b6; }
 .tw-who--visitor { background: #fee2e2; color: #991b1b; }
 .tw-log-bad { color: #b91c1c; font-weight: 700; font-size: 12px; }
-.tw-log-src { margin: 14px 0 10px; }
-.tw-log-archive { margin-top: 22px; }
 .tw-log-archive h2 { margin-top: 0; }
 .tw-log-archive .tw-inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
 .tw-log-archive label { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tw-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--tw-brand-soft); color: var(--tw-brand); font-weight: 600; font-size: 13px; } .tw-chip a { text-decoration: none; color: inherit; font-size: 15px; }
+
+/* 1.22.1 – log: source tabs on their own row; archive dialog */
+.tw-log-src-row { display: block; clear: both; width: 100%; margin: 12px 0 14px; }
+.tw-log-src-row .tw-log-src { display: inline-flex !important; float: none !important; margin: 0 !important; }
+.tw-dialog-body { padding: 22px 24px 18px; }
+.tw-log-archive h2 { margin: 0 0 6px; font-size: 20px; }
+#tw-log-archive form.tw-inline-form { padding: 0; margin: 6px 0 4px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; max-height: none; }
+#tw-log-archive h3 { margin: 18px 0 2px; font-size: 15px; }
+#tw-log-archive label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }

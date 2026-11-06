@@ -147,7 +147,7 @@ $user = wp_get_current_user();
                 if (m === 'reset') dlg.querySelectorAll('input[name^="lbl["]').forEach(function (i) { i.value = ''; });
             });
         });
-        dlg.querySelector('form').addEventListener('submit', function (e) {
+        if (boxes.length) dlg.querySelector('form').addEventListener('submit', function (e) {
             if (![].some.call(boxes, function (c) { return c.checked; })) { e.preventDefault(); window.alert('Επιλέξτε τουλάχιστον μία στήλη.'); return; }
             setTimeout(function () { dlg.close(); }, 300);
         });
