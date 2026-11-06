@@ -118,6 +118,31 @@ final class TW_Settings {
             'terms_label' => 'Διάβασα και αποδέχομαι τους όρους εγγύησης.',
             'accuracy_label' => 'Επιβεβαιώνω ότι τα στοιχεία που συμπλήρωσα είναι σωστά.',
             'templates' => [],
+            // English for customers who use the platform in English (empty = the defaults below).
+            'templates_en' => [],
+            'company_contact_en' => '',
+            'terms_label_en' => 'I have read and accept the warranty terms.',
+            'accuracy_label_en' => 'I confirm that the details I have entered are correct.',
+            'marketing_label_en' => 'I would like to receive news, updates and offers from Thermic by email or SMS. I can withdraw my consent at any time.',
+            'email_footer_login_en' => 'This message concerns your secure sign-in to the environment where you register, edit and view your warranties for {company_name} products, and is not a marketing communication.',
+            'email_footer_service_en' => 'This message concerns the warranty and maintenance of your product and is not a marketing communication.',
+        ];
+    }
+
+    /** Contact details shown to customers in their language (English falls back to the Greek text). */
+    public static function company_contact($lang = 'el') {
+        return $lang === 'en' && trim((string) self::get('company_contact_en')) !== '' ? (string) self::get('company_contact_en') : (string) self::get('company_contact');
+    }
+
+    /** The three consent texts in a language: ['terms' =>, 'accuracy' =>, 'marketing' =>]. */
+    public static function consent_labels($lang = 'el') {
+        $s = self::all();
+        $sfx = $lang === 'en' ? '_en' : '';
+        $d = self::defaults();
+        return [
+            'terms' => trim((string) $s['terms_label' . $sfx]) ?: $d['terms_label' . $sfx],
+            'accuracy' => trim((string) $s['accuracy_label' . $sfx]) ?: $d['accuracy_label' . $sfx],
+            'marketing' => trim((string) $s['marketing_label' . $sfx]) ?: $d['marketing_label' . $sfx],
         ];
     }
 
@@ -209,6 +234,52 @@ final class TW_Settings {
         ];
     }
 
+    /** English message templates (same keys and placeholders as the Greek ones). */
+    public static function template_defaults_en() {
+        $genuine = "To keep the warranty valid, Service must be carried out exclusively with genuine Thermic spare parts.";
+        $submit = "Once the Service has been carried out, record it at {portal_url} (“My warranties” → “Submit Service”): date, technician's tax ID and {service_proof}. This keeps your warranty valid until the next Service.";
+        $where = "To arrange the Service, you can contact the dealer you bought the product from ({partner_email}) or {company_name} directly: {company_contact}.";
+        $ident = "Product: {product_name}\nSerial number: {serial}\nWarranty code: {warranty_code}";
+        return [
+            'registration_otp' => ['label' => 'Registration verification code', 'subject' => 'Verification code for serial number {serial}',
+                'body' => "Hello,\n\nyour verification code to activate the warranty of the product with serial number {serial} is:\n\n{code}\n\nThe code is valid for {minutes} minutes. If you did not request this activation, please ignore this message.", 'sms' => ''],
+            'login_otp' => ['label' => 'Sign-in code', 'subject' => 'Sign-in code – {company_name} warranties',
+                'body' => "Hello,\n\nyour sign-in code for the warranty platform is:\n\n{code}\n\nThe code is valid for {minutes} minutes. If you did not request to sign in, please ignore this message.", 'sms' => ''],
+            'activation' => ['label' => 'Warranty activation confirmation', 'subject' => 'Your warranty is active – {warranty_code}',
+                'body' => "Dear {customer_name},\n\nthe warranty of your product has been activated successfully.\n\n$ident\nPurchase date: {purchase_date}\nWarranty expiry: {warranty_end}\n\nScheduled Service:\n{service_schedule}\n\nThe warranty remains valid as long as each Service is carried out on time and recorded on the platform (date, technician's tax ID, receipt).\n$genuine\n$where\n\nYou can view your warranty at any time: {portal_url}",
+                'sms' => '{company_name}: The warranty of product S/N {serial} is active. Warranty code {warranty_code}, expires {warranty_end}.'],
+            'service_before' => ['label' => 'Service – reminder before the date', 'subject' => 'Your product\'s Service is coming up – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nin {days} days ({due_date}) it will be {years} years since your purchase, and the {milestone_no} scheduled Service of your product is due.\n\n$ident\n\n$where\n$genuine\n\n$submit",
+                'sms' => '{company_name}: Service is due on {due_date} for S/N {serial}. After the Service, record it at {portal_url}'],
+            'service_today' => ['label' => 'Service – due date', 'subject' => 'Today is the Service date – S/N {serial}',
+                'body' => "Dear {customer_name},\n\ntoday ({due_date}) is the due date of the {milestone_no} scheduled Service.\n\n$ident\n\nIf it has not been carried out yet, please arrange it by {grace_end_date}.\n$where\n$genuine\n\n$submit",
+                'sms' => '{company_name}: Today is the Service date for S/N {serial}. Please arrange it by {grace_end_date}.'],
+            'service_after' => ['label' => 'Service – end of grace period', 'subject' => 'No Service recorded – S/N {serial}',
+                'body' => "Dear {customer_name},\n\n{days} days have passed since the Service due date ({due_date}) and no Service has been recorded for your product.\n\n$ident\n\nIf the Service is not carried out and recorded by {lock_date}, the warranty will be permanently locked.\n\n$submit\n$where\n$genuine",
+                'sms' => '{company_name}: No Service recorded for S/N {serial}. Record it by {lock_date} at {portal_url}, otherwise the warranty will be locked.'],
+            'service_received' => ['label' => 'Service – submission received', 'subject' => 'We received your Service submission – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nwe have received the record of the {milestone_no} Service of your product.\n\n$ident\nService date: {performed_date}\nTechnician's tax ID: {technician_vat}\nReceipt: {receipt_info}\n\nThe record and the receipt are kept with your warranty, and the warranty remains valid. {next_step}\n\nPlease keep the original Service receipt as well.", 'sms' => ''],
+            'service_rejected' => ['label' => 'Service – submission not approved', 'subject' => 'Please resubmit your Service – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nthe submission of the {milestone_no} Service of your product could not be approved.\n\nReason: {review_note}\n\n$ident\n\nPlease submit the correct details again by {resubmit_until} at {portal_url}. If there is no new submission by then, the warranty will be permanently locked.\n\nFor any questions: {company_contact}.",
+                'sms' => '{company_name}: Your Service submission for S/N {serial} needs correcting. Please check your email and resubmit by {resubmit_until}.'],
+            'service_locked' => ['label' => 'Service – permanent lock', 'subject' => 'Warranty permanently locked – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nbecause the scheduled {milestone_no} Service (due {due_date}) was not carried out, the warranty of your product has been permanently locked and cannot be reactivated.\n\n$ident\n\nFor any questions: {company_contact}.",
+                'sms' => '{company_name}: The warranty of S/N {serial} has been permanently locked because the Service was not carried out.'],
+            'expiry_before' => ['label' => 'Expiry – reminder before expiry', 'subject' => 'Your warranty expires in {days} days – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nthe warranty of your product expires in {days} days, on {due_date}.\n\n$ident\n\n$where\n$genuine",
+                'sms' => '{company_name}: The warranty of S/N {serial} expires in {days} days ({due_date}).'],
+            'expiry_today' => ['label' => 'Expiry – expiry date', 'subject' => 'Your warranty expires today – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nthe warranty of your product expires today ({due_date}).\n\n$ident\n\nAny warranty claim must be submitted by {grace_end_date}.\n$where",
+                'sms' => '{company_name}: The warranty of S/N {serial} expires today.'],
+            'expiry_after' => ['label' => 'Expiry – end of the 30-day period', 'subject' => 'The period after expiry has ended – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nthe {days}-day period after the warranty expiry ({due_date}) has ended.\n\n$ident\n\nOn {lock_date} the warranty will be permanently locked.",
+                'sms' => '{company_name}: The period after the expiry of the warranty of S/N {serial} has ended. Permanent lock on {lock_date}.'],
+            'expiry_locked' => ['label' => 'Expiry – permanent lock', 'subject' => 'Warranty permanently locked – S/N {serial}',
+                'body' => "Dear {customer_name},\n\nthe warranty of your product expired on {due_date} and has now been permanently locked.\n\n$ident\n\nThank you for choosing {company_name}.",
+                'sms' => '{company_name}: The warranty of S/N {serial} has been permanently locked.'],
+        ];
+    }
+
     public static function ensure_defaults() {
         if (get_option(self::OPTION) === false) {
             add_option(self::OPTION, self::defaults(), '', false);
@@ -256,9 +327,9 @@ final class TW_Settings {
     /** Words used in messages for what the customer must provide as proof of Service. */
     public static function service_proof_text() {
         switch (self::service_proof_mode()) {
-            case 'fields': return 'αριθμό και ημερομηνία της απόδειξης';
-            case 'both': return 'αριθμό και ημερομηνία της απόδειξης, μαζί με φωτογραφία ή PDF της';
-            default: return 'φωτογραφία ή PDF της απόδειξης';
+            case 'fields': return tw__('αριθμό και ημερομηνία της απόδειξης');
+            case 'both': return tw__('αριθμό και ημερομηνία της απόδειξης, μαζί με φωτογραφία ή PDF της');
+            default: return tw__('φωτογραφία ή PDF της απόδειξης');
         }
     }
 
@@ -266,9 +337,10 @@ final class TW_Settings {
         update_option(self::OPTION, array_merge(self::all(), $values), false);
     }
 
-    public static function template($key) {
-        $defaults = self::template_defaults();
-        $saved = self::get('templates');
+    public static function template($key, $lang = 'el') {
+        $en = $lang === 'en';
+        $defaults = $en ? self::template_defaults_en() : self::template_defaults();
+        $saved = self::get($en ? 'templates_en' : 'templates');
         $t = $defaults[$key] ?? ['subject' => '', 'body' => '', 'sms' => ''];
         if (is_array($saved) && isset($saved[$key]) && is_array($saved[$key])) {
             foreach (['subject', 'body', 'sms'] as $f) {
@@ -296,35 +368,44 @@ final class TW_Settings {
 
     // ---- Terms (versioned: every change creates a new version; consents point to it) ----
 
-    public static function terms_versions() {
-        $v = get_option(self::TERMS_OPTION, []);
+    /** Greek terms in TERMS_OPTION; English terms (own versions) in TERMS_OPTION . '_en'. */
+    public static function terms_versions($lang = 'el') {
+        $v = get_option(self::TERMS_OPTION . ($lang === 'en' ? '_en' : ''), []);
         return is_array($v) ? $v : [];
     }
 
-    public static function current_terms() {
-        $v = self::terms_versions();
-        return $v ? end($v) : ['version' => 0, 'text' => '', 'hash' => '', 'published_at' => ''];
+    /**
+     * Current terms for a language, with 'lang' telling which text it really is: English customers see the
+     * Greek terms until an English text is published.
+     */
+    public static function current_terms($lang = 'el') {
+        if ($lang === 'en') {
+            $v = self::terms_versions('en');
+            if ($v && trim((string) end($v)['text']) !== '') return end($v) + ['lang' => 'en'];
+        }
+        $v = self::terms_versions('el');
+        return ($v ? end($v) : ['version' => 0, 'text' => '', 'hash' => '', 'published_at' => '']) + ['lang' => 'el'];
     }
 
-    public static function terms_version($version) {
-        foreach (self::terms_versions() as $t) {
-            if ((int) $t['version'] === (int) $version) return $t;
+    public static function terms_version($version, $lang = 'el') {
+        foreach (self::terms_versions($lang) as $t) {
+            if ((int) $t['version'] === (int) $version) return $t + ['lang' => $lang];
         }
         return null;
     }
 
     /** Saves the text as a new version if it changed. Returns the current version number. */
-    public static function save_terms($text) {
+    public static function save_terms($text, $lang = 'el') {
         $text = trim(str_replace("\r\n", "\n", (string) $text));
         $hash = hash('sha256', $text);
-        $versions = self::terms_versions();
+        $versions = self::terms_versions($lang);
         $current = $versions ? end($versions) : null;
         if ($current && $current['hash'] === $hash) {
             return (int) $current['version'];
         }
         $n = $current ? (int) $current['version'] + 1 : 1;
         $versions[] = ['version' => $n, 'text' => $text, 'hash' => $hash, 'published_at' => TW_DB::now()];
-        update_option(self::TERMS_OPTION, $versions, false);
+        update_option(self::TERMS_OPTION . ($lang === 'en' ? '_en' : ''), $versions, false);
         return $n;
     }
 }

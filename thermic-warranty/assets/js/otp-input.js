@@ -5,6 +5,7 @@
 (function () {
     'use strict';
     var N = 6;
+    function T(x) { return (window.TW && TW.i18n && TW.i18n[x]) || x; }
 
     function digits(v) { return String(v || '').replace(/\D/g, ''); }
     function fmt(s) { var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
@@ -21,7 +22,7 @@
         var wrap = document.createElement('div');
         wrap.className = 'tw-otp-boxes';
         wrap.setAttribute('role', 'group');
-        wrap.setAttribute('aria-label', 'Κωδικός 6 ψηφίων');
+        wrap.setAttribute('aria-label', T('Κωδικός 6 ψηφίων'));
         var boxes = [];
         for (var i = 0; i < N; i++) {
             var b = document.createElement('input');
@@ -30,7 +31,7 @@
             b.className = 'tw-otp-box';
             b.setAttribute('maxlength', i === 0 ? String(N) : '1'); // the first box accepts a whole autofilled code
             b.setAttribute('autocomplete', i === 0 ? 'one-time-code' : 'off');
-            b.setAttribute('aria-label', 'Ψηφίο ' + (i + 1));
+            b.setAttribute('aria-label', T('Ψηφίο %d').replace('%d', i + 1));
             b.setAttribute('pattern', '[0-9]*');
             wrap.appendChild(b);
             boxes.push(b);
@@ -107,8 +108,8 @@
                 timer.classList.toggle('is-low', left <= 30);
                 timer.classList.toggle('is-expired', left === 0);
                 timer.textContent = left > 0
-                    ? 'Ο κωδικός λήγει σε ' + fmt(left)
-                    : (inp.getAttribute('data-expired-text') || 'Ο κωδικός έληξε. Ζητήστε νέο κωδικό.');
+                    ? T('Ο κωδικός λήγει σε %s').replace('%s', fmt(left))
+                    : (inp.getAttribute('data-expired-text') || T('Ο κωδικός έληξε. Ζητήστε νέο κωδικό.'));
                 if (!left) clearInterval(tick);
             }
             step();

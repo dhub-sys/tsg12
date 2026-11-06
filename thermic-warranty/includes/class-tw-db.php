@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.8.0';
+    const DB_VERSION = '1.9.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -72,6 +72,7 @@ final class TW_DB {
   city varchar(120) NOT NULL DEFAULT '',
   partner_vat varchar(20) NOT NULL DEFAULT '',
   partner_country varchar(2) NOT NULL DEFAULT 'GR',
+  lang varchar(2) NOT NULL DEFAULT 'el',
   partner_email varchar(190) NOT NULL DEFAULT '',
   invoice_number varchar(100) NOT NULL DEFAULT '',
   invoice_file varchar(255) NOT NULL DEFAULT '',
@@ -106,6 +107,7 @@ final class TW_DB {
   ip varchar(64) NOT NULL DEFAULT '',
   user_agent varchar(255) NOT NULL DEFAULT '',
   created_at datetime NOT NULL,
+  lang varchar(2) NOT NULL DEFAULT 'el',
   PRIMARY KEY  (id),
   KEY warranty_id (warranty_id)
 ) $c;");

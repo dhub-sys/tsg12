@@ -18,7 +18,7 @@ final class TW_Frontend {
         add_action('template_redirect', [__CLASS__, 'no_cache_on_our_pages']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
 
-        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_service', 'portal_export', 'portal_erase', 'logout'];
+        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_export', 'portal_erase', 'logout'];
         foreach ($public as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
@@ -45,6 +45,8 @@ final class TW_Frontend {
             'maxMb' => (int) TW_Settings::get('invoice_max_mb'),
             'invoiceMode' => TW_Settings::invoice_mode(),
             'turnstile' => TW_Guard::on('public') ? TW_Guard::site_key() : '',
+            'lang' => TW_I18n::lang(),
+            'i18n' => TW_I18n::js(),
         ]);
         if (TW_Guard::on('public')) wp_register_script('tw-turnstile', TW_Guard::explicit_script_url(), ['tw-front'], null, true);
     }
@@ -81,7 +83,7 @@ final class TW_Frontend {
     }
 
     private static function fail($message, $field = '', $status = 400) {
-        wp_send_json_error(['message' => $message, 'field' => $field], $status);
+        wp_send_json_error(['message' => tw__($message), 'field' => $field], $status);
     }
 
     private static function email_input() {
@@ -144,7 +146,7 @@ final class TW_Frontend {
         [, $code] = TW_OTP::create('register', $email, $serial->id);
         $vars = [
             'company_name' => TW_Settings::get('company_name'),
-            'company_contact' => TW_Settings::get('company_contact'),
+            'company_contact' => TW_Settings::company_contact(TW_I18n::lang()),
             'serial' => $serial->serial,
             'code' => $code,
             'minutes' => TW_OTP::ttl_minutes(),
@@ -156,7 +158,7 @@ final class TW_Frontend {
         }
         TW_DB::log_event('otp_sent', ['email' => TW_Util::mask_email($email)], 0, $serial->id, 'customer:' . $email);
         wp_send_json_success([
-            'message' => sprintf('Στείλαμε έναν 6ψήφιο κωδικό επαλήθευσης στο %s. Ισχύει για %d λεπτά.', TW_Util::mask_email($email), TW_OTP::ttl_minutes()),
+            'message' => sprintf(tw__('Στείλαμε έναν 6ψήφιο κωδικό επαλήθευσης στο %s. Ισχύει για %d λεπτά.'), TW_Util::mask_email($email), TW_OTP::ttl_minutes()),
             'serial' => $serial->serial,
             'ttl' => TW_OTP::ttl_minutes() * MINUTE_IN_SECONDS,
         ]);
@@ -199,13 +201,20 @@ final class TW_Frontend {
         $address = sanitize_text_field(self::input('address'));
         if (mb_strlen($address) < 3) self::fail('Συμπληρώστε τη διεύθυνση.', 'address');
         $city = sanitize_text_field(self::input('city'));
-        $postcode = preg_replace('/\s+/', '', self::input('postcode'));
-        if (!preg_match('/^\d{5}$/', $postcode)) self::fail('Ο ταχυδρομικός κώδικας πρέπει να έχει 5 ψηφία.', 'postcode');
+        $postcode = trim(preg_replace('/\s+/', ' ', self::input('postcode')));
+        // Greek: 5 digits. English (customers abroad): 3–10 letters/digits, or none where there are no postcodes.
+        if (TW_I18n::lang() === 'en') {
+            if ($postcode !== '' && !preg_match('/^[A-Za-z0-9 \-]{3,10}$/', $postcode)) self::fail('Ο ταχυδρομικός κώδικας δεν είναι έγκυρος.', 'postcode');
+        } elseif (!preg_match('/^\d{5}$/', str_replace(' ', '', $postcode))) {
+            self::fail('Ο ταχυδρομικός κώδικας πρέπει να έχει 5 ψηφία.', 'postcode');
+        } else {
+            $postcode = str_replace(' ', '', $postcode);
+        }
 
         $partner_country = strtoupper(sanitize_key(self::input('partner_country'))) ?: 'GR';
         if (!isset(TW_Util::enabled_countries()[$partner_country])) self::fail('Επιλέξτε χώρα από τη λίστα.', 'partner_vat');
         [$vat, $vat_err] = TW_Util::tax_id($partner_country, self::input('partner_vat'));
-        if ($vat_err) self::fail('Συνεργάτης: ' . $vat_err, 'partner_vat');
+        if ($vat_err) self::fail(tw__('Συνεργάτης:') . ' ' . $vat_err, 'partner_vat');
         $partner_email = strtolower(sanitize_email(self::input('partner_email')));
         if (!is_email($partner_email)) self::fail('Συμπληρώστε έγκυρο email συνεργάτη.', 'partner_email');
 
@@ -219,7 +228,7 @@ final class TW_Frontend {
         if ($purchase < '2000-01-01') self::fail('Η ημερομηνία αγοράς δεν είναι έγκυρη.', 'purchase_date');
         $max_delay = (int) TW_Settings::get('max_registration_delay_days');
         if ($max_delay > 0 && TW_Schedule::diff_days($purchase, TW_Schedule::today()) > $max_delay) {
-            self::fail(sprintf('Η ενεργοποίηση πρέπει να γίνει μέσα σε %d ημέρες από την αγορά. Επικοινωνήστε μαζί μας.', $max_delay), 'purchase_date');
+            self::fail(sprintf(tw__('Η ενεργοποίηση πρέπει να γίνει μέσα σε %d ημέρες από την αγορά. Επικοινωνήστε μαζί μας.'), $max_delay), 'purchase_date');
         }
 
         $consents = [
@@ -229,8 +238,8 @@ final class TW_Frontend {
         ];
         if (!$consents['terms']) self::fail('Για να ολοκληρωθεί η ενεργοποίηση πρέπει να αποδεχθείτε τους όρους εγγύησης.', 'consent_terms');
         if (!$consents['data_accuracy']) self::fail('Επιβεβαιώστε ότι τα στοιχεία είναι σωστά.', 'consent_accuracy');
-        $terms = TW_Settings::current_terms();
-        if ((int) self::input('terms_version') !== (int) $terms['version']) {
+        $terms = TW_Settings::current_terms(TW_I18n::lang());
+        if ((int) self::input('terms_version') !== (int) $terms['version'] || self::input('terms_lang') !== $terms['lang']) {
             self::fail('Οι όροι εγγύησης ενημερώθηκαν στο μεταξύ. Ανανεώστε τη σελίδα, διαβάστε τους και αποδεχθείτε τους ξανά.', 'consent_terms', 409);
         }
 
@@ -258,6 +267,7 @@ final class TW_Frontend {
             'invoice_file' => $invoice['file'],
             'invoice_original_name' => $invoice['name'],
             'purchase_date' => $purchase,
+            'lang' => TW_I18n::lang(),
         ], $consents);
         if (is_wp_error($w)) {
             if ($invoice['file']) @unlink(TW_Util::invoice_path($invoice['file']));
@@ -291,7 +301,7 @@ final class TW_Frontend {
             'warranty_end' => TW_Util::date_label($w->warranty_end),
             'next_service' => $next ? TW_Util::date_label($next['due']) : '',
             'email' => TW_Util::mask_email($w->email),
-            'portal_url' => (string) TW_Settings::get('portal_url') ?: TW_App::public_url('my'),
+            'portal_url' => TW_I18n::url((string) TW_Settings::get('portal_url') ?: TW_App::public_url('my')),
         ]);
     }
 
@@ -300,7 +310,7 @@ final class TW_Frontend {
     public static function ajax_login_start() {
         $email = self::email_input();
         self::guard(true);
-        $generic = sprintf('Αν υπάρχουν εγγυήσεις με το email %s, θα λάβετε σε λίγο έναν κωδικό σύνδεσης.', TW_Util::mask_email($email));
+        $generic = sprintf(tw__('Αν υπάρχουν εγγυήσεις με το email %s, θα λάβετε σε λίγο έναν κωδικό σύνδεσης.'), TW_Util::mask_email($email));
         $rl = TW_OTP::rate_limit_ok($email);
         if (is_wp_error($rl)) self::fail($rl->get_error_message(), '', 429);
         if (!TW_Warranty::by_email($email)) {
@@ -312,7 +322,7 @@ final class TW_Frontend {
         [, $code] = TW_OTP::create('login', $email, 0);
         TW_Messenger::send_template_email($email, 'login_otp', [
             'company_name' => TW_Settings::get('company_name'),
-            'company_contact' => TW_Settings::get('company_contact'),
+            'company_contact' => TW_Settings::company_contact(TW_I18n::lang()),
             'code' => $code,
             'minutes' => TW_OTP::ttl_minutes(),
         ]);
@@ -386,6 +396,15 @@ final class TW_Frontend {
     }
 
     /** One choice for the person: applies to all their warranties. */
+    /** Language for emails and SMS, for all of the customer's warranties. */
+    public static function ajax_portal_lang() {
+        $s = self::require_session();
+        $lang = TW_I18n::norm(self::input('comm_lang'));
+        if (!$lang) self::fail('Επιλέξτε γλώσσα.', 'comm_lang');
+        TW_Warranty::set_lang_for_email($s->email, $lang);
+        wp_send_json_success(['message' => TW_I18n::with($lang, function () { return tw__('Η γλώσσα επικοινωνίας αποθηκεύτηκε.'); })]);
+    }
+
     public static function ajax_portal_marketing() {
         $s = self::require_session();
         $choice = self::input('granted');
@@ -393,8 +412,8 @@ final class TW_Frontend {
         $granted = $choice === '1';
         TW_Warranty::set_marketing_for_email($s->email, $granted, 'portal');
         wp_send_json_success(['message' => $granted
-            ? 'Η επιλογή σας αποθηκεύτηκε: θα λαμβάνετε ενημερώσεις και προσφορές. Μπορείτε να την αλλάξετε οποτεδήποτε.'
-            : 'Η επιλογή σας αποθηκεύτηκε: η συγκατάθεσή σας ανακλήθηκε και δεν θα λαμβάνετε ενημερώσεις και προσφορές. Τα μηνύματα για το Service και την εγγύηση συνεχίζουν κανονικά.']);
+            ? tw__('Η επιλογή σας αποθηκεύτηκε: θα λαμβάνετε ενημερώσεις και προσφορές. Μπορείτε να την αλλάξετε οποτεδήποτε.')
+            : tw__('Η επιλογή σας αποθηκεύτηκε: η συγκατάθεσή σας ανακλήθηκε και δεν θα λαμβάνετε ενημερώσεις και προσφορές. Τα μηνύματα για το Service και την εγγύηση συνεχίζουν κανονικά.')]);
     }
 
     /** Customer submits the Service of a milestone: date, technician ΑΦΜ, receipt. */
@@ -415,12 +434,12 @@ final class TW_Frontend {
         if ($date > TW_Schedule::today()) self::fail('Η ημερομηνία του Service δεν μπορεί να είναι μελλοντική.', 'performed_date');
         $earliest = TW_Schedule::add_days($m['due'], -max(0, (int) TW_Settings::get('service_submit_window_days')));
         if ($date < $earliest) {
-            self::fail(sprintf('Για το %dο Service δεκτές είναι ημερομηνίες από %s και μετά.', $no, TW_Util::date_label($earliest)), 'performed_date');
+            self::fail(sprintf(tw__('Για το %dο Service δεκτές είναι ημερομηνίες από %s και μετά.'), $no, TW_Util::date_label($earliest)), 'performed_date');
         }
         $tech_country = strtoupper(sanitize_key(self::input('technician_country'))) ?: 'GR';
         if (!isset(TW_Util::enabled_countries()[$tech_country])) self::fail('Επιλέξτε χώρα από τη λίστα.', 'technician_vat');
         [$vat, $vat_err] = TW_Util::tax_id($tech_country, self::input('technician_vat'));
-        if ($vat_err) self::fail('Τεχνικός: ' . $vat_err, 'technician_vat');
+        if ($vat_err) self::fail(tw__('Τεχνικός:') . ' ' . $vat_err, 'technician_vat');
         $receipt = ['file' => '', 'name' => '', 'number' => '', 'date' => null];
         if (TW_Settings::service_needs_fields()) {
             $receipt['number'] = sanitize_text_field(self::input('receipt_number'));
@@ -429,13 +448,13 @@ final class TW_Frontend {
             $rdo = DateTimeImmutable::createFromFormat('!Y-m-d', $rd);
             if (!$rdo || $rdo->format('Y-m-d') !== $rd) self::fail('Συμπληρώστε την ημερομηνία του παραστατικού.', 'receipt_date');
             if ($rd > TW_Schedule::today()) self::fail('Η ημερομηνία του παραστατικού δεν μπορεί να είναι μελλοντική.', 'receipt_date');
-            if ($rd < $earliest) self::fail(sprintf('Η ημερομηνία του παραστατικού πρέπει να είναι από %s και μετά.', TW_Util::date_label($earliest)), 'receipt_date');
+            if ($rd < $earliest) self::fail(sprintf(tw__('Η ημερομηνία του παραστατικού πρέπει να είναι από %s και μετά.'), TW_Util::date_label($earliest)), 'receipt_date');
             $receipt['date'] = $rd;
         }
         if (self::input('genuine_parts') !== '1') self::fail('Επιβεβαιώστε ότι χρησιμοποιήθηκαν αυθεντικά ανταλλακτικά.', 'genuine_parts');
         if (TW_Settings::service_needs_file()) {
             if (empty($_FILES['receipt_file']['name'])) self::fail('Επισυνάψτε την απόδειξη του Service (PDF, JPG ή PNG).', 'receipt_file');
-            $file = TW_Util::store_invoice($_FILES['receipt_file'], 'της απόδειξης');
+            $file = TW_Util::store_invoice($_FILES['receipt_file'], tw__('της απόδειξης'));
             if (is_wp_error($file)) self::fail($file->get_error_message(), 'receipt_file');
             $receipt['file'] = $file['file'];
             $receipt['name'] = $file['name'];
@@ -451,7 +470,7 @@ final class TW_Frontend {
                 $w->customer_name, $no, $w->serial, $w->warranty_code, TW_Util::date_label($date), $vat, $link));
         }
         do_action('tw_service_submitted', $w, $row);
-        wp_send_json_success(['message' => sprintf('Το %dο Service καταχωρήθηκε και η εγγύηση συνεχίζει να ισχύει. Σας στείλαμε επιβεβαίωση με email· κρατήστε και την πρωτότυπη απόδειξη.', $no)]);
+        wp_send_json_success(['message' => sprintf(tw__('Το %dο Service καταχωρήθηκε και η εγγύηση συνεχίζει να ισχύει. Σας στείλαμε επιβεβαίωση με email· κρατήστε και την πρωτότυπη απόδειξη.'), $no)]);
     }
 
     public static function ajax_portal_export() {
@@ -466,12 +485,12 @@ final class TW_Frontend {
         $req = wp_create_user_request($s->email, 'remove_personal_data', [], 'pending');
         if (is_wp_error($req)) {
             if ($req->get_error_code() === 'duplicate_request') {
-                wp_send_json_success(['message' => 'Υπάρχει ήδη αίτημα διαγραφής σε εξέλιξη για το email σας.']);
+                wp_send_json_success(['message' => tw__('Υπάρχει ήδη αίτημα διαγραφής σε εξέλιξη για το email σας.')]);
             }
             self::fail('Δεν ήταν δυνατή η καταχώρηση του αιτήματος. Επικοινωνήστε μαζί μας.');
         }
         wp_send_user_request($req);
         TW_DB::log_event('erasure_requested', '', 0, 0, 'customer:' . $s->email);
-        wp_send_json_success(['message' => 'Στείλαμε email επιβεβαίωσης για το αίτημα διαγραφής. Μετά την επιβεβαίωση θα εξεταστεί από την εταιρεία. Στοιχεία ενεργών εγγυήσεων διατηρούνται όσο διαρκεί η εγγύηση, ώστε να μπορεί να εξυπηρετηθεί.']);
+        wp_send_json_success(['message' => tw__('Στείλαμε email επιβεβαίωσης για το αίτημα διαγραφής. Μετά την επιβεβαίωση θα εξεταστεί από την εταιρεία. Στοιχεία ενεργών εγγυήσεων διατηρούνται όσο διαρκεί η εγγύηση, ώστε να μπορεί να εξυπηρετηθεί.')]);
     }
 }

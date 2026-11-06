@@ -42,13 +42,13 @@ final class TW_OTP {
         $since = date('Y-m-d H:i:s', current_time('timestamp') - HOUR_IN_SECONDS);
         $by_email = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE email = %s AND created_at > %s", $email, $since));
         if ($by_email >= self::MAX_SENDS_PER_HOUR_EMAIL) {
-            return new WP_Error('rate', 'Έχουν σταλεί πολλοί κωδικοί σε αυτό το email. Δοκιμάστε ξανά σε λίγο.');
+            return new WP_Error('rate', tw__('Έχουν σταλεί πολλοί κωδικοί σε αυτό το email. Δοκιμάστε ξανά σε λίγο.'));
         }
         $ip = TW_Util::client_ip();
         if ($ip !== '') {
             $by_ip = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE ip = %s AND created_at > %s", $ip, $since));
             if ($by_ip >= self::MAX_SENDS_PER_HOUR_IP) {
-                return new WP_Error('rate', 'Πάρα πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο.');
+                return new WP_Error('rate', tw__('Πάρα πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο.'));
             }
         }
         return true;
@@ -92,16 +92,16 @@ final class TW_OTP {
             $purpose, $email, (int) $serial_id, $now
         ));
         if (!$row) {
-            return new WP_Error('otp', 'Ο κωδικός έληξε ή δεν βρέθηκε. Ζητήστε νέο κωδικό.');
+            return new WP_Error('otp', tw__('Ο κωδικός έληξε ή δεν βρέθηκε. Ζητήστε νέο κωδικό.'));
         }
         if ((int) $row->attempts >= self::MAX_ATTEMPTS) {
-            return new WP_Error('otp', 'Υπερβήκατε τον αριθμό προσπαθειών. Ζητήστε νέο κωδικό.');
+            return new WP_Error('otp', tw__('Υπερβήκατε τον αριθμό προσπαθειών. Ζητήστε νέο κωδικό.'));
         }
         $wpdb->query($wpdb->prepare("UPDATE $t SET attempts = attempts + 1 WHERE id = %d", $row->id));
         $code = preg_replace('/\D/', '', (string) $code);
         if (!hash_equals($row->code_hash, self::hash($code))) {
             $left = self::MAX_ATTEMPTS - (int) $row->attempts - 1;
-            return new WP_Error('otp', $left > 0 ? sprintf('Λάθος κωδικός. Απομένουν %d προσπάθειες.', $left) : 'Λάθος κωδικός. Ζητήστε νέο κωδικό.');
+            return new WP_Error('otp', $left > 0 ? sprintf(tw__('Λάθος κωδικός. Απομένουν %d προσπάθειες.'), $left) : tw__('Λάθος κωδικός. Ζητήστε νέο κωδικό.'));
         }
         $token = bin2hex(random_bytes(32));
         $wpdb->update($t, [

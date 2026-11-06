@@ -14,7 +14,7 @@ final class TW_Activity {
         return [
             'warranty' => ['Εγγυήσεις', ['activated', 'status_*', 'locked', 'customer_corrected', 'anonymized', 'activation_email_resent', 'card_printed', 'invoice_downloaded', 'warranty_viewed']],
             'service' => ['Service', ['service_*', 'receipt_downloaded']],
-            'customer' => ['Πελάτες & «Οι εγγυήσεις μου»', ['otp_sent', 'otp_email_failed', 'portal_*', 'marketing_*', 'erasure_*']],
+            'customer' => ['Πελάτες & «Οι εγγυήσεις μου»', ['otp_sent', 'otp_email_failed', 'portal_*', 'marketing_*', 'erasure_*', 'language_changed']],
             'messages' => ['Μηνύματα', ['message_*', 'activation_email_*', 'activation_sms_*', 'email_undeliverable', 'sms_undeliverable', 'fallback_sent']],
             'serials' => ['Σειριακοί', ['serial_*', 'serials_imported']],
             'access' => ['Συνδέσεις & ασφάλεια', ['staff_*', 'access_blocked', 'ip_lock_*', 'log_verified', 'log_archived']],

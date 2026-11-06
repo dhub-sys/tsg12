@@ -24,11 +24,16 @@ final class TW_Messenger {
 
     /** Placeholders available for a warranty. */
     public static function warranty_vars($w, array $extra = []) {
+        $lang = TW_I18n::norm($w->lang ?? '') ?: 'el';
+        return TW_I18n::with($lang, function () use ($w, $extra, $lang) { return self::warranty_vars_in_lang($w, $extra) + ['_lang' => $lang]; });
+    }
+
+    private static function warranty_vars_in_lang($w, array $extra) {
         $s = TW_Settings::all();
         $vars = [
             'company_name' => $s['company_name'],
-            'company_contact' => $s['company_contact'],
-            'portal_url' => $s['portal_url'] ?: TW_App::public_url('my'),
+            'company_contact' => TW_Settings::company_contact(TW_I18n::lang()),
+            'portal_url' => TW_I18n::url($s['portal_url'] ?: TW_App::public_url('my')),
             'customer_name' => $w->customer_name,
             'email' => $w->email,
             'serial' => $w->serial,
@@ -67,7 +72,8 @@ final class TW_Messenger {
      */
     public static function footer_text($kind) {
         if ($kind !== 'login' && $kind !== 'service') return '';
-        $text = (string) TW_Settings::get($kind === 'login' ? 'email_footer_login' : 'email_footer_service');
+        $key = ($kind === 'login' ? 'email_footer_login' : 'email_footer_service') . (TW_I18n::lang() === 'en' ? '_en' : '');
+        $text = (string) TW_Settings::get($key);
         return trim(self::render($text, ['company_name' => TW_Settings::get('company_name')]));
     }
 
@@ -107,17 +113,32 @@ final class TW_Messenger {
         return $ok ? true : ($err ?: 'wp_mail failed');
     }
 
+    /**
+     * Sends a customer message in their language: $vars['_lang'] (set by warranty_vars from the warranty),
+     * else the language of the current request.
+     */
     public static function send_template_email($to, $key, array $vars) {
-        $t = TW_Settings::template($key);
-        $footer = in_array($key, ['registration_otp', 'login_otp'], true) ? 'login' : 'service';
-        return self::send_email($to, self::render($t['subject'], $vars), self::render($t['body'], $vars), $footer);
+        $lang = TW_I18n::norm($vars['_lang'] ?? '') ?: TW_I18n::lang();
+        return TW_I18n::with($lang, function () use ($to, $key, $vars, $lang) {
+            $vars = self::localize_vars($vars, $lang);
+            $t = TW_Settings::template($key, $lang);
+            $footer = in_array($key, ['registration_otp', 'login_otp'], true) ? 'login' : 'service';
+            return self::send_email($to, self::render($t['subject'], $vars), self::render($t['body'], $vars), $footer);
+        });
+    }
+
+    /** English: "1st"/"2nd" for {milestone_no} (the Greek templates add "ο" themselves). */
+    private static function localize_vars(array $vars, $lang) {
+        if ($lang === 'en' && isset($vars['milestone_no']) && is_numeric($vars['milestone_no'])) $vars['milestone_no'] = TW_I18n::ordinal((int) $vars['milestone_no']);
+        return $vars;
     }
 
     /** @return true|string|null null when SMS is disabled or the template is empty */
     public static function send_template_sms($phone, $key, array $vars) {
-        $t = TW_Settings::template($key);
+        $lang = TW_I18n::norm($vars['_lang'] ?? '') ?: TW_I18n::lang();
+        $t = TW_Settings::template($key, $lang);
         if (!self::sms_active() || trim($t['sms']) === '') return null;
-        return self::send_sms($phone, self::render($t['sms'], $vars));
+        return self::send_sms($phone, self::render($t['sms'], self::localize_vars($vars, $lang)));
     }
 
     /** @return true|string */

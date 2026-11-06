@@ -84,10 +84,10 @@ final class TW_Util {
 
     /** What the tax number is called for a country (for labels and messages). */
     public static function tax_id_label($country) {
-        if ($country === 'GR' || $country === '') return 'ΑΦΜ';
-        if (isset(self::EU_VAT[$country])) return 'ΑΦΜ (VAT)';
+        if ($country === 'GR' || $country === '') return tw__('ΑΦΜ');
+        if (isset(self::EU_VAT[$country])) return tw__('ΑΦΜ (VAT)');
         if ($country === 'AE') return 'TRN';
-        return 'Αριθμός φορολογικού μητρώου';
+        return tw__('Αριθμός φορολογικού μητρώου');
     }
 
     /**
@@ -103,19 +103,19 @@ final class TW_Util {
         $v = strtoupper(preg_replace('/[\s.\-\/]/', '', (string) $raw));
         if ($country === 'GR') {
             $v = preg_replace('/^(EL|GR)/', '', $v);
-            return self::valid_afm($v) ? [$v, null] : [$v, 'Ο ΑΦΜ δεν είναι έγκυρος (9 ψηφία).'];
+            return self::valid_afm($v) ? [$v, null] : [$v, tw__('Ο ΑΦΜ δεν είναι έγκυρος (9 ψηφία).')];
         }
         if (isset(self::EU_VAT[$country])) {
             $body = strpos($v, $country) === 0 ? substr($v, 2) : $v;
             return preg_match('/^(?:' . self::EU_VAT[$country] . ')$/', $body)
                 ? [$country . $body, null]
-                : [$v, sprintf('Ο ΑΦΜ (VAT) δεν έχει τη μορφή που ισχύει στη χώρα (%s).', self::countries()[$country])];
+                : [$v, sprintf(tw__('Ο ΑΦΜ (VAT) δεν έχει τη μορφή που ισχύει στη χώρα (%s).'), tw__(self::countries()[$country]))];
         }
         if ($country === 'AE') {
             $v = preg_replace('/^AE/', '', $v);
-            return preg_match('/^\d{15}$/', $v) ? [$v, null] : [$v, 'Το TRN των Ηνωμένων Αραβικών Εμιράτων έχει 15 ψηφία.'];
+            return preg_match('/^\d{15}$/', $v) ? [$v, null] : [$v, tw__('Το TRN των Ηνωμένων Αραβικών Εμιράτων έχει 15 ψηφία.')];
         }
-        return preg_match('/^[A-Z0-9]{4,20}$/', $v) ? [$v, null] : [$v, 'Ο αριθμός φορολογικού μητρώου πρέπει να έχει 4–20 γράμματα ή ψηφία.'];
+        return preg_match('/^[A-Z0-9]{4,20}$/', $v) ? [$v, null] : [$v, tw__('Ο αριθμός φορολογικού μητρώου πρέπει να έχει 4–20 γράμματα ή ψηφία.')];
     }
 
     /** Prefix shown in the country dropdown: EL for Greece (as in EU VAT numbers), otherwise the ISO code. */
@@ -134,19 +134,20 @@ final class TW_Util {
         if ($country !== 'GR' && $value !== '' && strpos($value, $country) === 0 && isset(self::EU_VAT[$country])) $value = substr($value, 2);
         if (count($list) === 1) { // Greece only: a plain ΑΦΜ field, no dropdown
             return '<input type="hidden" name="' . esc_attr($country_name) . '" value="GR"><input type="text" name="' . esc_attr($vat_name) . '"' . ($id ? ' id="' . esc_attr($id) . '"' : '')
-                . ' value="' . esc_attr($value) . '" maxlength="20" inputmode="numeric" placeholder="9 ψηφία" autocomplete="off"' . ($required ? ' required' : '') . '>';
+                . ' value="' . esc_attr($value) . '" maxlength="20" inputmode="numeric" placeholder="' . esc_attr(tw__('9 ψηφία')) . '" autocomplete="off"' . ($required ? ' required' : '') . '>';
         }
         $h = '<div class="tw-taxid" data-tw-taxid>';
-        $h .= '<select name="' . esc_attr($country_name) . '" aria-label="Χώρα" class="tw-taxid-country">';
+        $h .= '<select name="' . esc_attr($country_name) . '" aria-label="' . esc_attr(tw__('Χώρα')) . '" class="tw-taxid-country">';
         foreach ($list as $code => $name) {
-            $ph = $code === 'GR' ? '9 ψηφία' : ($code === 'CY' ? 'π.χ. 12345678X' : ($code === 'AE' ? '15 ψηφία (TRN)' : (isset(self::EU_VAT[$code]) ? 'ΑΦΜ (VAT)' : 'Αριθμός φορολογικού μητρώου')));
+            $ph = tw__($code === 'GR' ? '9 ψηφία' : ($code === 'CY' ? 'π.χ. 12345678X' : ($code === 'AE' ? '15 ψηφία (TRN)' : (isset(self::EU_VAT[$code]) ? 'ΑΦΜ (VAT)' : 'Αριθμός φορολογικού μητρώου'))));
+            $name = tw__($name);
             // Closed, the dropdown shows only the prefix; opened, the full country names (see the page scripts).
             $full = self::tax_prefix($code) . ' · ' . $name;
             $h .= '<option value="' . esc_attr($code) . '" data-ph="' . esc_attr($ph) . '" data-short="' . esc_attr(self::tax_prefix($code)) . '" data-full="' . esc_attr($full) . '" title="' . esc_attr($name) . '"' . selected($country, $code, false) . '>' . esc_html($full) . '</option>';
         }
         $h .= '</select>';
         $h .= '<input type="text" name="' . esc_attr($vat_name) . '"' . ($id ? ' id="' . esc_attr($id) . '"' : '') . ' value="' . esc_attr($value) . '" maxlength="20" autocomplete="off" spellcheck="false"'
-            . ($country === 'GR' ? ' inputmode="numeric" placeholder="9 ψηφία"' : '') . ($required ? ' required' : '') . '>';
+            . ($country === 'GR' ? ' inputmode="numeric" placeholder="' . esc_attr(tw__('9 ψηφία')) . '"' : '') . ($required ? ' required' : '') . '>';
         return $h . '</div>';
     }
 
@@ -154,7 +155,7 @@ final class TW_Util {
     public static function tax_id_text($country, $value) {
         if ($value === '' || $value === null) return '—';
         $country = $country ?: 'GR';
-        return self::tax_id_label($country) . ' ' . $value . ($country !== 'GR' ? ' – ' . (self::countries()[$country] ?? $country) : '');
+        return self::tax_id_label($country) . ' ' . $value . ($country !== 'GR' ? ' – ' . tw__(self::countries()[$country] ?? $country) : '');
     }
 
     /** Greek ΑΦΜ check digit validation. */
@@ -232,17 +233,18 @@ final class TW_Util {
      * Validates and stores the invoice upload in the private directory.
      * @return array|WP_Error ['file' => relative path, 'name' => original name]
      */
-    public static function store_invoice(array $file, $label = 'του παραστατικού') {
+    public static function store_invoice(array $file, $label = null) {
+        if ($label === null) $label = tw__('του παραστατικού');
         if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || (int) $file['error'] !== UPLOAD_ERR_OK) {
-            return new WP_Error('upload', sprintf('Το αρχείο %s δεν ανέβηκε σωστά.', $label));
+            return new WP_Error('upload', sprintf(tw__('Το αρχείο %s δεν ανέβηκε σωστά.'), $label));
         }
         $max = max(1, (int) TW_Settings::get('invoice_max_mb')) * 1024 * 1024;
         if ((int) $file['size'] > $max) {
-            return new WP_Error('upload', sprintf('Το αρχείο ξεπερνά το όριο των %d MB.', (int) TW_Settings::get('invoice_max_mb')));
+            return new WP_Error('upload', sprintf(tw__('Το αρχείο ξεπερνά το όριο των %d MB.'), (int) TW_Settings::get('invoice_max_mb')));
         }
         $check = wp_check_filetype_and_ext($file['tmp_name'], $file['name'], self::invoice_mimes());
         if (empty($check['ext']) || empty($check['type'])) {
-            return new WP_Error('upload', 'Επιτρέπονται μόνο αρχεία PDF, JPG ή PNG.');
+            return new WP_Error('upload', tw__('Επιτρέπονται μόνο αρχεία PDF, JPG ή PNG.'));
         }
         $dir = self::protect_upload_dir() . '/' . current_time('Y');
         if (!is_dir($dir)) wp_mkdir_p($dir);

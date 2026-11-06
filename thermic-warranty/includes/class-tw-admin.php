@@ -181,7 +181,7 @@ final class TW_Admin {
             'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'card_printed' => 'Εκτύπωση καρτέλας', 'staff_login' => 'Σύνδεση στο διαχειριστικό', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
             'status_void' => 'Κατάσταση: Ακυρωμένη', 'status_locked' => 'Κατάσταση: Κλειδωμένη', 'customer_corrected' => 'Διόρθωση στοιχείων πελάτη', 'anonymized' => 'Ανωνυμοποίηση στοιχείων',
             'email_undeliverable' => 'Το email δεν παραδόθηκε', 'sms_undeliverable' => 'Το SMS δεν παραδόθηκε', 'fallback_sent' => 'Αποστολή από εναλλακτικό κανάλι',
-            'warranty_viewed' => 'Προβολή καρτέλας από την ομάδα',
+            'warranty_viewed' => 'Προβολή καρτέλας από την ομάδα', 'language_changed' => 'Αλλαγή γλώσσας επικοινωνίας',
             'erasure_requested' => 'Αίτημα διαγραφής από τον πελάτη', 'erasure_processed' => 'Εκτέλεση αιτήματος διαγραφής',
         ];
         return $map[$action] ?? $action;
@@ -203,7 +203,7 @@ final class TW_Admin {
         $names = ['note' => 'Αιτιολογία', 'milestone' => 'Service', 'date' => 'Ημερομηνία', 'technician_vat' => 'ΑΦΜ τεχνικού', 'warranty_code' => 'Κωδικός',
             'terms_version' => 'Όροι έκδοσης', 'email' => 'Email', 'by' => 'Από', 'genuine_parts' => 'Γνήσια ανταλλακτικά', 'to' => 'Παραλήπτης', 'reason' => 'Λόγος',
             'step' => 'Βήμα', 'after_failed' => 'Μετά από αποτυχία', 'source' => 'Πηγή', 'customer_name' => 'Ονοματεπώνυμο', 'phone_mobile' => 'Κινητό',
-            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'changed' => 'Αλλαγές', 'partner_country' => 'Χώρα συνεργάτη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
+            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'changed' => 'Αλλαγές', 'lang' => 'Γλώσσα', 'partner_country' => 'Χώρα συνεργάτη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
             'partner_email' => 'Email συνεργάτη', 'invoice_number' => 'Αριθμός παραστατικού'];
         $out = [];
         foreach ($d as $k => $v) {
@@ -488,6 +488,7 @@ final class TW_Admin {
                         <tr><th>Διεύθυνση</th><td><?php echo esc_html(trim($w->address . ', ' . $w->postcode . ' ' . $w->city, ', ')); ?></td></tr>
                         <tr><th>Συνεργάτης</th><td><?php echo esc_html(TW_Util::tax_id_text($w->partner_country, $w->partner_vat)); ?> – <?php echo esc_html($w->partner_email); ?></td></tr>
                         <tr><th>Εμπορικές ενημερώσεις</th><td><?php echo $w->marketing_opt_in ? 'Ναι' : 'Όχι'; ?></td></tr>
+                        <tr><th>Γλώσσα επικοινωνίας</th><td><?php echo esc_html(TW_I18n::languages()[$w->lang ?? 'el'] ?? 'Ελληνικά'); ?></td></tr>
                     </table>
                 </div>
             </div>
@@ -803,8 +804,11 @@ final class TW_Admin {
 
     public static function page_settings() {
         $s = TW_Settings::all();
-        $terms = TW_Settings::current_terms();
-        $tpl = TW_Settings::template_defaults();
+        // Messages and terms are edited per customer language (?tl=en for English).
+        $tl = self::q('tl') === 'en' ? 'en' : 'el';
+        $terms = TW_Settings::current_terms('el');
+        $terms_en = TW_Settings::terms_versions('en') ? TW_Settings::current_terms('en') : ['version' => 0, 'text' => '', 'published_at' => '', 'lang' => 'en'];
+        $tpl = $tl === 'en' ? TW_Settings::template_defaults_en() : TW_Settings::template_defaults();
         $post = self::url();
         $tab = self::q('tab') ?: 'general';
         $tabs = ['general' => 'Γενικά', 'sender' => 'Αποστολέας', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις', 'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo (email & SMS)', 'sms' => 'Άλλος πάροχος SMS', 'security' => 'Ασφάλεια', 'privacy' => 'GDPR'];
@@ -830,11 +834,12 @@ final class TW_Admin {
             </nav>
             <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                 <?php wp_nonce_field('tw_save_settings'); ?>
-                <input type="hidden" name="action" value="tw_save_settings"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
+                <input type="hidden" name="action" value="tw_save_settings"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>"><input type="hidden" name="tl" value="<?php echo esc_attr($tl); ?>">
                 <table class="form-table">
                 <?php if ($tab === 'general') :
                     $field('company_name', 'Επωνυμία');
                     $field('company_contact', 'Στοιχεία επικοινωνίας για Service', 'text', 'Εμφανίζεται στα μηνύματα: «…ή απευθείας στη Thermic: <em>αυτό το κείμενο</em>».');
+                    $field('company_contact_en', 'Στοιχεία επικοινωνίας (English)', 'text', 'Για τους πελάτες στα αγγλικά, π.χ. <code>Thermic – tel. +30 210 0000000 – service@example.com</code>. Κενό = το ελληνικό κείμενο.');
                     $field('register_url', 'Σελίδα ενεργοποίησης (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url()) . '</code>. Συμπληρώστε μόνο αν βάλατε το shortcode <code>[thermic_warranty_register]</code> σε δική σας σελίδα του site.');
                     $field('portal_url', 'Σελίδα «Οι εγγυήσεις μου» (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url('my')) . '</code>. Συμπληρώστε μόνο αν χρησιμοποιείτε το shortcode <code>[thermic_warranty_portal]</code>. Μπαίνει στα email.');
                     $field('admin_emails', 'Email εταιρείας για ειδοποιήσεις', 'text', 'Ένα ή περισσότερα, χωρισμένα με κόμμα.');
@@ -980,12 +985,29 @@ final class TW_Admin {
                     $field('terms_label', 'Checkbox όρων (υποχρεωτικό)', 'textarea');
                     $field('accuracy_label', 'Checkbox ορθότητας στοιχείων (υποχρεωτικό)', 'textarea');
                     $field('marketing_label', 'Checkbox εμπορικών ενημερώσεων (προαιρετικό, αρχικά αποεπιλεγμένο)', 'textarea');
+                    ?>
+                    <tr><td colspan="2"><h2 style="margin:12px 0 0">English – για πελάτες που χρησιμοποιούν την πλατφόρμα στα αγγλικά</h2></td></tr>
+                    <tr><th>Terms (English)</th><td>
+                        <textarea name="terms_text_en" rows="14" class="large-text" lang="en"><?php echo esc_textarea($terms_en['text']); ?></textarea>
+                        <p class="description"><?php if ($terms_en['version']) : ?>Τρέχουσα αγγλική έκδοση: <strong>v<?php echo (int) $terms_en['version']; ?></strong> (<?php echo esc_html(TW_Util::datetime_label($terms_en['published_at'])); ?>). <?php foreach (array_reverse(TW_Settings::terms_versions('en')) as $tv) printf('<a href="%s" target="_blank">v%d</a> ', esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 'v' => $tv['version'], 'tl' => 'en'], $post), 'tw_terms_view')), (int) $tv['version']); ?><?php else : ?><strong>Δεν υπάρχει ακόμη αγγλικό κείμενο:</strong> οι πελάτες στα αγγλικά βλέπουν και αποδέχονται τους ελληνικούς όρους.<?php endif; ?> Οι αγγλικοί όροι έχουν δική τους αρίθμηση εκδόσεων· σε κάθε πελάτη καταγράφεται γλώσσα και έκδοση που αποδέχθηκε. Προτείνεται εγκεκριμένη μετάφραση.</p>
+                    </td></tr>
+                    <?php
+                    $field('terms_label_en', 'Terms checkbox (English)', 'textarea');
+                    $field('accuracy_label_en', 'Accuracy checkbox (English)', 'textarea');
+                    $field('marketing_label_en', 'Marketing checkbox (English)', 'textarea');
                 elseif ($tab === 'messages') : ?>
                     <tr><td colspan="2"><p class="description">Διαθέσιμα πεδία: <code>{customer_name} {serial} {warranty_code} {product_name} {product_code} {purchase_date} {warranty_end} {due_date} {days} {years} {milestone_no} {grace_end_date} {lock_date} {partner_email} {company_name} {company_contact} {portal_url} {service_schedule}</code>, και για τους κωδικούς επαλήθευσης <code>{code} {minutes}</code>. Αφήστε ένα πεδίο κενό για το προεπιλεγμένο κείμενο. Κενό SMS = δεν στέλνεται SMS σε αυτό το βήμα.</p></td></tr>
                     <?php
-                    $field('email_footer_login', 'Υποσέλιδο: κωδικοί σύνδεσης πελατών', 'textarea', 'Κάτω από τα email με κωδικό επαλήθευσης/σύνδεσης προς τους πελάτες. Δεκτό το <code>{company_name}</code>. Κενό = χωρίς υποσέλιδο.');
-                    $field('email_footer_service', 'Υποσέλιδο: μηνύματα εγγύησης & Service', 'textarea', 'Κάτω από τα υπόλοιπα email προς τους πελάτες (ενεργοποίηση, υπενθυμίσεις, Service, λήξη). Κενό = χωρίς υποσέλιδο. Τα email προς την ομάδα δεν έχουν υποσέλιδο.');
-                    foreach ($tpl as $key => $def) : $cur = TW_Settings::template($key); $saved = $s['templates'][$key] ?? []; ?>
+                    ?>
+                    <tr><td colspan="2"><p class="tw-lang-tabs">Γλώσσα μηνυμάτων:
+                        <a class="button<?php echo $tl === 'el' ? ' button-primary' : ''; ?>" href="<?php echo esc_url(self::url('settings', ['tab' => 'messages'])); ?>">Ελληνικά</a>
+                        <a class="button<?php echo $tl === 'en' ? ' button-primary' : ''; ?>" href="<?php echo esc_url(self::url('settings', ['tab' => 'messages', 'tl' => 'en'])); ?>">English</a>
+                        <span class="description">Κάθε πελάτης λαμβάνει τα μηνύματα στη γλώσσα του (αυτή με την οποία ενεργοποίησε, ή όποια επέλεξε στο «Οι εγγυήσεις μου»).</span></p></td></tr>
+                    <?php
+                    $sfx = $tl === 'en' ? '_en' : '';
+                    $field('email_footer_login' . $sfx, $tl === 'en' ? 'Footer: customer sign-in codes (English)' : 'Υποσέλιδο: κωδικοί σύνδεσης πελατών', 'textarea', 'Κάτω από τα email με κωδικό επαλήθευσης/σύνδεσης προς τους πελάτες. Δεκτό το <code>{company_name}</code>. Κενό = χωρίς υποσέλιδο.');
+                    $field('email_footer_service' . $sfx, $tl === 'en' ? 'Footer: warranty & Service messages (English)' : 'Υποσέλιδο: μηνύματα εγγύησης & Service', 'textarea', 'Κάτω από τα υπόλοιπα email προς τους πελάτες (ενεργοποίηση, υπενθυμίσεις, Service, λήξη). Κενό = χωρίς υποσέλιδο. Τα email προς την ομάδα δεν έχουν υποσέλιδο.');
+                    foreach ($tpl as $key => $def) : $saved = $s[$tl === 'en' ? 'templates_en' : 'templates'][$key] ?? []; ?>
                         <tr><th><?php echo esc_html($def['label']); ?><br><code><?php echo esc_html($key); ?></code></th><td>
                             <p><input type="text" class="large-text" name="tpl[<?php echo esc_attr($key); ?>][subject]" value="<?php echo esc_attr($saved['subject'] ?? ''); ?>" placeholder="<?php echo esc_attr($def['subject']); ?>"></p>
                             <p><textarea class="large-text" rows="6" name="tpl[<?php echo esc_attr($key); ?>][body]" placeholder="<?php echo esc_attr($def['body']); ?>"><?php echo esc_textarea($saved['body'] ?? ''); ?></textarea></p>
@@ -1098,10 +1120,10 @@ final class TW_Admin {
             </form>
             <?php if ($tab === 'privacy') self::erasure_requests(); ?>
             <?php if ($tab === 'brevo') self::brevo_tools(); ?>
-            <?php if (in_array($tab, ['messages', 'sms', 'general', 'brevo', 'sender'], true)) : ?>
+            <?php if (in_array($tab, ['messages', 'sms', 'general', 'brevo', 'sender'], true)) : $tpl = $tab === 'messages' && $tl === 'en' ? TW_Settings::template_defaults_en() : TW_Settings::template_defaults(); ?>
                 <h2>Δοκιμαστική αποστολή</h2>
                 <form method="post" action="<?php echo esc_url($post); ?>" class="tw-inline-form">
-                    <?php wp_nonce_field('tw_test_message'); ?><input type="hidden" name="action" value="tw_test_message"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>">
+                    <?php wp_nonce_field('tw_test_message'); ?><input type="hidden" name="action" value="tw_test_message"><input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>"><input type="hidden" name="tl" value="<?php echo esc_attr($tl); ?>">
                     <select name="template"><?php foreach ($tpl as $k => $d) printf('<option value="%s">%s</option>', esc_attr($k), esc_html($d['label'])); ?></select>
                     <input type="email" name="email" placeholder="email" value="<?php echo esc_attr(wp_get_current_user()->user_email); ?>">
                     <input type="tel" name="phone" placeholder="κινητό (για SMS)">
@@ -1663,11 +1685,11 @@ final class TW_Admin {
             'sender' => [],
         ];
         $numbers = ['service_submit_window_days', 'service_resubmit_days', 'warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
-        $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label', 'email_footer_login', 'email_footer_service'];
+        $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label', 'email_footer_login', 'email_footer_service', 'terms_label_en', 'accuracy_label_en', 'marketing_label_en', 'email_footer_login_en', 'email_footer_service_en'];
         $urls = ['portal_url', 'register_url', 'privacy_url', 'sms_url', 'logo_url'];
         $values = [];
         foreach ($in as $k => $v) {
-            if (!array_key_exists($k, $defaults) || $k === 'templates' || strpos($k, 'ip_') === 0) continue; // IP lock: wp-admin only
+            if (!array_key_exists($k, $defaults) || $k === 'templates' || $k === 'templates_en' || strpos($k, 'ip_') === 0) continue; // IP lock: wp-admin only
             if (in_array($k, $numbers, true)) $values[$k] = max(0, (int) $v);
             elseif (in_array($k, $urls, true)) $values[$k] = esc_url_raw(trim($v));
             elseif (in_array($k, $multiline, true)) $values[$k] = sanitize_textarea_field($v);
@@ -1687,6 +1709,7 @@ final class TW_Admin {
         if (isset($values['warranty_years'])) $values['warranty_years'] = max(1, $values['warranty_years']);
         if ($tab === 'sms' && isset($values['sms_method'])) $values['sms_method'] = strtoupper($values['sms_method']) === 'GET' ? 'GET' : 'POST';
 
+        $tl = self::post('tl') === 'en' ? 'en' : 'el';
         if ($tab === 'messages' && isset($_POST['tpl']) && is_array($_POST['tpl'])) {
             $tpl = [];
             foreach (wp_unslash($_POST['tpl']) as $key => $f) {
@@ -1697,7 +1720,7 @@ final class TW_Admin {
                     'sms' => sanitize_textarea_field($f['sms'] ?? ''),
                 ];
             }
-            $values['templates'] = $tpl;
+            $values[$tl === 'en' ? 'templates_en' : 'templates'] = $tpl;
         }
         $msg = 'Οι ρυθμίσεις αποθηκεύτηκαν.';
         if ($tab === 'app') {
@@ -1750,6 +1773,15 @@ final class TW_Admin {
                 $msg .= sprintf(' Δημιουργήθηκε νέα έκδοση όρων v%d.', $v);
                 TW_DB::log_event('terms_published', ['version' => $v]);
             }
+            $en_text = trim(sanitize_textarea_field(wp_unslash($_POST['terms_text_en'] ?? '')));
+            if ($en_text !== '' || TW_Settings::terms_versions('en')) {
+                $before_en = TW_Settings::terms_versions('en') ? (int) TW_Settings::current_terms('en')['version'] : 0;
+                $ve = TW_Settings::save_terms($en_text, 'en');
+                if ($ve !== $before_en) {
+                    $msg .= sprintf(' Δημιουργήθηκε νέα αγγλική έκδοση όρων v%d.', $ve);
+                    TW_DB::log_event('terms_published', ['version' => $ve . ' (EN)']);
+                }
+            }
         }
         if ($tab === 'schedule') {
             $old = TW_Settings::all();
@@ -1790,13 +1822,13 @@ final class TW_Admin {
         }
         if ($changed) TW_DB::log_event('settings_saved', ['section' => $tab, 'changed' => implode(' · ', $changed)]);
         self::flash($msg);
-        self::back('tw-settings', ['tab' => $tab]);
+        self::back('tw-settings', ['tab' => $tab, 'tl' => $tl === 'en' && $tab === 'messages' ? 'en' : null]);
     }
 
     public static function handle_terms_view() {
         if (!current_user_can(self::cap())) wp_die('', 403);
         check_admin_referer('tw_terms_view');
-        $t = TW_Settings::terms_version((int) ($_GET['v'] ?? 0));
+        $t = TW_Settings::terms_version((int) ($_GET['v'] ?? 0), self::q('tl') === 'en' ? 'en' : 'el');
         if (!$t) wp_die('Δεν βρέθηκε.');
         header('Content-Type: text/html; charset=utf-8');
         echo '<!doctype html><meta charset="utf-8"><title>Όροι v' . (int) $t['version'] . '</title><body style="font-family:sans-serif;max-width:800px;margin:2em auto;line-height:1.5">';
@@ -2075,6 +2107,7 @@ final class TW_Admin {
             'customer_name' => 'Δοκιμαστικός Πελάτης', 'email' => sanitize_email(self::post('email')), 'serial' => 'TEST-000123',
             'product_name' => 'Δοκιμαστικό προϊόν', 'product_code' => 'TST-01', 'warranty_code' => 'TW-TEST-TEST-TEST',
             'purchase_date' => TW_Schedule::today(), 'warranty_end' => TW_Schedule::warranty_end(TW_Schedule::today()), 'partner_email' => 'partner@example.com',
+            'lang' => self::post('tl') === 'en' ? 'en' : 'el',
         ];
         $vars = TW_Messenger::warranty_vars($fake, ['due_date' => TW_Util::date_label(TW_Schedule::add_days(TW_Schedule::today(), 30)), 'days' => 30, 'years' => 3,
             'milestone_no' => 1, 'grace_end_date' => '—', 'lock_date' => '—', 'code' => '123456', 'minutes' => TW_OTP::ttl_minutes()]);
@@ -2128,6 +2161,7 @@ final class TW_Admin {
             'warranty_end' => ['Λήξη εγγύησης', function ($r) { return TW_Util::date_label($r->warranty_end); }],
             'next_service' => ['Επόμενο Service', function ($r) { $n = TW_Warranty::next_service($r); return $n ? TW_Util::date_label($n['due']) : ''; }],
             'marketing' => ['Ενημερώσεις & προσφορές', function ($r) { return $r->marketing_opt_in ? 'Ναι' : 'Όχι'; }],
+            'lang' => ['Γλώσσα', function ($r) { return TW_I18n::languages()[$r->lang ?? 'el'] ?? 'Ελληνικά'; }],
             'lock_reason' => ['Λόγος κλειδώματος', function ($r) { return $r->lock_reason; }],
             'created' => ['Ενεργοποίηση', function ($r) { return TW_Util::datetime_label($r->created_at); }],
         ];

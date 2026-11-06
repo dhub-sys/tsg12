@@ -70,17 +70,19 @@ final class TW_Warranty {
         }
         $wid = (int) $wpdb->insert_id;
 
-        $terms = TW_Settings::current_terms();
-        $s = TW_Settings::all();
-        $labels = ['terms' => $s['terms_label'], 'data_accuracy' => $s['accuracy_label'], 'marketing' => $s['marketing_label']];
+        // Consents are recorded with the exact texts and terms version the customer saw, in their language.
+        $lang = TW_I18n::norm($data['lang'] ?? '') ?: 'el';
+        $terms = TW_Settings::current_terms($lang);
+        $cl = TW_Settings::consent_labels($lang);
+        $labels = ['terms' => $cl['terms'], 'data_accuracy' => $cl['accuracy'], 'marketing' => $cl['marketing']];
         foreach ($labels as $type => $label) {
-            self::record_consent($wid, $type, !empty($consents[$type]), $label, 'registration', $type === 'terms' ? $terms : null);
+            self::record_consent($wid, $type, !empty($consents[$type]), $label, 'registration', $type === 'terms' ? $terms : null, $type === 'terms' ? $terms['lang'] : $lang);
         }
-        TW_DB::log_event('activated', ['warranty_code' => $code, 'terms_version' => $terms['version']], $wid, $serial_id, 'customer:' . $data['email']);
+        TW_DB::log_event('activated', ['warranty_code' => $code, 'terms_version' => $terms['version'] . ($terms['lang'] === 'en' ? ' (EN)' : ''), 'lang' => $lang === 'en' ? 'English' : 'Ελληνικά'], $wid, $serial_id, 'customer:' . $data['email']);
         return self::get($wid);
     }
 
-    public static function record_consent($warranty_id, $type, $granted, $label, $source, $terms = null) {
+    public static function record_consent($warranty_id, $type, $granted, $label, $source, $terms = null, $lang = 'el') {
         global $wpdb;
         $wpdb->insert(TW_DB::table('consents'), [
             'warranty_id' => (int) $warranty_id,
@@ -89,6 +91,7 @@ final class TW_Warranty {
             'terms_version' => $terms ? (int) $terms['version'] : 0,
             'terms_hash' => $terms ? $terms['hash'] : '',
             'label_text' => $label,
+            'lang' => TW_I18n::norm($lang) ?: 'el',
             'source' => $source,
             'ip' => TW_Util::client_ip(),
             'user_agent' => TW_Util::user_agent(),
@@ -99,7 +102,7 @@ final class TW_Warranty {
     public static function set_marketing($warranty, $granted, $source) {
         global $wpdb;
         $wpdb->update(TW_DB::table('warranties'), ['marketing_opt_in' => $granted ? 1 : 0, 'updated_at' => TW_DB::now()], ['id' => $warranty->id]);
-        self::record_consent($warranty->id, 'marketing', $granted, (string) TW_Settings::get('marketing_label'), $source);
+        self::record_consent($warranty->id, 'marketing', $granted, TW_Settings::consent_labels($warranty->lang ?? 'el')['marketing'], $source, null, $warranty->lang ?? 'el');
         TW_DB::log_event($granted ? 'marketing_granted' : 'marketing_withdrawn', ['source' => $source], $warranty->id, $warranty->serial_id, in_array($source, ['portal', 'registration', 'inherited'], true) ? 'customer:' . $warranty->email : null);
     }
 
@@ -112,6 +115,27 @@ final class TW_Warranty {
         foreach (self::by_email($email) as $w) {
             if ((bool) $w->marketing_opt_in === (bool) $granted) continue;
             self::set_marketing($w, $granted, $source);
+            $n++;
+        }
+        return $n;
+    }
+
+    /** The customer's language for messages (from their newest warranty). */
+    public static function customer_lang($email) {
+        global $wpdb;
+        $l = $wpdb->get_var($wpdb->prepare("SELECT lang FROM " . TW_DB::table('warranties') . " WHERE email = %s AND anonymized_at IS NULL ORDER BY id DESC LIMIT 1", $email));
+        return TW_I18n::norm($l) ?: 'el';
+    }
+
+    /** Sets the language for messages on all of the customer's warranties. @return int changed */
+    public static function set_lang_for_email($email, $lang, $actor = null) {
+        global $wpdb;
+        $lang = TW_I18n::norm($lang) ?: 'el';
+        $n = 0;
+        foreach (self::by_email($email) as $w) {
+            if (($w->lang ?? 'el') === $lang) continue;
+            $wpdb->update(TW_DB::table('warranties'), ['lang' => $lang, 'updated_at' => TW_DB::now()], ['id' => $w->id]);
+            TW_DB::log_event('language_changed', ['lang' => $lang === 'en' ? 'English' : 'Ελληνικά'], $w->id, $w->serial_id, $actor ?: 'customer:' . $email);
             $n++;
         }
         return $n;
@@ -356,24 +380,28 @@ final class TW_Warranty {
     /** e.g. "αρ. ΑΠΥ-123 / 03/11/2026, αρχείο: scan.pdf" */
     public static function receipt_text($row) {
         $parts = [];
-        if ($row->receipt_number) $parts[] = 'αρ. ' . $row->receipt_number . ($row->receipt_date ? ' / ' . TW_Util::date_label($row->receipt_date) : '');
-        if ($row->receipt_file) $parts[] = 'αρχείο' . ($row->receipt_original_name ? ': ' . $row->receipt_original_name : '');
+        if ($row->receipt_number) $parts[] = tw__('αρ.') . ' ' . $row->receipt_number . ($row->receipt_date ? ' / ' . TW_Util::date_label($row->receipt_date) : '');
+        if ($row->receipt_file) $parts[] = tw__('αρχείο') . ($row->receipt_original_name ? ': ' . $row->receipt_original_name : '');
         return $parts ? implode(', ', $parts) : '—';
     }
 
     /** Placeholders for the Service submission/review messages. */
     public static function service_vars($w, $row) {
+        return TW_I18n::with($w->lang ?? 'el', function () use ($w, $row) { return self::service_vars_in_lang($w, $row); });
+    }
+
+    private static function service_vars_in_lang($w, $row) {
         $next = null;
         foreach (TW_Schedule::milestones($w->purchase_date, $w->warranty_end) as $m) {
             if ($m['type'] === 'service' && $m['no'] > (int) $row->milestone_no) { $next = $m; break; }
         }
         $next_step = $next
-            ? sprintf('Επόμενο Service: %s.', TW_Util::date_label($next['due']))
-            : sprintf('Η εγγύηση ισχύει έως %s.', TW_Util::date_label($w->warranty_end));
+            ? sprintf(tw__('Επόμενο Service: %s.'), TW_Util::date_label($next['due']))
+            : sprintf(tw__('Η εγγύηση ισχύει έως %s.'), TW_Util::date_label($w->warranty_end));
         return TW_Messenger::warranty_vars($w, [
             'milestone_no' => (int) $row->milestone_no,
             'performed_date' => TW_Util::date_label($row->performed_date),
-            'technician_vat' => $row->technician_vat,
+            'technician_vat' => $row->technician_vat . (($row->technician_country ?? 'GR') !== 'GR' ? ' (' . tw__(TW_Util::countries()[$row->technician_country] ?? $row->technician_country) . ')' : ''),
             'receipt_info' => self::receipt_text($row),
             'review_note' => $row->review_note,
             'resubmit_until' => TW_Util::date_label((string) $row->resubmit_until),

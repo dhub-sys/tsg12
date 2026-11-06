@@ -37,3 +37,8 @@ button, input, select, textarea { font-family: inherit; }
 .tw-pub-nav a.is-active { color: var(--tw-brand-ink, #fff); }
 .tw-pub-foot { background: var(--tw-side, #0f1320); color: var(--tw-side-ink, rgba(255,255,255,.72)); border-top: 0; }
 .tw-pub-foot a { color: var(--tw-side-strong, #fff); }
+
+/* 1.23 – EL | EN switch on the standalone customer pages */
+.tw-lang-switch { display: inline-flex; gap: 2px; margin-left: 10px; padding: 2px; border: 1px solid rgba(0,0,0,.12); border-radius: 999px; }
+.tw-lang-switch a { padding: 4px 10px !important; border-radius: 999px; font-size: 13px; font-weight: 600; text-decoration: none; }
+.tw-lang-switch a.is-active { background: var(--tw-accent, #c8102e); color: var(--tw-accent-ink, #fff) !important; }

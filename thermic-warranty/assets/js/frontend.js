@@ -3,17 +3,21 @@
     'use strict';
     if (typeof window.TW === 'undefined') return;
 
+    // Customer-side language: strings are written in Greek and looked up in TW.i18n (English) when needed.
+    function T(s) { return (TW.i18n && TW.i18n[s]) || s; }
+
     function post(action, data) {
         var fd = data instanceof FormData ? data : new FormData();
         if (!(data instanceof FormData) && data) {
             Object.keys(data).forEach(function (k) { fd.append(k, data[k]); });
         }
         fd.append('action', 'tw_' + action);
+        if (TW.lang) fd.append('tw_lang', TW.lang);
         return fetch(TW.ajax, { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) {
-                return r.json().catch(function () { return { success: false, data: { message: 'Σφάλμα επικοινωνίας με τον server.' } }; });
+                return r.json().catch(function () { return { success: false, data: { message: T('Σφάλμα επικοινωνίας με τον server.') } }; });
             })
-            .catch(function () { return { success: false, data: { message: 'Δεν υπάρχει σύνδεση. Δοκιμάστε ξανά.' } }; });
+            .catch(function () { return { success: false, data: { message: T('Δεν υπάρχει σύνδεση. Δοκιμάστε ξανά.') } }; });
     }
 
     // ------------------------------------------------------------ bot protection
@@ -43,7 +47,7 @@
         var g = {};
         ['tw_website', 'tw_t'].forEach(function (k) { if (form[k]) g[k] = form[k].value; });
         var t = tsToken(form);
-        if (t === '') { alertBox(root, 'Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.'); return false; }
+        if (t === '') { alertBox(root, T('Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.')); return false; }
         if (t) g['cf-turnstile-response'] = t;
         return g;
     }
@@ -81,9 +85,9 @@
             inp.setAttribute('data-tw-file', '1');
             var box = document.createElement('label');
             box.className = 'tw-file';
-            var empty = 'Δεν επιλέχθηκε αρχείο';
+            var empty = T('Δεν επιλέχθηκε αρχείο');
             inp.parentNode.insertBefore(box, inp);
-            box.innerHTML = '<span class="tw-file-btn">' + UP + 'Επιλογή αρχείου</span><span class="tw-file-name">' + empty + '</span>';
+            box.innerHTML = '<span class="tw-file-btn">' + UP + T('Επιλογή αρχείου') + '</span><span class="tw-file-name">' + empty + '</span>';
             box.appendChild(inp);
             var name = box.querySelector('.tw-file-name');
             function show() {
@@ -155,7 +159,7 @@
         var f2 = root.querySelector('[data-step="2"]');
         var f3 = root.querySelector('[data-step="3"]');
         var f4 = root.querySelector('[data-step="4"]');
-        var ASK = 'Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.';
+        var ASK = T('Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.');
 
         function show(n) {
             steps.forEach(function (s) { s.hidden = s.getAttribute('data-step') !== String(n); });
@@ -189,7 +193,7 @@
             e.preventDefault();
             alertBox(root, '');
             var serial = f1.serial.value.trim();
-            if (!serial) { alertBox(root, 'Συμπληρώστε τον σειριακό αριθμό.'); markField(f1, 'serial'); return; }
+            if (!serial) { alertBox(root, T('Συμπληρώστε τον σειριακό αριθμό.')); markField(f1, 'serial'); return; }
             var g = guard(f1, root);
             if (!g) return;
             busy(f1, true);
@@ -200,7 +204,7 @@
                 state.serial = r.data.serial;
                 state.product = r.data.product;
                 state.pass = r.data.pass;
-                productLine(f2.querySelector('.tw-product'), '✔ Βρέθηκε: ');
+                productLine(f2.querySelector('.tw-product'), '✔ ' + T('Βρέθηκε:') + ' ');
                 show(2);
             });
         });
@@ -227,7 +231,7 @@
         f2.addEventListener('submit', function (e) {
             e.preventDefault();
             state.email = f2.email.value.trim();
-            if (!f2.email.checkValidity() || !state.email) { alertBox(root, 'Συμπληρώστε ένα έγκυρο email.'); markField(f2, 'email'); return; }
+            if (!f2.email.checkValidity() || !state.email) { alertBox(root, T('Συμπληρώστε ένα έγκυρο email.')); markField(f2, 'email'); return; }
             sendCode(f2).then(function (ok) { if (ok) show(3); });
         });
 
@@ -235,7 +239,7 @@
         f3.addEventListener('submit', function (e) {
             e.preventDefault();
             var code = f3.code.value.replace(/\D/g, '');
-            if (code.length !== 6) { alertBox(root, 'Ο κωδικός έχει 6 ψηφία.'); markField(f3, 'code'); return; }
+            if (code.length !== 6) { alertBox(root, T('Ο κωδικός έχει 6 ψηφία.')); markField(f3, 'code'); return; }
             busy(f3, true);
             post('reg_verify', extend({ serial: state.serial, email: state.email, code: code }, guard(f3, root) || {})).then(function (r) {
                 busy(f3, false);
@@ -252,13 +256,13 @@
         });
 
         function fillDetails() {
-            productLine(f4.querySelector('.tw-product'), 'Προϊόν: ');
+            productLine(f4.querySelector('.tw-product'), T('Προϊόν') + ': ');
             bind(f4, { email: state.verifiedEmail });
         }
 
         root.querySelectorAll('[data-action="resend"]').forEach(function (b) {
             b.addEventListener('click', function () {
-                sendCode(f3).then(function (ok) { if (ok) { alertBox(root, 'Στάλθηκε νέος κωδικός.', 'success'); f3.code.focus(); } });
+                sendCode(f3).then(function (ok) { if (ok) { alertBox(root, T('Στάλθηκε νέος κωδικός.'), 'success'); f3.code.focus(); } });
             });
         });
         root.querySelectorAll('[data-action="change-email"]').forEach(function (b) {
@@ -282,7 +286,7 @@
                 var el = req[i];
                 var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
                 if (empty || (el.checkValidity && !el.checkValidity())) {
-                    var lbl = el.type === 'checkbox' ? 'Πρέπει να επιλέξετε το υποχρεωτικό πεδίο.' : 'Συμπληρώστε σωστά όλα τα υποχρεωτικά πεδία.';
+                    var lbl = el.type === 'checkbox' ? T('Πρέπει να επιλέξετε το υποχρεωτικό πεδίο.') : T('Συμπληρώστε σωστά όλα τα υποχρεωτικά πεδία.');
                     alertBox(root, lbl);
                     markField(f4, el.name);
                     return;
@@ -290,7 +294,7 @@
             }
             var file = f4.invoice_file && f4.invoice_file.files[0];
             if (file && file.size > TW.maxMb * 1024 * 1024) {
-                alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f4, 'invoice_file'); return;
+                alertBox(root, T('Το αρχείο ξεπερνά το όριο των %d MB.').replace('%d', TW.maxMb)); markField(f4, 'invoice_file'); return;
             }
             if (tsToken(f4) === '') { alertBox(root, ASK); return; }
             var fd = new FormData(f4); // includes the honeypot, timestamp and Turnstile token
@@ -361,7 +365,7 @@
         l1.addEventListener('submit', function (e) {
             e.preventDefault();
             email = l1.email.value.trim();
-            if (!email || !l1.email.checkValidity()) { alertBox(root, 'Συμπληρώστε ένα έγκυρο email.'); markField(l1, 'email'); return; }
+            if (!email || !l1.email.checkValidity()) { alertBox(root, T('Συμπληρώστε ένα έγκυρο email.')); markField(l1, 'email'); return; }
             var g = guard(l1, root);
             if (!g) return;
             busy(l1, true);
@@ -412,7 +416,7 @@
                     e.preventDefault();
                     var v = (mf.querySelector('input[name=marketing]:checked') || {}).value;
                     if (!v) return;
-                    if (v === '0' && !window.confirm('Να ανακληθεί η συγκατάθεσή σας για ενημερώσεις και προσφορές, για όλα τα προϊόντα σας;')) return;
+                    if (v === '0' && !window.confirm(T('Να ανακληθεί η συγκατάθεσή σας για ενημερώσεις και προσφορές, για όλα τα προϊόντα σας;'))) return;
                     btn.disabled = true;
                     post('portal_marketing', { csrf: csrf, granted: v }).then(function (r) {
                         if (!r.success) { btn.disabled = false; alertBox(root, r.data.message); return; }
@@ -421,7 +425,25 @@
                 });
             }
 
-            // Warranty card: show / hide / print, per product.
+            // Language for emails and SMS: one choice for all products.
+            var lf = content.querySelector('[data-action="lang-form"]');
+            if (lf) {
+                var lbtn = lf.querySelector('button[type=submit]');
+                var linit = (lf.querySelector('input[name=comm_lang]:checked') || {}).value || '';
+                lf.addEventListener('change', function () { lbtn.disabled = ((lf.querySelector('input[name=comm_lang]:checked') || {}).value || '') === linit; });
+                lf.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var v = (lf.querySelector('input[name=comm_lang]:checked') || {}).value;
+                    if (!v) return;
+                    lbtn.disabled = true;
+                    post('portal_lang', { csrf: csrf, comm_lang: v }).then(function (r) {
+                        if (!r.success) { lbtn.disabled = false; alertBox(root, r.data.message); return; }
+                        load(function () { alertBox(root, r.data.message, 'success'); var box = content.querySelector('#tw-my-data'); if (box) box.scrollIntoView({ block: 'center' }); });
+                    });
+                });
+            }
+
+                        // Warranty card: show / hide / print, per product.
             content.querySelectorAll('[data-action="show-card"]').forEach(function (b) {
                 b.addEventListener('click', function () {
                     var view = b.closest('article').querySelector('.tw-card-view');
@@ -447,10 +469,10 @@
                     for (var i = 0; i < req.length; i++) {
                         var el = req[i];
                         var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
-                        if (empty) { alertBox(root, 'Συμπληρώστε όλα τα υποχρεωτικά πεδία του Service.'); markField(f, el.name); return; }
+                        if (empty) { alertBox(root, T('Συμπληρώστε όλα τα υποχρεωτικά πεδία του Service.')); markField(f, el.name); return; }
                     }
                     var file = f.receipt_file && f.receipt_file.files[0];
-                    if (file && file.size > TW.maxMb * 1024 * 1024) { alertBox(root, 'Το αρχείο ξεπερνά το όριο των ' + TW.maxMb + ' MB.'); markField(f, 'receipt_file'); return; }
+                    if (file && file.size > TW.maxMb * 1024 * 1024) { alertBox(root, T('Το αρχείο ξεπερνά το όριο των %d MB.').replace('%d', TW.maxMb)); markField(f, 'receipt_file'); return; }
                     var fd = new FormData(f);
                     fd.set('genuine_parts', f.genuine_parts.checked ? '1' : '0');
                     fd.append('csrf', csrf);
@@ -479,7 +501,7 @@
 
             var er = content.querySelector('[data-action="erase"]');
             if (er) er.addEventListener('click', function () {
-                if (!window.confirm('Θέλετε να υποβάλετε αίτημα διαγραφής των προσωπικών σας δεδομένων;')) return;
+                if (!window.confirm(T('Θέλετε να υποβάλετε αίτημα διαγραφής των προσωπικών σας δεδομένων;'))) return;
                 post('portal_erase', { csrf: csrf }).then(function (r) {
                     alertBox(root, r.data.message, r.success ? 'success' : 'error');
                 });

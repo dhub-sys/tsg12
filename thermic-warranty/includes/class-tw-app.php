@@ -115,6 +115,7 @@ final class TW_App {
     }
 
     private static function route_admin() {
+        TW_I18n::set('el'); // the console is in Greek
         // Office-only access (if a WordPress administrator turned it on): before anything else, sign-in included.
         TW_Access::enforce();
         // Sign-in, 2FA, password set/reset and sign-out.
@@ -154,6 +155,7 @@ final class TW_App {
     }
 
     private static function route_public() {
+        TW_I18n::remember();
         $screen = get_query_var('tw_screen') === 'my' ? 'my' : 'register';
         if ($screen === 'my' && isset($_GET['copy'])) {
             // Printable copy of the customer's data: only for a signed-in customer (session cookie, SameSite=Strict).

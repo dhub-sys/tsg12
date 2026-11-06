@@ -276,17 +276,19 @@ final class TW_Cron {
     }
 
     /** Label of a notifications row (reminder step or one-off message). */
-    public static function row_label($row) {
+    /** @param bool $customer wording for the customer (their language) instead of the console */
+    public static function row_label($row, $customer = false) {
         $one_off = ['activation' => 'Επιβεβαίωση ενεργοποίησης', 'service_rejected' => 'Απόρριψη υποβολής Service'];
-        if (isset($one_off[$row->milestone_key])) return $one_off[$row->milestone_key];
+        if (isset($one_off[$row->milestone_key])) return $customer ? tw__($one_off[$row->milestone_key]) : $one_off[$row->milestone_key];
         $m = $row->milestone_key === 'expiry' ? ['type' => 'expiry', 'no' => 0] : ['type' => 'service', 'no' => (int) str_replace('service_', '', $row->milestone_key)];
-        return self::step_label($m, (int) $row->offset_days);
+        return self::step_label($m, (int) $row->offset_days, $customer);
     }
 
-    public static function step_label($m, $offset) {
-        $what = $m['type'] === 'service' ? sprintf('%dο Service', $m['no']) : 'Λήξη';
-        if ($offset === 0) return "$what – ημέρα";
-        return sprintf('%s %s%d ημ.', $what, $offset > 0 ? '+' : '', $offset);
+    public static function step_label($m, $offset, $customer = false) {
+        $t = function ($s) use ($customer) { return $customer ? tw__($s) : $s; };
+        $what = $m['type'] === 'service' ? sprintf($t('%s Service'), $customer ? TW_I18n::ordinal($m['no']) : $m['no'] . 'ο') : $t('Λήξη');
+        if ($offset === 0) return $what . ' – ' . $t('ημέρα');
+        return sprintf('%s %s%d %s', $what, $offset > 0 ? '+' : '', $offset, $t('ημ.'));
     }
 
     public static function vars($w, $m, $offset, $step_date) {

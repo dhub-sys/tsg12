@@ -84,7 +84,7 @@ final class TW_Schedule {
         $lines = [];
         foreach (self::milestones($purchase_date) as $m) {
             if ($m['type'] === 'service') {
-                $lines[] = sprintf('- %dο Service: %s (%d χρόνια από την αγορά)', $m['no'], TW_Util::date_label($m['due']), $m['years']);
+                $lines[] = sprintf(tw__('- %1$s Service: %2$s (%3$d χρόνια από την αγορά)'), TW_I18n::ordinal($m['no']), TW_Util::date_label($m['due']), $m['years']);
             }
         }
         return $lines ? implode("\n", $lines) : '-';
