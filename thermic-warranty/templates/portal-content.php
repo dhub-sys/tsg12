@@ -94,7 +94,7 @@ $s = TW_Settings::all();
                     </div>
                     <div class="tw-field">
                         <label>ΑΦΜ τεχνικού <span class="tw-req">*</span></label>
-                        <input type="text" name="technician_vat" inputmode="numeric" maxlength="9" required>
+                        <?php echo TW_Util::tax_id_field('technician_vat', 'technician_country'); // phpcs:ignore ?>
                     </div>
                 </div>
                 <div class="tw-field">
@@ -137,7 +137,7 @@ $s = TW_Settings::all();
                 <dt>Κινητό</dt><dd><?php echo esc_html($w->phone_mobile); ?></dd>
                 <?php if ($w->phone_landline) : ?><dt>Σταθερό</dt><dd><?php echo esc_html($w->phone_landline); ?></dd><?php endif; ?>
                 <dt>Διεύθυνση</dt><dd><?php echo esc_html(trim($w->address . ', ' . $w->postcode . ' ' . $w->city, ', ')); ?></dd>
-                <dt>Συνεργάτης (ΑΦΜ)</dt><dd><?php echo esc_html($w->partner_vat); ?></dd>
+                <dt>Συνεργάτης</dt><dd><?php echo esc_html(TW_Util::tax_id_text($w->partner_country, $w->partner_vat)); ?></dd>
                 <dt>Παραστατικό</dt><dd><?php echo esc_html($w->invoice_number); ?></dd>
                 <dt>Ενεργοποίηση</dt><dd><?php echo esc_html(TW_Util::datetime_label($w->created_at)); ?></dd>
             </dl>

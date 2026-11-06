@@ -122,6 +122,16 @@ $user = wp_get_current_user();
         var x = document.createElement('button'); x.type = 'button'; x.className = 'tw-dismiss'; x.setAttribute('aria-label', 'Κλείσιμο'); x.textContent = '×';
         x.onclick = function () { n.remove(); }; n.appendChild(x);
     });
+    // Tax number with country prefix: numeric keypad and hint follow the chosen country.
+    document.querySelectorAll('[data-tw-taxid]').forEach(function (box) {
+        var sel = box.querySelector('select'), inp = box.querySelector('input');
+        function label(full) { [].forEach.call(sel.options, function (o) { o.textContent = o.getAttribute(full ? 'data-full' : 'data-short'); }); }
+        function upd() { var o = sel.options[sel.selectedIndex]; inp.placeholder = o.getAttribute('data-ph') || ''; sel.title = o.getAttribute('title') || ''; if (sel.value === 'GR') inp.setAttribute('inputmode', 'numeric'); else inp.removeAttribute('inputmode'); }
+        ['focus', 'mousedown', 'touchstart', 'keydown'].forEach(function (ev) { sel.addEventListener(ev, function () { label(true); }, { passive: true }); });
+        sel.addEventListener('blur', function () { label(false); });
+        sel.addEventListener('change', function () { upd(); label(false); inp.focus(); });
+        label(false); upd();
+    });
     // Export dialogs: choose columns and headers, then download (the page stays as it is).
     document.querySelectorAll('[data-tw-dialog]').forEach(function (b) {
         var dlg = document.getElementById(b.getAttribute('data-tw-dialog'));

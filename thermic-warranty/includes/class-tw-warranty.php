@@ -185,8 +185,8 @@ final class TW_Warranty {
             if ($m['due'] > $today && !$m['service']) continue; // not due yet
             $sv = $m['service'];
             if ($sv && self::service_counts($sv)) {
-                $lines[] = sprintf('%dο Service: καταχωρήθηκε %s – ΑΦΜ τεχνικού %s – απόδειξη: %s – γνήσια ανταλλακτικά: %s%s',
-                    $m['no'], TW_Util::date_label($sv->performed_date), $sv->technician_vat ?: '—', self::receipt_text($sv),
+                $lines[] = sprintf('%dο Service: καταχωρήθηκε %s – τεχνικός: %s – απόδειξη: %s – γνήσια ανταλλακτικά: %s%s',
+                    $m['no'], TW_Util::date_label($sv->performed_date), TW_Util::tax_id_text($sv->technician_country, $sv->technician_vat), self::receipt_text($sv),
                     $sv->genuine_parts ? 'ναι' : 'όχι', $sv->review_status === 'approved' ? ' – ελέγχθηκε' : '');
             } elseif (in_array($m['state'], ['due', 'rejected'], true)) {
                 $open = $m;
@@ -265,7 +265,7 @@ final class TW_Warranty {
     }
 
     /** Service recorded directly by the company: approved at once. */
-    public static function record_service($w, $milestone_no, $date, $by, $technician, $genuine, $notes, $technician_vat = '', $receipt = null) {
+    public static function record_service($w, $milestone_no, $date, $by, $technician, $genuine, $notes, $technician_vat = '', $receipt = null, $technician_country = 'GR') {
         global $wpdb;
         $wpdb->insert(TW_DB::table('services'), [
             'warranty_id' => (int) $w->id,
@@ -274,6 +274,7 @@ final class TW_Warranty {
             'performed_by' => $by,
             'technician' => $technician,
             'technician_vat' => $technician_vat,
+            'technician_country' => $technician_country,
             'genuine_parts' => $genuine ? 1 : 0,
             'receipt_file' => $receipt['file'] ?? '',
             'receipt_original_name' => $receipt['name'] ?? '',
@@ -294,7 +295,7 @@ final class TW_Warranty {
      * Service submitted by the customer from the portal. Accepted at once (the warranty continues);
      * the company may check it later, typically when a warranty claim comes in. Earlier submissions are kept.
      */
-    public static function submit_service($w, $milestone_no, $date, $technician_vat, $technician, array $receipt, $notes) {
+    public static function submit_service($w, $milestone_no, $date, $technician_vat, $technician, array $receipt, $notes, $technician_country = 'GR') {
         global $wpdb;
         $wpdb->insert(TW_DB::table('services'), [
             'warranty_id' => (int) $w->id,
@@ -303,6 +304,7 @@ final class TW_Warranty {
             'performed_by' => 'customer',
             'technician' => $technician,
             'technician_vat' => $technician_vat,
+            'technician_country' => $technician_country,
             'genuine_parts' => 1,
             'receipt_file' => $receipt['file'] ?? '',
             'receipt_original_name' => $receipt['name'] ?? '',

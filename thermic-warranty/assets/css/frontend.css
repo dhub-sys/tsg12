@@ -157,3 +157,10 @@
 .tw-card-view { margin: 4px 0 16px; padding: 18px 20px; border: 1px solid #e3e6ea; border-radius: 12px; background: #fff; }
 .tw-card-view h3 { margin-top: 0; }
 @media (max-width: 560px) { .tw-consent-row { flex-direction: column; } .tw-consent-side { align-items: stretch; width: 100%; } }
+
+/* 1.20 – tax number with the country prefix as a dropdown on the left */
+.tw-taxid { display: flex; align-items: stretch; width: 100%; }
+.tw-taxid .tw-taxid-country { padding: 10px 6px 10px 10px; border: 1px solid var(--tw-border); border-radius: 6px; font-size: 16px; color: inherit; flex: 0 0 auto; width: 5.4em; max-width: 45%; border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; border-right: 0 !important; background-color: var(--tw-bg-soft, #f6f7f9); font-weight: 600; text-overflow: ellipsis; }
+.tw-taxid input { width: auto !important; flex: 1 1 auto; min-width: 0; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.tw-taxid select:focus { outline: 2px solid var(--tw-accent); outline-offset: 1px; position: relative; z-index: 1; }
+.tw-invalid .tw-taxid select { border-color: var(--tw-bad) !important; }

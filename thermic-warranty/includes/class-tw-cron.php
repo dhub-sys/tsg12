@@ -248,7 +248,7 @@ final class TW_Cron {
         foreach ($wpdb->get_results($wpdb->prepare(
             "SELECT v.*, s.serial_no, w.warranty_code, w.customer_name FROM $sv v JOIN $w w ON w.id = v.warranty_id JOIN $sr s ON s.id = w.serial_id
              WHERE v.source = 'customer' AND v.created_at >= %s AND v.created_at < %s ORDER BY v.id", $since, $until)) as $row) {
-            $sections['Υποβολές Service από πελάτες'][] = sprintf('%dο Service: %s – ημ/νία %s – ΑΦΜ τεχνικού %s – απόδειξη: %s', $row->milestone_no, $who($row), TW_Util::date_label($row->performed_date), $row->technician_vat ?: '—', TW_Warranty::receipt_text($row));
+            $sections['Υποβολές Service από πελάτες'][] = sprintf('%dο Service: %s – ημ/νία %s – τεχνικός: %s – απόδειξη: %s', $row->milestone_no, $who($row), TW_Util::date_label($row->performed_date), TW_Util::tax_id_text($row->technician_country ?? 'GR', $row->technician_vat), TW_Warranty::receipt_text($row));
         }
         $count = 0;
         foreach ($sections as $l) $count += count($l);

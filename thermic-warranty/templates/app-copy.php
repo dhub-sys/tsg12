@@ -72,7 +72,7 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
                 <tr><th>Κινητό τηλέφωνο</th><td><?php echo esc_html($w->phone_mobile); ?></td></tr>
                 <tr><th>Σταθερό τηλέφωνο</th><td><?php echo esc_html($w->phone_landline ?: '—'); ?></td></tr>
                 <tr><th>Διεύθυνση</th><td><?php echo esc_html(trim($w->address . ', ' . $w->postcode . ' ' . $w->city, ', ')); ?></td></tr>
-                <tr><th>Συνεργάτης (πωλητής)</th><td>ΑΦΜ <?php echo esc_html($w->partner_vat); ?> – <?php echo esc_html($w->partner_email); ?></td></tr>
+                <tr><th>Συνεργάτης (πωλητής)</th><td><?php echo esc_html(TW_Util::tax_id_text($w->partner_country, $w->partner_vat)); ?> – <?php echo esc_html($w->partner_email); ?></td></tr>
             </table>
 
             <h3>Πρόγραμμα Service</h3>
@@ -100,7 +100,7 @@ $review_labels = ['pending' => 'Καταχωρήθηκε', 'approved' => 'Κατ
                 <tbody>
                 <?php foreach (array_reverse($history) as $sv) : ?>
                     <tr><td><?php echo (int) $sv->milestone_no; ?>ο</td><td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td>
-                        <td><?php echo esc_html(trim(($sv->technician_vat ? 'ΑΦΜ ' . $sv->technician_vat : '') . ($sv->technician ? ' – ' . $sv->technician : ''), ' –') ?: '—'); ?></td>
+                        <td><?php echo esc_html(trim(($sv->technician_vat ? TW_Util::tax_id_text($sv->technician_country, $sv->technician_vat) : '') . ($sv->technician ? ' – ' . $sv->technician : ''), ' –') ?: '—'); ?></td>
                         <td><?php echo esc_html(TW_Warranty::receipt_text($sv)); ?></td>
                         <td><?php echo esc_html(TW_Util::datetime_label($sv->created_at)); ?> (<?php echo $sv->source === 'customer' ? 'από εσάς' : 'από την εταιρεία'; ?>)</td>
                         <td><?php echo esc_html($review_labels[$sv->review_status] ?? $sv->review_status); ?><?php echo $sv->review_status === 'rejected' && $sv->review_note ? ': ' . esc_html($sv->review_note) : ''; ?></td></tr>

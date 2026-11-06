@@ -104,7 +104,7 @@ $terms = TW_Settings::current_terms();
             <div class="tw-grid">
                 <div class="tw-field">
                     <label for="tw-vat">ΑΦΜ συνεργάτη <span class="tw-req">*</span></label>
-                    <input id="tw-vat" name="partner_vat" type="text" inputmode="numeric" required maxlength="9">
+                    <?php echo TW_Util::tax_id_field('partner_vat', 'partner_country', '', 'GR', 'tw-vat'); // phpcs:ignore ?>
                 </div>
                 <div class="tw-field">
                     <label for="tw-partner-email">Email συνεργάτη <span class="tw-req">*</span></label>

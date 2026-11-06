@@ -395,6 +395,7 @@
 
         function wire() {
             enhanceFiles(content);
+            taxIds(content);
             var out = content.querySelector('[data-action="logout"]');
             if (out) out.addEventListener('click', function () { post('logout', {}).then(load); });
 
@@ -488,7 +489,28 @@
         load();
     }
 
+    // Tax number with country prefix: numeric keypad and hint follow the chosen country.
+    function taxIds(scope) {
+        scope.querySelectorAll('[data-tw-taxid]:not([data-ready])').forEach(function (box) {
+            box.setAttribute('data-ready', '1');
+            var sel = box.querySelector('select'), inp = box.querySelector('input');
+            function label(full) { [].forEach.call(sel.options, function (o) { o.textContent = o.getAttribute(full ? 'data-full' : 'data-short'); }); }
+            function upd() {
+                var o = sel.options[sel.selectedIndex];
+                inp.placeholder = o.getAttribute('data-ph') || '';
+                if (sel.value === 'GR') inp.setAttribute('inputmode', 'numeric'); else inp.removeAttribute('inputmode');
+                sel.title = o.getAttribute('title') || '';
+            }
+            ['focus', 'mousedown', 'touchstart', 'keydown'].forEach(function (ev) { sel.addEventListener(ev, function () { label(true); }, { passive: true }); });
+            sel.addEventListener('blur', function () { label(false); });
+            sel.addEventListener('change', function () { upd(); label(false); inp.focus(); });
+            label(false); upd();
+        });
+    }
+    window.TWTaxIds = taxIds;
+
     function boot() {
+        taxIds(document);
         document.querySelectorAll('[data-tw="register"]').forEach(Register);
         document.querySelectorAll('[data-tw="portal"]').forEach(Portal);
     }

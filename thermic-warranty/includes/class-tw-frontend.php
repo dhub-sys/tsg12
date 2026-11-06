@@ -202,8 +202,10 @@ final class TW_Frontend {
         $postcode = preg_replace('/\s+/', '', self::input('postcode'));
         if (!preg_match('/^\d{5}$/', $postcode)) self::fail('Ο ταχυδρομικός κώδικας πρέπει να έχει 5 ψηφία.', 'postcode');
 
-        $vat = preg_replace('/\D/', '', self::input('partner_vat'));
-        if (!TW_Util::valid_afm($vat)) self::fail('Ο ΑΦΜ συνεργάτη δεν είναι έγκυρος.', 'partner_vat');
+        $partner_country = strtoupper(sanitize_key(self::input('partner_country'))) ?: 'GR';
+        if (!isset(TW_Util::countries()[$partner_country])) $partner_country = 'GR';
+        [$vat, $vat_err] = TW_Util::tax_id($partner_country, self::input('partner_vat'));
+        if ($vat_err) self::fail('Συνεργάτης: ' . $vat_err, 'partner_vat');
         $partner_email = strtolower(sanitize_email(self::input('partner_email')));
         if (!is_email($partner_email)) self::fail('Συμπληρώστε έγκυρο email συνεργάτη.', 'partner_email');
 
@@ -250,6 +252,7 @@ final class TW_Frontend {
             'postcode' => $postcode,
             'city' => $city,
             'partner_vat' => $vat,
+            'partner_country' => $partner_country,
             'partner_email' => $partner_email,
             'invoice_number' => $invoice_number,
             'invoice_file' => $invoice['file'],
@@ -414,8 +417,10 @@ final class TW_Frontend {
         if ($date < $earliest) {
             self::fail(sprintf('Για το %dο Service δεκτές είναι ημερομηνίες από %s και μετά.', $no, TW_Util::date_label($earliest)), 'performed_date');
         }
-        $vat = preg_replace('/\D/', '', self::input('technician_vat'));
-        if (!TW_Util::valid_afm($vat)) self::fail('Ο ΑΦΜ τεχνικού δεν είναι έγκυρος.', 'technician_vat');
+        $tech_country = strtoupper(sanitize_key(self::input('technician_country'))) ?: 'GR';
+        if (!isset(TW_Util::countries()[$tech_country])) $tech_country = 'GR';
+        [$vat, $vat_err] = TW_Util::tax_id($tech_country, self::input('technician_vat'));
+        if ($vat_err) self::fail('Τεχνικός: ' . $vat_err, 'technician_vat');
         $receipt = ['file' => '', 'name' => '', 'number' => '', 'date' => null];
         if (TW_Settings::service_needs_fields()) {
             $receipt['number'] = sanitize_text_field(self::input('receipt_number'));
@@ -436,7 +441,7 @@ final class TW_Frontend {
             $receipt['name'] = $file['name'];
         }
 
-        $row = TW_Warranty::submit_service($w, $no, $date, $vat, sanitize_text_field(self::input('technician')), $receipt, sanitize_textarea_field(self::input('notes')));
+        $row = TW_Warranty::submit_service($w, $no, $date, $vat, sanitize_text_field(self::input('technician')), $receipt, sanitize_textarea_field(self::input('notes')), $tech_country);
         $vars = TW_Warranty::service_vars($w, $row);
         TW_Messenger::send_template_email($w->email, 'service_received', $vars);
         $link = TW_App::admin_url('warranties', ['view' => $w->id]);

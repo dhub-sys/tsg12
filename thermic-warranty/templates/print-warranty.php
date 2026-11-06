@@ -104,7 +104,7 @@ $printed = sprintf('Εκτύπωση: %s – %s', TW_Util::datetime_label(TW_DB:
                     <tr><th>Κινητό</th><td><?php echo esc_html($w->phone_mobile ?: '—'); ?></td></tr>
                     <tr><th>Σταθερό</th><td><?php echo esc_html($w->phone_landline ?: '—'); ?></td></tr>
                     <tr><th>Διεύθυνση</th><td><?php echo esc_html(trim($w->address . ', ' . $w->postcode . ' ' . $w->city, ', ') ?: '—'); ?></td></tr>
-                    <tr><th>Συνεργάτης</th><td>ΑΦΜ <?php echo esc_html($w->partner_vat); ?><br><?php echo esc_html($w->partner_email); ?></td></tr>
+                    <tr><th>Συνεργάτης</th><td><?php echo esc_html(TW_Util::tax_id_text($w->partner_country, $w->partner_vat)); ?><br><?php echo esc_html($w->partner_email); ?></td></tr>
                     <tr><th>Ενημερώσεις</th><td><?php echo $w->marketing_opt_in ? 'Ναι' : 'Όχι'; ?></td></tr>
                 </table>
             </section>
@@ -120,7 +120,7 @@ $printed = sprintf('Εκτύπωση: %s – %s', TW_Util::datetime_label(TW_DB:
                     <td><?php echo esc_html(TW_Util::date_label($m['due'])); ?></td>
                     <td><?php echo esc_html(TW_Util::date_label($m['lock_date'])); ?></td>
                     <td><span class="pill pill-<?php echo esc_attr($m['state']); ?>"><?php echo esc_html($ms_labels[$m['state']] ?? $m['state']); ?></span></td>
-                    <td><?php echo $sv ? esc_html(TW_Util::date_label($sv->performed_date) . ' · ΑΦΜ ' . ($sv->technician_vat ?: '—')) : '—'; ?></td>
+                    <td><?php echo $sv ? esc_html(TW_Util::date_label($sv->performed_date) . ' · ' . TW_Util::tax_id_text($sv->technician_country, $sv->technician_vat)) : '—'; ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -136,7 +136,7 @@ $printed = sprintf('Εκτύπωση: %s – %s', TW_Util::datetime_label(TW_DB:
                     <td><?php echo esc_html(TW_Util::datetime_label($sv->created_at)); ?><?php echo $is_latest ? '' : '<br><small>αντικαταστάθηκε</small>'; ?></td>
                     <td><?php echo (int) $sv->milestone_no; ?>ο</td>
                     <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td>
-                    <td><?php echo esc_html(($sv->technician_vat ? 'ΑΦΜ ' . $sv->technician_vat : '—') . ($sv->technician ? ' – ' . $sv->technician : '')); ?></td>
+                    <td><?php echo esc_html(TW_Util::tax_id_text($sv->technician_country, $sv->technician_vat) . ($sv->technician ? ' – ' . $sv->technician : '')); ?></td>
                     <td><?php echo esc_html(TW_Warranty::receipt_text($sv)); ?></td>
                     <td><?php echo $sv->genuine_parts ? 'Ναι' : 'Όχι'; ?></td>
                     <td><?php echo $sv->source === 'customer' ? 'Πελάτης' : 'Εταιρεία'; ?></td>

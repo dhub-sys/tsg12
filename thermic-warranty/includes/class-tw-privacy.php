@@ -44,6 +44,7 @@ final class TW_Privacy {
                 'postcode' => $w->postcode,
                 'city' => $w->city,
                 'partner_vat' => $w->partner_vat,
+                'partner_country' => $w->partner_country ?: 'GR',
                 'partner_email' => $w->partner_email,
                 'invoice_number' => $w->invoice_number,
                 'invoice_file_uploaded' => $w->invoice_file ? 'yes' : 'no',

@@ -200,7 +200,7 @@ final class TW_Admin {
         $names = ['note' => 'Αιτιολογία', 'milestone' => 'Service', 'date' => 'Ημερομηνία', 'technician_vat' => 'ΑΦΜ τεχνικού', 'warranty_code' => 'Κωδικός',
             'terms_version' => 'Όροι έκδοσης', 'email' => 'Email', 'by' => 'Από', 'genuine_parts' => 'Γνήσια ανταλλακτικά', 'to' => 'Παραλήπτης', 'reason' => 'Λόγος',
             'step' => 'Βήμα', 'after_failed' => 'Μετά από αποτυχία', 'source' => 'Πηγή', 'customer_name' => 'Ονοματεπώνυμο', 'phone_mobile' => 'Κινητό',
-            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
+            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'partner_country' => 'Χώρα συνεργάτη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
             'partner_email' => 'Email συνεργάτη', 'invoice_number' => 'Αριθμός παραστατικού'];
         $out = [];
         foreach ($d as $k => $v) {
@@ -475,7 +475,7 @@ final class TW_Admin {
                         <tr><th>Κινητό</th><td><?php echo esc_html($w->phone_mobile); ?></td></tr>
                         <tr><th>Σταθερό</th><td><?php echo esc_html($w->phone_landline); ?></td></tr>
                         <tr><th>Διεύθυνση</th><td><?php echo esc_html(trim($w->address . ', ' . $w->postcode . ' ' . $w->city, ', ')); ?></td></tr>
-                        <tr><th>Συνεργάτης</th><td>ΑΦΜ <?php echo esc_html($w->partner_vat); ?> – <?php echo esc_html($w->partner_email); ?></td></tr>
+                        <tr><th>Συνεργάτης</th><td><?php echo esc_html(TW_Util::tax_id_text($w->partner_country, $w->partner_vat)); ?> – <?php echo esc_html($w->partner_email); ?></td></tr>
                         <tr><th>Εμπορικές ενημερώσεις</th><td><?php echo $w->marketing_opt_in ? 'Ναι' : 'Όχι'; ?></td></tr>
                     </table>
                 </div>
@@ -489,7 +489,7 @@ final class TW_Admin {
                     <td><?php echo esc_html(TW_Util::date_label($m['lock_date'])); ?></td>
                     <td><?php echo esc_html($ms_labels[$m['state']] ?? $m['state']); ?></td>
                     <td><?php if ($m['service']) : $sv = $m['service']; ?>
-                        <?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?> · ΑΦΜ <?php echo esc_html($sv->technician_vat ?: '—'); ?>
+                        <?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?> · <?php echo esc_html(TW_Util::tax_id_text($sv->technician_country, $sv->technician_vat)); ?>
                         <?php echo $sv->receipt_number ? '· αρ. ' . esc_html($sv->receipt_number) : ''; ?>
                         <?php echo $sv->receipt_file ? '· <a href="' . esc_url(self::receipt_url($w, $sv)) . '" target="_blank">απόδειξη</a>' : ''; ?>
                     <?php endif; ?></td>
@@ -506,7 +506,7 @@ final class TW_Admin {
                     <td><?php echo esc_html(TW_Util::datetime_label($sv->created_at)); ?><?php echo $is_latest ? '' : '<br><small>αντικαταστάθηκε από νεότερη</small>'; ?></td>
                     <td><?php echo (int) $sv->milestone_no; ?>ο</td>
                     <td><?php echo esc_html(TW_Util::date_label($sv->performed_date)); ?></td>
-                    <td><?php echo $sv->technician_vat ? 'ΑΦΜ <code>' . esc_html($sv->technician_vat) . '</code>' : '—'; ?><?php echo $sv->technician ? '<br>' . esc_html($sv->technician) : ''; ?><?php echo $sv->notes ? '<br><small>' . esc_html($sv->notes) . '</small>' : ''; ?></td>
+                    <td><?php echo $sv->technician_vat ? esc_html(TW_Util::tax_id_label($sv->technician_country ?: 'GR')) . ' <code>' . esc_html($sv->technician_vat) . '</code>' . (($sv->technician_country ?: 'GR') !== 'GR' ? ' ' . esc_html(TW_Util::countries()[$sv->technician_country] ?? '') : '') : '—'; ?><?php echo $sv->technician ? '<br>' . esc_html($sv->technician) : ''; ?><?php echo $sv->notes ? '<br><small>' . esc_html($sv->notes) . '</small>' : ''; ?></td>
                     <td><?php
                         $bits = [];
                         if ($sv->receipt_number) $bits[] = 'Αρ. <strong>' . esc_html($sv->receipt_number) . '</strong>' . ($sv->receipt_date ? '<br>' . esc_html(TW_Util::date_label($sv->receipt_date)) : '');
@@ -557,7 +557,7 @@ final class TW_Admin {
                         <p><label>Ημερομηνία Service<br><input type="date" name="performed_date" required max="<?php echo esc_attr(TW_Schedule::today()); ?>"></label></p>
                         <p><label>Από<br><select name="performed_by"><option value="partner">Συνεργάτη</option><option value="thermic">Thermic</option></select></label></p>
                         <p><label>Τεχνικός / συνεργείο<br><input type="text" name="technician" class="regular-text"></label></p>
-                        <p><label>ΑΦΜ τεχνικού<br><input type="text" name="technician_vat" inputmode="numeric" maxlength="9"></label></p>
+                        <p><label>ΑΦΜ τεχνικού</label><br><?php echo TW_Util::tax_id_field('technician_vat', 'technician_country', '', 'GR', '', false); // phpcs:ignore ?></p>
                         <p><label>Αριθμός απόδειξης<br><input type="text" name="receipt_number" class="regular-text" maxlength="100"></label></p>
                         <p><label>Ημερομηνία παραστατικού<br><input type="date" name="receipt_date" max="<?php echo esc_attr(TW_Schedule::today()); ?>"></label></p>
                         <p><label>Αρχείο απόδειξης (προαιρετικό)<br><input type="file" name="receipt_file" accept=".pdf,.jpg,.jpeg,.png"></label></p>
@@ -610,7 +610,7 @@ final class TW_Admin {
                             <p><label>Διεύθυνση<input type="text" name="address" value="<?php echo esc_attr($w->address); ?>"></label></p>
                             <p><label>Τ.Κ.<input type="text" name="postcode" value="<?php echo esc_attr($w->postcode); ?>"></label></p>
                             <p><label>Πόλη / Περιοχή<input type="text" name="city" value="<?php echo esc_attr($w->city); ?>"></label></p>
-                            <p><label>ΑΦΜ συνεργάτη<input type="text" name="partner_vat" value="<?php echo esc_attr($w->partner_vat); ?>"></label></p>
+                            <p><label>ΑΦΜ συνεργάτη</label><?php echo TW_Util::tax_id_field('partner_vat', 'partner_country', (string) $w->partner_vat, $w->partner_country ?: 'GR', '', false); // phpcs:ignore ?></p>
                             <p><label>Email συνεργάτη<input type="email" name="partner_email" value="<?php echo esc_attr($w->partner_email); ?>"></label></p>
                             <p><label>Αριθμός παραστατικού<input type="text" name="invoice_number" value="<?php echo esc_attr($w->invoice_number); ?>"></label></p>
                         </div>
@@ -1830,11 +1830,13 @@ final class TW_Admin {
         $date = self::post('performed_date');
         $valid = false;
         foreach (TW_Schedule::milestones($w->purchase_date, $w->warranty_end) as $m) if ($m['type'] === 'service' && $m['no'] === $no) $valid = true;
-        $vat = preg_replace('/\D/', '', self::post('technician_vat'));
+        $tech_country = strtoupper(sanitize_key(self::post('technician_country'))) ?: 'GR';
+        if (!isset(TW_Util::countries()[$tech_country])) $tech_country = 'GR';
+        [$vat, $vat_err] = self::post('technician_vat') === '' ? ['', null] : TW_Util::tax_id($tech_country, self::post('technician_vat'));
         if (!$valid || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             self::flash('Μη έγκυρα στοιχεία Service.', 'error');
-        } elseif ($vat !== '' && !TW_Util::valid_afm($vat)) {
-            self::flash('Ο ΑΦΜ τεχνικού δεν είναι έγκυρος.', 'error');
+        } elseif ($vat_err) {
+            self::flash('Τεχνικός: ' . $vat_err, 'error');
         } else {
             $rd = self::post('receipt_date');
             $receipt = ['file' => '', 'name' => '', 'number' => sanitize_text_field(self::post('receipt_number')),
@@ -1846,7 +1848,7 @@ final class TW_Admin {
                 $receipt['name'] = $file['name'];
             }
             TW_Warranty::record_service($w, $no, $date, self::post('performed_by') === 'thermic' ? 'thermic' : 'partner',
-                sanitize_text_field(self::post('technician')), !empty($_POST['genuine_parts']), sanitize_textarea_field(self::post('notes')), $vat, $receipt);
+                sanitize_text_field(self::post('technician')), !empty($_POST['genuine_parts']), sanitize_textarea_field(self::post('notes')), $vat, $receipt, $tech_country);
             self::flash(sprintf('Καταχωρήθηκε το %dο Service.', $no));
         }
         self::back('tw-warranties', ['view' => $w->id]);
@@ -1943,7 +1945,8 @@ final class TW_Admin {
             'address' => sanitize_text_field(self::post('address')),
             'postcode' => preg_replace('/\s+/', '', sanitize_text_field(self::post('postcode'))),
             'city' => sanitize_text_field(self::post('city')),
-            'partner_vat' => preg_replace('/\D/', '', self::post('partner_vat')),
+            'partner_vat' => trim(self::post('partner_vat')),
+            'partner_country' => isset(TW_Util::countries()[strtoupper(self::post('partner_country'))]) ? strtoupper(self::post('partner_country')) : 'GR',
             'partner_email' => strtolower(sanitize_email(self::post('partner_email'))),
             'invoice_number' => sanitize_text_field(self::post('invoice_number')),
         ];
@@ -1953,7 +1956,10 @@ final class TW_Admin {
         if (!is_email($new['email'])) $errors[] = 'email';
         if (!TW_Util::valid_mobile($new['phone_mobile'])) $errors[] = 'κινητό';
         if (self::post('phone_landline') !== '' && $new['phone_landline'] === '') $errors[] = 'σταθερό';
-        if ($new['partner_vat'] !== '' && !TW_Util::valid_afm($new['partner_vat'])) $errors[] = 'ΑΦΜ συνεργάτη';
+        if ($new['partner_vat'] !== '') {
+            [$new['partner_vat'], $vat_err] = TW_Util::tax_id($new['partner_country'], $new['partner_vat']);
+            if ($vat_err) $errors[] = 'ΑΦΜ συνεργάτη (' . $vat_err . ')';
+        }
         if ($new['partner_email'] !== '' && !is_email($new['partner_email'])) $errors[] = 'email συνεργάτη';
         if ($errors) {
             self::flash('Δεν αποθηκεύτηκε – ελέγξτε: ' . esc_html(implode(', ', $errors)) . '.', 'error');
@@ -2065,6 +2071,7 @@ final class TW_Admin {
             'postcode' => ['Τ.Κ.', function ($r) { return $r->postcode; }],
             'city' => ['Πόλη', function ($r) { return $r->city; }],
             'partner_vat' => ['ΑΦΜ συνεργάτη', function ($r) { return $r->partner_vat; }],
+            'partner_country' => ['Χώρα συνεργάτη', function ($r) { return TW_Util::countries()[$r->partner_country ?: 'GR'] ?? $r->partner_country; }],
             'partner_email' => ['Email συνεργάτη', function ($r) { return $r->partner_email; }],
             'invoice_number' => ['Αριθμός παραστατικού', function ($r) { return $r->invoice_number; }],
             'purchase_date' => ['Ημερομηνία αγοράς', function ($r) { return TW_Util::date_label($r->purchase_date); }],
