@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.7.0';
+    const DB_VERSION = '1.8.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -196,7 +196,27 @@ final class TW_DB {
   KEY warranty_id (warranty_id),
   KEY serial_id (serial_id),
   KEY created_at (created_at),
-  KEY action (action)
+  KEY action (action),
+  KEY actor (actor)
+) $c;");
+
+        // Archived activity log entries (same columns and signatures; ids kept).
+                dbDelta("CREATE TABLE {$t('events_archive')} (
+  id bigint(20) unsigned NOT NULL,
+  warranty_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  serial_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  actor varchar(100) NOT NULL DEFAULT '',
+  action varchar(50) NOT NULL,
+  details text NULL,
+  ip varchar(45) NOT NULL DEFAULT '',
+  sig varchar(64) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY warranty_id (warranty_id),
+  KEY serial_id (serial_id),
+  KEY created_at (created_at),
+  KEY action (action),
+  KEY actor (actor)
 ) $c;");
 
         update_option(self::DB_VERSION_OPTION, self::DB_VERSION);

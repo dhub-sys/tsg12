@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -440,7 +440,9 @@ final class TW_Admin {
         $timeline = TW_Warranty::timeline($w);
         $consents = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('consents') . " WHERE warranty_id = %d ORDER BY id", $id));
         $notes = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('notifications') . " WHERE warranty_id = %d ORDER BY id DESC", $id));
-        $events = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('events') . " WHERE warranty_id = %d ORDER BY id DESC", $id));
+        // The newest entries on the card; the full history is in the activity log (team managers).
+        $events_total = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . TW_DB::table('events') . " WHERE warranty_id = %d", $id));
+        $events = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('events') . " WHERE warranty_id = %d ORDER BY id DESC LIMIT 200", $id));
         $post = self::url();
         $ms_labels = ['done' => 'Καταχωρήθηκε – ελέγχθηκε', 'due' => 'Εκκρεμεί καταχώρηση', 'missed' => 'Δεν καταχωρήθηκε', 'upcoming' => 'Προσεχώς', 'before_registration' => 'Πριν από την ενεργοποίηση', 'expired' => 'Έληξε', 'submitted' => 'Καταχωρήθηκε από τον πελάτη', 'rejected' => 'Απορρίφθηκε – αναμένεται νέα υποβολή'];
         $history = TW_Warranty::services_history($w->id);
@@ -644,6 +646,7 @@ final class TW_Admin {
             <?php self::notifications_table($notes, false); ?>
 
             <h2>Ιστορικό</h2>
+            <?php if ($events_total > count($events)) : ?><p class="description">Εμφανίζονται οι <?php echo count($events); ?> πιο πρόσφατες από <?php echo (int) $events_total; ?> καταγραφές.<?php if (self::can_admin()) : ?> Όλες στο <a href="<?php echo esc_url(TW_App::admin_url('log', ['from' => substr($w->created_at, 0, 10), 'wid' => $w->id])); ?>">Ημερολόγιο</a> (όσες έχουν αρχειοθετηθεί, στην καρτέλα «Αρχείο»).<?php endif; ?></p><?php endif; ?>
             <table class="widefat striped"><thead><tr><th>Ημ/νία</th><th>Ενέργεια</th><th>Από</th><th>Λεπτομέρειες</th></tr></thead><tbody>
             <?php foreach ($events as $e) : ?>
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($e->created_at)); ?></td><td><?php echo esc_html(self::event_label($e->action)); ?></td><td><?php echo esc_html(self::actor_label($e->actor)); ?></td><td><small><?php echo esc_html(self::event_details($e->details)); ?></small></td></tr>
@@ -1507,6 +1510,8 @@ final class TW_Admin {
     public static function page_log() { TW_Activity::page(); }
     public static function handle_log_export() { TW_Activity::export(); }
     public static function handle_log_verify() { TW_Activity::verify_action(); }
+    public static function handle_log_archive() { TW_Activity::archive_action(); }
+    public static function handle_log_archive_settings() { TW_Activity::archive_settings_action(); }
 
     public static function page_changelog() {
         $log = include TW_DIR . 'includes/changelog.php';

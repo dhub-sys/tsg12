@@ -105,6 +105,7 @@ final class TW_Cron {
      * @return array summary lines
      */
     public static function run($today = null) {
+        TW_Activity::auto_archive();
         global $wpdb;
         $today = $today ?: TW_Schedule::today();
         $s = TW_Settings::all();

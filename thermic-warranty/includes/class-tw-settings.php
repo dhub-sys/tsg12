@@ -67,6 +67,8 @@ final class TW_Settings {
             'otp_minutes' => 2,
             // Countries offered next to the partner / technician tax number (Greece is always offered).
             'tax_countries' => ['GR', 'CY', 'AE', 'QA', 'XX'],
+            // Activity log entries older than this many years move to the archive automatically (0 = never).
+            'log_archive_years' => 0,
             'portal_url' => '',
             'register_url' => '',
             'privacy_url' => '',
