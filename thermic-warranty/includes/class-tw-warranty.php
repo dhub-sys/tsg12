@@ -409,6 +409,18 @@ final class TW_Warranty {
             if ($sv->receipt_file && ($p = TW_Util::invoice_path($sv->receipt_file))) @unlink($p);
         }
         $wpdb->update(TW_DB::table('services'), ['receipt_file' => '', 'receipt_original_name' => ''], ['warranty_id' => $w->id]);
+        // Activity log: replace the customer's email, phones and name, drop their IP, and sign the entries again.
+        $anon = 'anon-' . $w->id . '@invalid';
+        $repl = array_filter([(string) $w->email => $anon, (string) $w->phone_mobile => '', (string) $w->phone_landline => '', (string) $w->customer_name => '[ανωνυμοποιήθηκε]'], function ($v, $k) { return $k !== ''; }, ARRAY_FILTER_USE_BOTH);
+        // This warranty's entries; the customer's general entries only if no other warranty of theirs remains.
+        $others = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . TW_DB::table('warranties') . " WHERE email = %s AND id <> %d AND anonymized_at IS NULL", $w->email, $w->id));
+        $sql = $others ? "SELECT * FROM " . TW_DB::table('events') . " WHERE warranty_id = %d" : "SELECT * FROM " . TW_DB::table('events') . " WHERE warranty_id = %d OR (warranty_id = 0 AND actor = %s)";
+        foreach ($wpdb->get_results($others ? $wpdb->prepare($sql, $w->id) : $wpdb->prepare($sql, $w->id, 'customer:' . $w->email)) as $ev) {
+            $new = ['actor' => strtr((string) $ev->actor, $repl), 'details' => strtr((string) $ev->details, $repl)];
+            if (strpos($ev->actor, 'customer:') === 0) $new['ip'] = '';
+            $wpdb->update(TW_DB::table('events'), $new, ['id' => $ev->id]);
+            TW_DB::sign_event((int) $ev->id);
+        }
         TW_DB::log_event('anonymized', '', $w->id, $w->serial_id, $actor);
     }
 }

@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.6.0';
+    const DB_VERSION = '1.7.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -189,10 +189,14 @@ final class TW_DB {
   actor varchar(100) NOT NULL DEFAULT '',
   action varchar(50) NOT NULL,
   details text NULL,
+  ip varchar(45) NOT NULL DEFAULT '',
+  sig varchar(64) NOT NULL DEFAULT '',
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
   KEY warranty_id (warranty_id),
-  KEY serial_id (serial_id)
+  KEY serial_id (serial_id),
+  KEY created_at (created_at),
+  KEY action (action)
 ) $c;");
 
         update_option(self::DB_VERSION_OPTION, self::DB_VERSION);
@@ -215,7 +219,26 @@ final class TW_DB {
             'actor' => $actor,
             'action' => $action,
             'details' => is_string($details) ? $details : wp_json_encode($details, JSON_UNESCAPED_UNICODE),
+            // Who did it from where (not for automatic tasks).
+            'ip' => strpos($actor, 'system') === 0 ? '' : TW_Util::client_ip(),
             'created_at' => self::now(),
         ]);
+        if ($wpdb->insert_id) self::sign_event((int) $wpdb->insert_id);
+    }
+
+    /**
+     * Tamper evidence for the activity log: each entry is signed with a key derived from the site's secret keys
+     * in wp-config.php (not stored in the database), so an entry edited directly in the database no longer matches.
+     */
+    public static function event_signature($row) {
+        $row = (object) $row;
+        $data = implode('|', [(int) $row->id, (int) $row->warranty_id, (int) $row->serial_id, (string) $row->actor, (string) $row->action, (string) $row->details, (string) $row->ip, (string) $row->created_at]);
+        return hash_hmac('sha256', $data, wp_salt('auth') . 'tw-activity-log');
+    }
+
+    public static function sign_event($id) {
+        global $wpdb;
+        $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM " . self::table('events') . " WHERE id = %d", $id));
+        if ($row) $wpdb->update(self::table('events'), ['sig' => self::event_signature($row)], ['id' => $id]);
     }
 }

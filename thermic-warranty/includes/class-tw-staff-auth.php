@@ -17,6 +17,7 @@ final class TW_Staff_Auth {
 
         if ($action === 'tw_logout') {
             if (is_user_logged_in() && isset($_GET['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'tw_logout')) {
+                TW_DB::log_event('staff_logout');
                 wp_logout();
             }
             wp_safe_redirect(TW_App::admin_url());
@@ -43,6 +44,7 @@ final class TW_Staff_Auth {
             return ['step' => $back, 'email' => $email, 'error' => $guard];
         }
         if (self::blocked()) {
+            TW_DB::log_event('staff_login_blocked', ['email' => isset($_POST['email']) ? strtolower(sanitize_email(wp_unslash($_POST['email']))) : ''], 0, 0, 'visitor');
             return ['step' => 'login', 'error' => 'Πάρα πολλές αποτυχημένες προσπάθειες. Δοκιμάστε ξανά σε 15 λεπτά.'];
         }
 
@@ -140,6 +142,7 @@ final class TW_Staff_Auth {
         $auth = $user ? wp_authenticate($user->user_login, $password) : null;
         if (!$user || is_wp_error($auth)) {
             self::fail();
+            TW_DB::log_event('staff_login_failed', ['email' => $email, 'reason' => $user ? 'λάθος κωδικός πρόσβασης' : 'άγνωστο email'], 0, 0, 'visitor');
             return ['step' => 'login', 'email' => $email, 'error' => 'Λάθος email ή κωδικός πρόσβασης.'];
         }
         if (!TW_Settings::get('staff_2fa')) self::sign_in($auth);
@@ -156,6 +159,7 @@ final class TW_Staff_Auth {
         $res = TW_OTP::verify('staff', strtolower($user->user_email), $code, $user->ID);
         if (is_wp_error($res)) {
             self::fail();
+            TW_DB::log_event('staff_otp_failed', ['email' => $email, 'reason' => $res->get_error_message()], 0, 0, 'visitor');
             return ['step' => 'otp', 'email' => $email, 'error' => $res->get_error_message()];
         }
         TW_OTP::mark_used($res['row']->id);

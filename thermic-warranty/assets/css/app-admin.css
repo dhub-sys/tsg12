@@ -433,3 +433,16 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .tw-country-grid label { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
 .tw-country-grid input { margin: 0; }
 .tw-country-grid .tw-cc { display: inline-block; min-width: 2.4em; font-weight: 600; font-size: 12px; color: #4b5563; background: #f3f4f6; border-radius: 4px; text-align: center; padding: 1px 4px; }
+
+/* 1.21 – Ημερολόγιο */
+.tw-log-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tw-log-filters label { display: inline-flex; gap: 6px; align-items: center; }
+.tw-log-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 12px; }
+.tw-log-table td { vertical-align: top; font-size: 13px; }
+.tw-log-details { max-width: 420px; word-break: break-word; }
+.tw-nowrap { white-space: nowrap; }
+.tw-who { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: #eef0f3; color: #374151; }
+.tw-who--customer { background: #e0f2fe; color: #075985; }
+.tw-who--team { background: #ede9fe; color: #5b21b6; }
+.tw-who--visitor { background: #fee2e2; color: #991b1b; }
+.tw-log-bad { color: #b91c1c; font-weight: 700; font-size: 12px; }

@@ -57,6 +57,14 @@ final class TW_Cron {
             $data['delivery_status'] = 'sent';
         }
         $wpdb->update(TW_DB::table('notifications'), $data, ['id' => $id]);
+        // Activity log (activation messages are logged separately by the activation itself).
+        $row = $wpdb->get_row($wpdb->prepare("SELECT n.*, w.serial_id FROM " . TW_DB::table('notifications') . " n LEFT JOIN " . TW_DB::table('warranties') . " w ON w.id = n.warranty_id WHERE n.id = %d", $id));
+        if ($row && $row->milestone_key !== 'activation' && $data['status'] !== 'skipped') {
+            TW_DB::log_event($data['status'] === 'sent' ? 'message_sent' : 'message_failed', array_filter([
+                'message' => self::row_label($row), 'channel' => ['email' => 'email', 'sms' => 'SMS', 'partner' => 'email συνεργάτη'][$row->channel] ?? $row->channel,
+                'to' => $row->recipient, 'reason' => $data['error'],
+            ]), (int) $row->warranty_id, (int) $row->serial_id, 'system');
+        }
     }
 
     /** Records a one-off message (e.g. the activation confirmation) in the notifications log. */
@@ -214,6 +222,7 @@ final class TW_Cron {
             'Εγγυήσεις που έληξαν ή κλείδωσαν' => [],
             'Νέες ενεργοποιήσεις' => [],
             'Υποβολές Service από πελάτες' => [],
+            'Ασφάλεια' => [],
             'Άλλες ενέργειες' => [],
         ];
         // Reminders (and one-off messages) sent in the period.
@@ -233,13 +242,16 @@ final class TW_Cron {
         }
         // Events in the period.
         $map = ['locked' => 'Εγγυήσεις που έληξαν ή κλείδωσαν', 'status_expired' => 'Εγγυήσεις που έληξαν ή κλείδωσαν', 'activated' => 'Νέες ενεργοποιήσεις',
-            'fallback_sent' => 'Μηνύματα που δεν παραδόθηκαν', 'erasure_requested' => 'Άλλες ενέργειες', 'customer_corrected' => 'Άλλες ενέργειες', 'status_active' => 'Άλλες ενέργειες', 'status_void' => 'Άλλες ενέργειες'];
+            'fallback_sent' => 'Μηνύματα που δεν παραδόθηκαν', 'erasure_requested' => 'Άλλες ενέργειες', 'customer_corrected' => 'Άλλες ενέργειες', 'status_active' => 'Άλλες ενέργειες', 'status_void' => 'Άλλες ενέργειες',
+            'staff_login_failed' => 'Ασφάλεια', 'staff_otp_failed' => 'Ασφάλεια', 'staff_login_blocked' => 'Ασφάλεια', 'access_blocked' => 'Ασφάλεια',
+            'ip_lock_on' => 'Ασφάλεια', 'ip_lock_off' => 'Ασφάλεια', 'ip_lock_changed' => 'Ασφάλεια', 'team_added' => 'Ασφάλεια', 'team_removed' => 'Ασφάλεια',
+            'staff_password_set' => 'Ασφάλεια', 'backup_restored' => 'Ασφάλεια'];
         $in = implode(',', array_fill(0, count($map), '%s'));
         foreach ($wpdb->get_results($wpdb->prepare(
             "SELECT e.*, s.serial_no, w.warranty_code, w.customer_name FROM $e e LEFT JOIN $w w ON w.id = e.warranty_id LEFT JOIN $sr s ON s.id = w.serial_id
              WHERE e.action IN ($in) AND e.created_at >= %s AND e.created_at < %s ORDER BY e.id", array_merge(array_keys($map), [$since, $until]))) as $row) {
-            $label = TW_Admin::event_label($row->action);
-            $target = $row->serial_no ? $who($row) : TW_Admin::actor_label($row->actor);
+            $label = TW_Activity::label($row->action);
+            $target = $row->serial_no ? $who($row) : TW_Activity::who($row->actor) . ($row->ip ? ' – IP ' . $row->ip : '');
             $details = TW_Admin::event_details($row->details);
             if ($row->action === 'activated') $details = '';
             $sections[$map[$row->action]][] = $label . ': ' . $target . ($details !== '' ? ' – ' . $details : '');

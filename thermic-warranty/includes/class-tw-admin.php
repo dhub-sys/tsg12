@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -33,6 +33,7 @@ final class TW_Admin {
         if (self::can_admin()) {
             $screens['team'] = ['Ομάδα', 'users', 'page_team'];
             $screens['backups'] = ['Αντίγραφα ασφαλείας', 'database', 'page_backups'];
+            $screens['log'] = ['Ημερολόγιο', 'scroll', 'page_log'];
         }
         $screens['settings'] = ['Ρυθμίσεις', 'settings', 'page_settings'];
         $screens['help'] = ['Οδηγός χρήσης', 'book', 'page_help'];
@@ -61,6 +62,7 @@ final class TW_Admin {
             'cloud' => '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
             'plus' => '<path d="M5 12h14"/><path d="M12 5v14"/>',
             'upload' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+            'scroll' => '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
             'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
             'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
         ];
@@ -179,6 +181,7 @@ final class TW_Admin {
             'invoice_downloaded' => 'Προβολή παραστατικού αγοράς', 'card_printed' => 'Εκτύπωση καρτέλας', 'staff_login' => 'Σύνδεση στο διαχειριστικό', 'locked' => 'Οριστικό κλείδωμα', 'status_active' => 'Κατάσταση: Ενεργή', 'status_expired' => 'Κατάσταση: Έληξε',
             'status_void' => 'Κατάσταση: Ακυρωμένη', 'status_locked' => 'Κατάσταση: Κλειδωμένη', 'customer_corrected' => 'Διόρθωση στοιχείων πελάτη', 'anonymized' => 'Ανωνυμοποίηση στοιχείων',
             'email_undeliverable' => 'Το email δεν παραδόθηκε', 'sms_undeliverable' => 'Το SMS δεν παραδόθηκε', 'fallback_sent' => 'Αποστολή από εναλλακτικό κανάλι',
+            'warranty_viewed' => 'Προβολή καρτέλας από την ομάδα',
             'erasure_requested' => 'Αίτημα διαγραφής από τον πελάτη', 'erasure_processed' => 'Εκτέλεση αιτήματος διαγραφής',
         ];
         return $map[$action] ?? $action;
@@ -200,7 +203,7 @@ final class TW_Admin {
         $names = ['note' => 'Αιτιολογία', 'milestone' => 'Service', 'date' => 'Ημερομηνία', 'technician_vat' => 'ΑΦΜ τεχνικού', 'warranty_code' => 'Κωδικός',
             'terms_version' => 'Όροι έκδοσης', 'email' => 'Email', 'by' => 'Από', 'genuine_parts' => 'Γνήσια ανταλλακτικά', 'to' => 'Παραλήπτης', 'reason' => 'Λόγος',
             'step' => 'Βήμα', 'after_failed' => 'Μετά από αποτυχία', 'source' => 'Πηγή', 'customer_name' => 'Ονοματεπώνυμο', 'phone_mobile' => 'Κινητό',
-            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'partner_country' => 'Χώρα συνεργάτη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
+            'phone_landline' => 'Σταθερό', 'address' => 'Διεύθυνση', 'postcode' => 'Τ.Κ.', 'city' => 'Πόλη', 'changed' => 'Αλλαγές', 'partner_country' => 'Χώρα συνεργάτη', 'partner_vat' => 'ΑΦΜ συνεργάτη',
             'partner_email' => 'Email συνεργάτη', 'invoice_number' => 'Αριθμός παραστατικού'];
         $out = [];
         foreach ($d as $k => $v) {
@@ -377,6 +380,12 @@ final class TW_Admin {
 
     public static function page_warranties() {
         if (!empty($_GET['view'])) {
+            // Who looked at a customer's card (once per person and card every 30 minutes).
+            $vk = 'tw_viewed_' . get_current_user_id() . '_' . (int) $_GET['view'];
+            if (!get_transient($vk) && ($vw = TW_Warranty::get((int) $_GET['view']))) {
+                set_transient($vk, 1, 30 * MINUTE_IN_SECONDS);
+                TW_DB::log_event('warranty_viewed', '', $vw->id, $vw->serial_id);
+            }
             self::page_warranty((int) $_GET['view']);
             return;
         }
@@ -1495,6 +1504,10 @@ final class TW_Admin {
         include TW_DIR . 'templates/help.php';
     }
 
+    public static function page_log() { TW_Activity::page(); }
+    public static function handle_log_export() { TW_Activity::export(); }
+    public static function handle_log_verify() { TW_Activity::verify_action(); }
+
     public static function page_changelog() {
         $log = include TW_DIR . 'includes/changelog.php';
         ?>
@@ -1758,7 +1771,19 @@ final class TW_Admin {
             wp_safe_redirect(TW_App::admin_url('settings', ['tab' => $tab]));
             exit;
         }
+        $before = TW_Settings::all();
         TW_Settings::update($values);
+        // What changed, for the activity log; secrets are noted as changed without their values.
+        $secret = ['brevo_api_key', 'turnstile_secret', 'backup_password', 'backup_gdrive_client_secret', 'backup_onedrive_client_secret', 'backup_dropbox_app_secret', 'backup_ftp_password', 'sms_headers', 'brevo_webhook_token'];
+        $changed = [];
+        foreach ($values as $k => $v) {
+            $o = $before[$k] ?? null;
+            if (wp_json_encode($o) === wp_json_encode($v)) continue;
+            if (in_array($k, $secret, true)) $changed[] = $k . ' (άλλαξε)';
+            elseif (is_array($v) || is_array($o) || mb_strlen((string) $v) > 60 || mb_strlen((string) $o) > 60) $changed[] = $k;
+            else $changed[] = $k . ': ' . ((string) $o === '' ? '—' : (string) $o) . ' → ' . ((string) $v === '' ? '—' : (string) $v);
+        }
+        if ($changed) TW_DB::log_event('settings_saved', ['section' => $tab, 'changed' => implode(' · ', $changed)]);
         self::flash($msg);
         self::back('tw-settings', ['tab' => $tab]);
     }

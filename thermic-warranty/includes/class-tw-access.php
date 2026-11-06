@@ -115,6 +115,7 @@ final class TW_Access {
         if (!is_array($log)) $log = [];
         array_unshift($log, ['at' => TW_DB::now(), 'ip' => $ip, 'path' => mb_substr(strtok((string) ($_SERVER['REQUEST_URI'] ?? ''), '?'), 0, 120)]);
         update_option($key, array_slice($log, 0, 50), false);
+        TW_DB::log_event('access_blocked', ['reason' => 'IP εκτός λίστας'], 0, 0, 'visitor');
         status_header(403);
         nocache_headers();
         $s = TW_Settings::all();
