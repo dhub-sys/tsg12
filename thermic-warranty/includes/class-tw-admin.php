@@ -36,6 +36,7 @@ final class TW_Admin {
         }
         $screens['settings'] = ['Ρυθμίσεις', 'settings', 'page_settings'];
         $screens['help'] = ['Οδηγός χρήσης', 'book', 'page_help'];
+        $screens['changelog'] = ['Ιστορικό εκδόσεων', 'history', 'page_changelog'];
         return $screens;
     }
 
@@ -60,6 +61,7 @@ final class TW_Admin {
             'cloud' => '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
             'plus' => '<path d="M5 12h14"/><path d="M12 5v14"/>',
             'upload' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+            'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
             'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
         ];
         if (!isset($paths[$name])) return '';
@@ -1472,6 +1474,24 @@ final class TW_Admin {
     public static function page_help() {
         $s = TW_Settings::all();
         include TW_DIR . 'templates/help.php';
+    }
+
+    public static function page_changelog() {
+        $log = include TW_DIR . 'includes/changelog.php';
+        ?>
+        <div class="wrap tw-wrap">
+            <h1>Ιστορικό εκδόσεων</h1>
+            <p class="description" style="max-width:760px;margin-top:-10px">Οι αλλαγές σε κάθε έκδοση του <?php echo esc_html(TW_App::APP_NAME); ?>, με τη νεότερη πρώτη. Αναλυτικά για κάθε λειτουργία: <a href="<?php echo esc_url(self::url('help')); ?>">Οδηγός χρήσης</a>.</p>
+            <div class="tw-changelog">
+            <?php foreach ($log as $ver => $items) : ?>
+                <section class="tw-help-card tw-changelog-item<?php echo $ver === TW_VERSION ? ' is-current' : ''; ?>">
+                    <h2>Έκδοση <?php echo esc_html($ver); ?><?php if ($ver === TW_VERSION) : ?> <span class="tw-changelog-badge">Τρέχουσα</span><?php endif; ?></h2>
+                    <ul><?php foreach ($items as $it) echo '<li>' . esc_html($it) . '</li>'; ?></ul>
+                </section>
+            <?php endforeach; ?>
+            </div>
+        </div>
+        <?php
     }
 
     // ------------------------------------------------------------------ team

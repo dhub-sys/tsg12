@@ -45,7 +45,7 @@ $user = wp_get_current_user();
         </div>
         <a href="<?php echo esc_url(TW_Staff_Auth::logout_url()); ?>" class="tw-logout"><?php echo TW_Admin::icon('logout'); // phpcs:ignore ?><span>Αποσύνδεση</span></a>
         <div class="tw-credit">
-            <span>Έκδοση <?php echo esc_html(TW_VERSION); ?></span>
+            <a href="<?php echo esc_url(TW_App::admin_url('changelog')); ?>" class="tw-credit-ver">Έκδοση <?php echo esc_html(TW_VERSION); ?></a>
             <span>Developed by <a href="https://www.dazzlink.gr" target="_blank" rel="noopener">Dazzlink</a></span>
         </div>
     </div>
