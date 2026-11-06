@@ -122,6 +122,26 @@ $user = wp_get_current_user();
         var x = document.createElement('button'); x.type = 'button'; x.className = 'tw-dismiss'; x.setAttribute('aria-label', 'Κλείσιμο'); x.textContent = '×';
         x.onclick = function () { n.remove(); }; n.appendChild(x);
     });
+    // Export dialogs: choose columns and headers, then download (the page stays as it is).
+    document.querySelectorAll('[data-tw-dialog]').forEach(function (b) {
+        var dlg = document.getElementById(b.getAttribute('data-tw-dialog'));
+        if (!dlg) return;
+        b.addEventListener('click', function () { dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', ''); });
+        dlg.querySelectorAll('[data-tw-close]').forEach(function (c) { c.addEventListener('click', function () { dlg.close(); }); });
+        dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+        var boxes = dlg.querySelectorAll('input[name="cols[]"]');
+        dlg.querySelectorAll('[data-tw-cols]').forEach(function (t) {
+            t.addEventListener('click', function () {
+                var m = t.getAttribute('data-tw-cols');
+                boxes.forEach(function (c) { c.checked = m !== 'none'; });
+                if (m === 'reset') dlg.querySelectorAll('input[name^="lbl["]').forEach(function (i) { i.value = ''; });
+            });
+        });
+        dlg.querySelector('form').addEventListener('submit', function (e) {
+            if (![].some.call(boxes, function (c) { return c.checked; })) { e.preventDefault(); window.alert('Επιλέξτε τουλάχιστον μία στήλη.'); return; }
+            setTimeout(function () { dlg.close(); }, 300);
+        });
+    });
 })();
 </script>
 </body>

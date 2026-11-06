@@ -393,3 +393,22 @@ h1 .page-title-action, h1 .tw-badge { margin-left: 4px; }
 .tw-otp-timer { margin: 6px 0 14px; font-size: 13px; font-weight: 500; color: #4b5563; }
 .tw-otp-timer.is-low { color: #b45309; font-weight: 600; }
 .tw-otp-timer.is-expired { color: #b91c1c; font-weight: 600; }
+
+/* 1.19 – export dialog: choose columns and headers */
+.tw-dialog { border: 0; border-radius: 16px; padding: 0; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); box-shadow: 0 24px 60px rgba(15, 19, 32, .28); color: inherit; }
+.tw-dialog::backdrop { background: rgba(15, 19, 32, .45); }
+.tw-dialog form { padding: 22px 24px 18px; margin: 0; display: flex; flex-direction: column; max-height: calc(100vh - 48px); box-sizing: border-box; }
+.tw-export-scroll { overflow: auto; flex: 1 1 auto; min-height: 120px; border: 1px solid #e5e7eb; border-radius: 10px; }
+.tw-export-cols thead th { position: sticky; top: 0; background: #f9fafb; z-index: 1; }
+.tw-dialog h2 { margin: 0 0 6px; font-size: 20px; }
+.tw-dialog .description { margin: 0 0 10px; }
+.tw-export-tools { margin: 10px 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.tw-export-cols { width: 100%; border-collapse: collapse; }
+.tw-export-cols th { text-align: left; font-size: 12px; text-transform: none; color: #4b5563; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+.tw-export-cols td { padding: 3px 8px; border-bottom: 1px solid #f1f2f4; vertical-align: middle; }
+.tw-export-cols td:first-child { width: 28px; }
+.tw-export-cols td:nth-child(2) { white-space: nowrap; font-weight: 500; }
+.tw-export-cols input[type=text] { width: 100%; min-width: 0; margin: 0; padding: 4px 10px; min-height: 32px; font-size: 14px; }
+.tw-export-cols input[type=checkbox] { margin: 0; }
+.tw-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin: 14px 0 0; flex: none; }
+@media (max-width: 560px) { .tw-export-cols td:nth-child(2) { white-space: normal; } }

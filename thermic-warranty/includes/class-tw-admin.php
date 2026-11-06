@@ -390,7 +390,7 @@ final class TW_Admin {
         ?>
         <div class="wrap tw-wrap">
             <h1 class="wp-heading-inline">Εγγυήσεις &amp; πελάτες</h1>
-            <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή Excel (με τα τρέχοντα φίλτρα)</a>
+            <?php self::export_button('warranties', $export, 'Εξαγωγή Excel (με τα τρέχοντα φίλτρα)'); ?>
             <?php self::notice(); ?>
             <form method="get" class="tw-filters">
                 <?php self::get_form_fields('warranties'); ?>
@@ -693,7 +693,7 @@ final class TW_Admin {
         ?>
         <div class="wrap tw-wrap">
             <h1 class="wp-heading-inline">Σειριακοί αριθμοί</h1>
-            <a class="page-title-action" href="<?php echo esc_url($export); ?>">Εξαγωγή Excel</a>
+            <?php self::export_button('serials', $export, 'Εξαγωγή Excel'); ?>
             <?php self::notice(); ?>
             <?php if ($result) : ?>
                 <div class="notice notice-info"><p><strong>Αποτέλεσμα εισαγωγής <?php echo esc_html($result['batch']); ?>:</strong>
@@ -2017,49 +2017,141 @@ final class TW_Admin {
         self::back('tw-settings', ['tab' => $tab]);
     }
 
+    /** Exportable columns per list: key => [default header, value]. Order here = order in the file. */
+    public static function export_columns($type) {
+        if ($type === 'serials') {
+            $sl = TW_Util::serial_status_labels();
+            return [
+                'serial' => ['Σειριακός αριθμός', function ($r) { return $r->serial_no; }],
+                'product_code' => ['Κωδικός προϊόντος', function ($r) { return $r->product_code; }],
+                'product_name' => ['Όνομα προϊόντος', function ($r) { return $r->product_name; }],
+                'status' => ['Κατάσταση', function ($r) use ($sl) { return $sl[$r->status] ?? $r->status; }],
+                'batch' => ['Παρτίδα εισαγωγής', function ($r) { return $r->import_batch; }],
+                'created' => ['Καταχώρηση', function ($r) { return TW_Util::datetime_label($r->created_at); }],
+            ];
+        }
+        $wl = TW_Util::status_labels();
+        return [
+            'warranty_code' => ['Κωδικός εγγύησης', function ($r) { return $r->warranty_code; }],
+            'serial' => ['Σειριακός αριθμός', function ($r) { return $r->serial; }],
+            'product_code' => ['Κωδικός προϊόντος', function ($r) { return $r->product_code; }],
+            'product_name' => ['Όνομα προϊόντος', function ($r) { return $r->product_name; }],
+            'status' => ['Κατάσταση', function ($r) use ($wl) { return $wl[$r->status] ?? $r->status; }],
+            'customer_name' => ['Ονοματεπώνυμο', function ($r) { return $r->customer_name; }],
+            'email' => ['Email', function ($r) { return $r->email; }],
+            'phone_mobile' => ['Κινητό', function ($r) { return $r->phone_mobile; }],
+            'phone_landline' => ['Σταθερό', function ($r) { return $r->phone_landline; }],
+            'address' => ['Διεύθυνση', function ($r) { return $r->address; }],
+            'postcode' => ['Τ.Κ.', function ($r) { return $r->postcode; }],
+            'city' => ['Πόλη', function ($r) { return $r->city; }],
+            'partner_vat' => ['ΑΦΜ συνεργάτη', function ($r) { return $r->partner_vat; }],
+            'partner_email' => ['Email συνεργάτη', function ($r) { return $r->partner_email; }],
+            'invoice_number' => ['Αριθμός παραστατικού', function ($r) { return $r->invoice_number; }],
+            'purchase_date' => ['Ημερομηνία αγοράς', function ($r) { return TW_Util::date_label($r->purchase_date); }],
+            'warranty_end' => ['Λήξη εγγύησης', function ($r) { return TW_Util::date_label($r->warranty_end); }],
+            'next_service' => ['Επόμενο Service', function ($r) { $n = TW_Warranty::next_service($r); return $n ? TW_Util::date_label($n['due']) : ''; }],
+            'marketing' => ['Ενημερώσεις & προσφορές', function ($r) { return $r->marketing_opt_in ? 'Ναι' : 'Όχι'; }],
+            'lock_reason' => ['Λόγος κλειδώματος', function ($r) { return $r->lock_reason; }],
+            'created' => ['Ενεργοποίηση', function ($r) { return TW_Util::datetime_label($r->created_at); }],
+        ];
+    }
+
+    /** Columns most recently chosen by this user (or all, by default): [ [key, header], ... ]. */
+    private static function export_choice($type) {
+        $defs = self::export_columns($type);
+        $saved = get_user_meta(get_current_user_id(), 'tw_export_' . $type, true);
+        $out = [];
+        if (is_array($saved) && !empty($saved['cols'])) {
+            foreach ($saved['cols'] as $k) if (isset($defs[$k])) $out[] = [$k, ($saved['labels'][$k] ?? '') !== '' ? $saved['labels'][$k] : $defs[$k][0]];
+        }
+        if (!$out) foreach ($defs as $k => $d) $out[] = [$k, $d[0]];
+        return $out;
+    }
+
+    /** Columns and headers sent from the export dialog; remembered for this user. */
+    private static function export_request($type) {
+        $defs = self::export_columns($type);
+        $cols = isset($_POST['cols']) && is_array($_POST['cols']) ? array_values(array_intersect(array_map('sanitize_key', wp_unslash($_POST['cols'])), array_keys($defs))) : [];
+        if (!$cols) return self::export_choice($type);
+        $in = isset($_POST['lbl']) && is_array($_POST['lbl']) ? wp_unslash($_POST['lbl']) : [];
+        $labels = [];
+        foreach ($defs as $k => $d) {
+            $v = isset($in[$k]) ? mb_substr(trim(sanitize_text_field($in[$k])), 0, 60) : '';
+            if ($v !== '' && $v !== $d[0]) $labels[$k] = $v;
+        }
+        update_user_meta(get_current_user_id(), 'tw_export_' . $type, ['cols' => $cols, 'labels' => $labels]);
+        $out = [];
+        foreach ($cols as $k) $out[] = [$k, $labels[$k] ?? $defs[$k][0]];
+        return $out;
+    }
+
+    /** "Excel export" button + dialog: pick columns, rename headers. $url carries the list's current filters. */
+    private static function export_button($type, $url, $label) {
+        $defs = self::export_columns($type);
+        $choice = self::export_choice($type);
+        $chosen = [];
+        foreach ($choice as $c) $chosen[$c[0]] = $c[1];
+        $id = 'tw-export-' . $type;
+        ?>
+        <button type="button" class="page-title-action" data-tw-dialog="<?php echo esc_attr($id); ?>"><?php echo self::icon('download'); // phpcs:ignore ?> <?php echo esc_html($label); ?></button>
+        <dialog class="tw-dialog" id="<?php echo esc_attr($id); ?>">
+            <form method="post" action="<?php echo esc_url($url); ?>" class="tw-export-form">
+                <h2>Εξαγωγή Excel</h2>
+                <p class="description">Επιλέξτε ποιες στήλες θα έχει το αρχείο και, αν θέλετε, γράψτε άλλη επικεφαλίδα (π.χ. «Ηλ. ταχυδρομείο» αντί για «Email»). Οι επιλογές σας θυμούνται για την επόμενη φορά. Ισχύουν τα φίλτρα της λίστας.</p>
+                <?php if ($type === 'serials') : ?><p class="description">Αν αλλάξετε επικεφαλίδες ή αφαιρέσετε τη στήλη «Σειριακός αριθμός», το αρχείο δεν θα μπορεί να ξαναεισαχθεί όπως είναι.</p><?php endif; ?>
+                <p class="tw-export-tools"><button type="button" class="button" data-tw-cols="all">Όλες</button> <button type="button" class="button" data-tw-cols="none">Καμία</button> <button type="button" class="button" data-tw-cols="reset">Επαναφορά προεπιλογών</button></p>
+                <div class="tw-export-scroll"><table class="tw-export-cols">
+                    <thead><tr><th></th><th>Στήλη</th><th>Επικεφαλίδα στο αρχείο</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($defs as $k => $d) : ?>
+                        <tr>
+                            <td><input type="checkbox" name="cols[]" value="<?php echo esc_attr($k); ?>" id="<?php echo esc_attr($id . '-' . $k); ?>" <?php checked(isset($chosen[$k])); ?>></td>
+                            <td><label for="<?php echo esc_attr($id . '-' . $k); ?>"><?php echo esc_html($d[0]); ?></label></td>
+                            <td><input type="text" name="lbl[<?php echo esc_attr($k); ?>]" value="<?php echo esc_attr(isset($chosen[$k]) && $chosen[$k] !== $d[0] ? $chosen[$k] : ''); ?>" placeholder="<?php echo esc_attr($d[0]); ?>" maxlength="60"></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table></div>
+                <p class="tw-dialog-actions"><button type="submit" class="button button-primary"><?php echo self::icon('download'); // phpcs:ignore ?> Λήψη αρχείου</button> <button type="button" class="button" data-tw-close>Άκυρο</button></p>
+            </form>
+        </dialog>
+        <?php
+    }
+
     public static function handle_export() {
         global $wpdb;
         if (!current_user_can(self::cap())) wp_die('', 403);
         check_admin_referer('tw_export');
         @set_time_limit(0);
-        $type = self::q('type');
+        $type = self::q('type') === 'serials' ? 'serials' : 'warranties';
         $stamp = current_time('Ymd-His');
+        $defs = self::export_columns($type);
+        $cols = self::export_request($type);
+        $x = new TW_Xlsx(array_map(function ($c) { return $c[1]; }, $cols));
+        $row = function ($r) use ($cols, $defs) {
+            return array_map(function ($c) use ($r, $defs) { return (string) call_user_func($defs[$c[0]][1], $r); }, $cols);
+        };
+        $last = 0;
         if ($type === 'serials') {
             $t = TW_DB::table('serials');
             $where = ['1=1']; $p = [];
             if (self::q('s') !== '') { $l = '%' . $wpdb->esc_like(self::q('s')) . '%'; $where[] = '(serial_no LIKE %s OR product_name LIKE %s OR product_code LIKE %s)'; array_push($p, $l, $l, $l); }
             if (self::q('status') !== '') { $where[] = 'status = %s'; $p[] = self::q('status'); }
             if (self::q('batch') !== '') { $where[] = 'import_batch = %s'; $p[] = self::q('batch'); }
-            $labels = TW_Util::serial_status_labels();
-            // The headers are also accepted by the import, so an export can be edited and re-imported.
-            $x = new TW_Xlsx(['Σειριακός αριθμός', 'Κωδικός προϊόντος', 'Όνομα προϊόντος', 'Κατάσταση', 'Παρτίδα εισαγωγής', 'Καταχώρηση']);
-            $last = 0;
             do {
                 $sql = "SELECT id, serial_no, product_code, product_name, status, import_batch, created_at FROM $t WHERE " . implode(' AND ', $where) . ' AND id > %d ORDER BY id LIMIT 2000';
                 $rows = $wpdb->get_results($wpdb->prepare($sql, array_merge($p, [$last])));
-                foreach ($rows as $r) {
-                    $x->add([$r->serial_no, $r->product_code, $r->product_name, $labels[$r->status] ?? $r->status, $r->import_batch, TW_Util::datetime_label($r->created_at)]);
-                    $last = (int) $r->id;
-                }
+                foreach ($rows as $r) { $x->add($row($r)); $last = (int) $r->id; }
             } while (count($rows) === 2000);
-            TW_DB::log_event('serials_exported', ['filters' => array_filter($_GET)]);
+            TW_DB::log_event('serials_exported', ['filters' => array_filter($_GET), 'columns' => count($cols)]);
             $x->download('seiriakoi-' . $stamp . '.xlsx', 'Σειριακοί');
         }
         $where = self::warranty_filters(['s' => self::q('s'), 'status' => self::q('status'), 'expiring' => (int) self::q('expiring'), 'from' => self::q('from'), 'to' => self::q('to')]);
-        $labels = TW_Util::status_labels();
-        $x = new TW_Xlsx(['Κωδικός εγγύησης', 'Σειριακός αριθμός', 'Κωδικός προϊόντος', 'Όνομα προϊόντος', 'Κατάσταση', 'Ονοματεπώνυμο', 'Email', 'Κινητό', 'Σταθερό',
-            'Διεύθυνση', 'Τ.Κ.', 'Πόλη', 'ΑΦΜ συνεργάτη', 'Email συνεργάτη', 'Αριθμός παραστατικού', 'Ημερομηνία αγοράς', 'Λήξη εγγύησης', 'Ενημερώσεις & προσφορές', 'Λόγος κλειδώματος', 'Ενεργοποίηση']);
-        $last = 0;
         do {
             $rows = $wpdb->get_results($wpdb->prepare(TW_Warranty::select_sql() . " WHERE $where AND w.id > %d ORDER BY w.id LIMIT 2000", $last));
-            foreach ($rows as $r) {
-                $x->add([$r->warranty_code, $r->serial, $r->product_code, $r->product_name, $labels[$r->status] ?? $r->status, $r->customer_name, $r->email, $r->phone_mobile, $r->phone_landline,
-                    $r->address, $r->postcode, $r->city, $r->partner_vat, $r->partner_email, $r->invoice_number, TW_Util::date_label($r->purchase_date), TW_Util::date_label($r->warranty_end),
-                    $r->marketing_opt_in ? 'Ναι' : 'Όχι', $r->lock_reason, TW_Util::datetime_label($r->created_at)]);
-                $last = (int) $r->id;
-            }
+            foreach ($rows as $r) { $x->add($row($r)); $last = (int) $r->id; }
         } while (count($rows) === 2000);
-        TW_DB::log_event('warranties_exported', ['filters' => array_filter($_GET)]);
+        TW_DB::log_event('warranties_exported', ['filters' => array_filter($_GET), 'columns' => count($cols)]);
         $x->download('engyiseis-' . $stamp . '.xlsx', 'Εγγυήσεις');
     }
 }
