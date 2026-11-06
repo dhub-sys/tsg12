@@ -32,21 +32,31 @@ $user = wp_get_current_user();
         <?php endforeach; ?>
     </nav>
     <div class="tw-sidebar-foot">
-        <?php $tw_exp = TW_Staff_Auth::session_expires(); if ($tw_exp) : ?>
-        <div class="tw-session" data-expires="<?php echo (int) $tw_exp; ?>" data-now="<?php echo (int) time(); ?>" data-nonce="<?php echo esc_attr(wp_create_nonce('tw_session_refresh')); ?>" data-url="<?php echo esc_url(TW_App::admin_url()); ?>">
-            <?php echo TW_Admin::icon('clock'); // phpcs:ignore ?>
-            <span class="tw-session-text">Η σύνδεση λήγει σε <strong class="tw-session-left">–</strong></span>
-            <button type="button" class="tw-session-refresh" title="Ανανέωση σύνδεσης" aria-label="Ανανέωση σύνδεσης"><?php echo TW_Admin::icon('refresh'); // phpcs:ignore ?></button>
-        </div>
-        <?php endif; ?>
-        <div class="tw-user">
-            <span class="tw-avatar" aria-hidden="true"><?php $parts = preg_split('/\s+/u', trim($user->display_name ?: $user->user_email)); echo esc_html(mb_strtoupper(mb_substr($parts[0], 0, 1) . (isset($parts[1]) ? mb_substr($parts[1], 0, 1) : ''))); ?></span>
-            <span class="tw-user-text"><strong><?php echo esc_html($user->display_name); ?></strong><span><?php echo esc_html($user->user_email); ?></span></span>
-        </div>
-        <a href="<?php echo esc_url(TW_Staff_Auth::logout_url()); ?>" class="tw-logout"><?php echo TW_Admin::icon('logout'); // phpcs:ignore ?><span>Αποσύνδεση</span></a>
-        <div class="tw-credit">
-            <a href="<?php echo esc_url(TW_App::admin_url('changelog')); ?>" class="tw-credit-ver">Έκδοση <?php echo esc_html(TW_VERSION); ?></a>
-            <span>Developed by <a href="https://www.dazzlink.gr" target="_blank" rel="noopener">Dazzlink</a></span>
+        <?php
+        $tw_exp = TW_Staff_Auth::session_expires();
+        $tw_parts = preg_split('/\s+/u', trim($user->display_name ?: $user->user_email));
+        $tw_initials = mb_strtoupper(mb_substr($tw_parts[0], 0, 1) . (isset($tw_parts[1]) ? mb_substr($tw_parts[1], 0, 1) : ''));
+        ?>
+        <div class="tw-account">
+            <div class="tw-account-panel" id="tw-account-panel" hidden>
+                <div class="tw-account-email" title="<?php echo esc_attr($user->user_email); ?>"><?php echo esc_html($user->user_email); ?></div>
+                <a href="<?php echo esc_url(TW_Staff_Auth::logout_url()); ?>" class="tw-logout"><?php echo TW_Admin::icon('logout'); // phpcs:ignore ?><span>Αποσύνδεση</span></a>
+                <div class="tw-credit">
+                    <a href="<?php echo esc_url(TW_App::admin_url('changelog')); ?>" class="tw-credit-ver">Έκδοση <?php echo esc_html(TW_VERSION); ?></a>
+                    <span>Developed by <a href="https://www.dazzlink.gr" target="_blank" rel="noopener">Dazzlink</a></span>
+                </div>
+            </div>
+            <div class="tw-account-bar<?php echo $tw_exp ? ' tw-session' : ''; ?>"<?php if ($tw_exp) : ?> data-expires="<?php echo (int) $tw_exp; ?>" data-now="<?php echo (int) time(); ?>" data-nonce="<?php echo esc_attr(wp_create_nonce('tw_session_refresh')); ?>" data-url="<?php echo esc_url(TW_App::admin_url()); ?>"<?php endif; ?>>
+                <button type="button" class="tw-account-toggle" aria-expanded="false" aria-controls="tw-account-panel" title="Λογαριασμός">
+                    <span class="tw-avatar" aria-hidden="true"><?php echo esc_html($tw_initials); ?></span>
+                    <span class="tw-account-text">
+                        <strong><?php echo esc_html($user->display_name ?: $user->user_email); ?></strong>
+                        <?php if ($tw_exp) : ?><span class="tw-account-session"><?php echo TW_Admin::icon('clock'); // phpcs:ignore ?><span class="tw-session-text">Λήγει σε <strong class="tw-session-left">–</strong></span></span><?php endif; ?>
+                    </span>
+                    <svg class="tw-account-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+                </button>
+                <?php if ($tw_exp) : ?><button type="button" class="tw-session-refresh" title="Ανανέωση σύνδεσης" aria-label="Ανανέωση σύνδεσης"><?php echo TW_Admin::icon('refresh'); // phpcs:ignore ?></button><?php endif; ?>
+            </div>
         </div>
     </div>
 </aside>
@@ -66,6 +76,30 @@ $user = wp_get_current_user();
     function set(open) { document.body.classList.toggle('tw-nav-open', open); b.setAttribute('aria-expanded', open ? 'true' : 'false'); bd.hidden = !open; }
     b.addEventListener('click', function () { set(!document.body.classList.contains('tw-nav-open')); });
     bd.addEventListener('click', function () { set(false); });
+    // Account panel (email, sign out, version) opens upwards from the account bar; the choice is remembered.
+    (function () {
+        var t = document.querySelector('.tw-account-toggle'), panel = document.getElementById('tw-account-panel'); if (!t || !panel) return;
+        function open(on, save) {
+            panel.hidden = !on; t.setAttribute('aria-expanded', on ? 'true' : 'false'); t.closest('.tw-account').classList.toggle('is-open', on);
+            if (save) { try { localStorage.setItem('tw_account_open', on ? '1' : '0'); } catch (e) {} }
+            fade();
+        }
+        try { if (localStorage.getItem('tw_account_open') === '1') open(true, false); } catch (e) {}
+        t.addEventListener('click', function () { open(panel.hidden, true); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { open(false, true); t.focus(); } });
+    })();
+    // Menu: a soft fade at the top/bottom edge when there are more items to scroll to.
+    function fade() {
+        var n = document.querySelector('.tw-nav'); if (!n) return;
+        n.classList.toggle('fade-top', n.scrollTop > 2);
+        n.classList.toggle('fade-bottom', n.scrollTop + n.clientHeight < n.scrollHeight - 2);
+    }
+    (function () {
+        var n = document.querySelector('.tw-nav'); if (!n) return;
+        n.addEventListener('scroll', fade, { passive: true }); window.addEventListener('resize', fade);
+        var a = n.querySelector('a.is-active'); if (a && a.offsetTop + a.offsetHeight > n.clientHeight) n.scrollTop = a.offsetTop - n.clientHeight / 2;
+        fade();
+    })();
     // Session countdown with refresh (the server ends the session at the same moment).
     (function () {
         var box = document.querySelector('.tw-session'); if (!box) return;
