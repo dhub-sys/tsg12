@@ -838,6 +838,25 @@ final class TW_Admin {
                         'both' => 'Και τα δύο: αριθμός, ημερομηνία και αρχείο',
                     ]);
                     $field('invoice_max_mb', 'Μέγιστο μέγεθος αρχείου (MB)', 'number', '', 'min="1" max="50"');
+                    $on = TW_Util::enabled_countries();
+                    ?>
+                    <tr><th>Χώρες για τον ΑΦΜ</th><td>
+                        <p class="description" style="margin-top:0">Ποιες χώρες εμφανίζονται στη λίστα δίπλα στον ΑΦΜ συνεργάτη και τεχνικού (στη φόρμα ενεργοποίησης και στην υποβολή Service). Η Ελλάδα εμφανίζεται πάντα· αν είναι η μόνη, το πεδίο δεν έχει λίστα χωρών. Η «Άλλη χώρα» δέχεται οποιονδήποτε αριθμό φορολογικού μητρώου.</p>
+                        <input type="hidden" name="s[tax_countries][]" value="GR">
+                        <p class="tw-export-tools" style="margin:8px 0"><button type="button" class="button" data-tw-tc="all">Όλες</button> <button type="button" class="button" data-tw-tc="none">Μόνο Ελλάδα</button></p>
+                        <div class="tw-country-grid">
+                            <?php foreach (TW_Util::countries() as $code => $name) : ?>
+                                <label><input type="checkbox" name="s[tax_countries][]" value="<?php echo esc_attr($code); ?>" <?php checked(isset($on[$code])); ?> <?php disabled($code === 'GR'); ?>> <span class="tw-cc"><?php echo esc_html(TW_Util::tax_prefix($code)); ?></span> <?php echo esc_html($name); ?></label>
+                            <?php endforeach; ?>
+                        </div>
+                        <script>
+                        document.querySelectorAll('[data-tw-tc]').forEach(function (b) { b.addEventListener('click', function () {
+                            var all = b.getAttribute('data-tw-tc') === 'all';
+                            document.querySelectorAll('.tw-country-grid input:not([disabled])').forEach(function (c) { c.checked = all; });
+                        }); });
+                        </script>
+                    </td></tr>
+                    <?php
                 elseif ($tab === 'app') :
                     $field('admin_slug', 'Διεύθυνση διαχειριστικού', 'text', 'Το διαχειριστικό ανοίγει στο <code>' . esc_html(home_url('/')) . '<strong>' . esc_html($s['admin_slug']) . '</strong>/</code>.', 'pattern="[a-z0-9\\-]+"');
                     $field('public_slug', 'Διεύθυνση σελίδων πελατών', 'text', 'Ενεργοποίηση: <code>' . esc_html(TW_App::public_url()) . '</code> – Οι εγγυήσεις μου: <code>' . esc_html(TW_App::public_url('my')) . '</code>', 'pattern="[a-z0-9\\-]+"');
@@ -1637,6 +1656,7 @@ final class TW_Admin {
             elseif ($k === 'admin_slug' || $k === 'public_slug') $values[$k] = sanitize_title($v) ?: $defaults[$k];
             elseif ($k === 'invoice_mode') $values[$k] = in_array($v, ['required', 'optional', 'off'], true) ? $v : 'required';
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
+            elseif ($k === 'tax_countries') $values[$k] = array_values(array_intersect(array_keys(TW_Util::countries()), array_map('strtoupper', array_map('sanitize_key', (array) $v))));
             elseif ($k === 'otp_minutes') $values[$k] = in_array((int) $v, TW_OTP::MINUTE_CHOICES, true) ? (int) $v : 2;
             elseif ($k === 'staff_session_minutes') $values[$k] = in_array((int) $v, TW_Staff_Auth::SESSION_CHOICES, true) ? (int) $v : 120;
             elseif ($k === 'pdf_watermark') $values[$k] = in_array($v, ['text', 'logo', 'none'], true) ? $v : 'text';

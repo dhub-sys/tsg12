@@ -75,6 +75,13 @@ final class TW_Util {
         ];
     }
 
+    /** Countries offered in the forms (Settings → Γενικά), in the order of countries(); Greece always first. */
+    public static function enabled_countries() {
+        $on = (array) TW_Settings::get('tax_countries');
+        $on[] = 'GR';
+        return array_intersect_key(self::countries(), array_flip($on));
+    }
+
     /** What the tax number is called for a country (for labels and messages). */
     public static function tax_id_label($country) {
         if ($country === 'GR' || $country === '') return 'ΑΦΜ';
@@ -122,10 +129,16 @@ final class TW_Util {
      */
     public static function tax_id_field($vat_name, $country_name, $value = '', $country = 'GR', $id = '', $required = true) {
         $country = isset(self::countries()[$country]) ? $country : 'GR';
+        $list = self::enabled_countries();
+        if (!isset($list[$country])) $list[$country] = self::countries()[$country]; // keep a stored value visible
         if ($country !== 'GR' && $value !== '' && strpos($value, $country) === 0 && isset(self::EU_VAT[$country])) $value = substr($value, 2);
+        if (count($list) === 1) { // Greece only: a plain ΑΦΜ field, no dropdown
+            return '<input type="hidden" name="' . esc_attr($country_name) . '" value="GR"><input type="text" name="' . esc_attr($vat_name) . '"' . ($id ? ' id="' . esc_attr($id) . '"' : '')
+                . ' value="' . esc_attr($value) . '" maxlength="20" inputmode="numeric" placeholder="9 ψηφία" autocomplete="off"' . ($required ? ' required' : '') . '>';
+        }
         $h = '<div class="tw-taxid" data-tw-taxid>';
         $h .= '<select name="' . esc_attr($country_name) . '" aria-label="Χώρα" class="tw-taxid-country">';
-        foreach (self::countries() as $code => $name) {
+        foreach ($list as $code => $name) {
             $ph = $code === 'GR' ? '9 ψηφία' : ($code === 'CY' ? 'π.χ. 12345678X' : ($code === 'AE' ? '15 ψηφία (TRN)' : (isset(self::EU_VAT[$code]) ? 'ΑΦΜ (VAT)' : 'Αριθμός φορολογικού μητρώου')));
             // Closed, the dropdown shows only the prefix; opened, the full country names (see the page scripts).
             $full = self::tax_prefix($code) . ' · ' . $name;

@@ -65,6 +65,8 @@ final class TW_Settings {
             'ip_proxy' => '',
             // Lifetime of the emailed one-time codes, in minutes.
             'otp_minutes' => 2,
+            // Countries offered next to the partner / technician tax number (Greece is always offered).
+            'tax_countries' => ['GR', 'CY', 'AE', 'QA', 'XX'],
             'portal_url' => '',
             'register_url' => '',
             'privacy_url' => '',

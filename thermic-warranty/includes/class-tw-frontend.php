@@ -203,7 +203,7 @@ final class TW_Frontend {
         if (!preg_match('/^\d{5}$/', $postcode)) self::fail('Ο ταχυδρομικός κώδικας πρέπει να έχει 5 ψηφία.', 'postcode');
 
         $partner_country = strtoupper(sanitize_key(self::input('partner_country'))) ?: 'GR';
-        if (!isset(TW_Util::countries()[$partner_country])) $partner_country = 'GR';
+        if (!isset(TW_Util::enabled_countries()[$partner_country])) self::fail('Επιλέξτε χώρα από τη λίστα.', 'partner_vat');
         [$vat, $vat_err] = TW_Util::tax_id($partner_country, self::input('partner_vat'));
         if ($vat_err) self::fail('Συνεργάτης: ' . $vat_err, 'partner_vat');
         $partner_email = strtolower(sanitize_email(self::input('partner_email')));
@@ -418,7 +418,7 @@ final class TW_Frontend {
             self::fail(sprintf('Για το %dο Service δεκτές είναι ημερομηνίες από %s και μετά.', $no, TW_Util::date_label($earliest)), 'performed_date');
         }
         $tech_country = strtoupper(sanitize_key(self::input('technician_country'))) ?: 'GR';
-        if (!isset(TW_Util::countries()[$tech_country])) $tech_country = 'GR';
+        if (!isset(TW_Util::enabled_countries()[$tech_country])) self::fail('Επιλέξτε χώρα από τη λίστα.', 'technician_vat');
         [$vat, $vat_err] = TW_Util::tax_id($tech_country, self::input('technician_vat'));
         if ($vat_err) self::fail('Τεχνικός: ' . $vat_err, 'technician_vat');
         $receipt = ['file' => '', 'name' => '', 'number' => '', 'date' => null];
