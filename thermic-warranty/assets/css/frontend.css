@@ -164,3 +164,28 @@
 .tw-taxid input { width: auto !important; flex: 1 1 auto; min-width: 0; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
 .tw-taxid select:focus { outline: 2px solid var(--tw-accent); outline-offset: 1px; position: relative; z-index: 1; }
 .tw-invalid .tw-taxid select { border-color: var(--tw-bad) !important; }
+
+/* 1.23.1 – the same card look on the standalone pages and inside any theme (shortcodes) */
+.tw-app.tw-register, .tw-app.tw-portal {
+    box-sizing: border-box; background: #fff; color: #1d2330; line-height: 1.55; text-align: left;
+    border: 1px solid #e3e6ea; border-radius: 14px; padding: 28px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+    margin-top: 24px; margin-bottom: 32px;
+}
+.tw-app.tw-register *, .tw-app.tw-portal *, .tw-app.tw-register *::before, .tw-app.tw-portal *::after { box-sizing: border-box; }
+.tw-app .tw-card { box-shadow: none; }
+/* Keep theme styles from leaking in: the same values the standalone pages get from the browser defaults */
+.tw-app h3, .tw-app h4, .tw-app h5 { font-family: inherit; color: inherit; letter-spacing: normal; text-transform: none; line-height: 1.3; font-weight: 700; }
+.tw-app h3 { font-size: 1.17em; margin: 0 0 .5em; }
+.tw-app h4 { font-size: 1em; margin: 1.33em 0; }
+.tw-app h5 { font-size: .83em; margin: 1.67em 0; }
+.tw-app p { margin: 1em 0; }
+.tw-app label { font-family: inherit; text-transform: none; letter-spacing: normal; }
+.tw-app fieldset { min-width: 0; }
+.tw-app legend { width: auto; border: 0; margin: 0; float: none; font-size: inherit; color: inherit; }
+.tw-app .tw-btn { text-transform: none; letter-spacing: normal; line-height: normal; text-decoration: none; box-shadow: none; }
+/* Same width as on the standalone pages, even when the theme narrows its content column (still fits small screens). */
+.tw-app.tw-register, .tw-app.tw-portal { width: 100%; max-width: 760px !important; margin-left: auto !important; margin-right: auto !important; }
+#tw-print-card.tw-app { margin: 0 auto; }
+@media (max-width: 600px) {
+    .tw-app.tw-register, .tw-app.tw-portal { padding: 18px 14px; border-radius: 10px; margin-top: 12px; }
+}

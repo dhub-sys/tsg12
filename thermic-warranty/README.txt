@@ -1,7 +1,7 @@
 === Warranty Manager ===
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.23.0
+Stable tag: 1.23.1
 
 Αυτόνομη πλατφόρμα (standalone app) ηλεκτρονικής ενεργοποίησης και διαχείρισης εγγυήσεων με σειριακούς
 αριθμούς. Το WordPress λειτουργεί μόνο ως «μηχανή»: η ομάδα της εταιρείας δουλεύει σε δικό της
@@ -181,6 +181,9 @@ Stable tag: 1.23.0
 - Πίνακες: wp_tw_serials, wp_tw_warranties, wp_tw_consents, wp_tw_otps, wp_tw_services, wp_tw_notifications, wp_tw_events.
 
 == Changelog ==
+
+= 1.23.1 =
+* Οι φόρμες των πελατών έχουν την ίδια εμφάνιση (κάρτα με περίγραμμα, ίδιο πλάτος) και όταν μπαίνουν με shortcode σε σελίδα του θέματος.
 
 = 1.23.0 =
 * Οι σελίδες και τα μηνύματα των πελατών και στα αγγλικά, με αυτόματη αναγνώριση γλώσσας (Polylang, επιλογή EL | EN, browser).

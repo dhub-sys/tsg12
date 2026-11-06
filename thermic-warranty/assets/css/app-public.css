@@ -17,8 +17,6 @@ body.tw-public {
 .tw-pub-nav a:hover { background: #f1f3f6; color: #1d2330; }
 .tw-pub-nav a.is-active { background: var(--tw-brand); color: #fff; }
 .tw-pub-main { flex: 1; width: 100%; max-width: 960px; margin: 0 auto; padding: 32px 16px 56px; }
-.tw-pub-main .tw-app { background: #fff; border: 1px solid #e3e6ea; border-radius: 14px; padding: 28px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-.tw-pub-main .tw-card { box-shadow: none; }
 .tw-pub-foot { background: #fff; border-top: 1px solid #e3e6ea; font-size: 13px; color: #5f6b7a; }
 .tw-pub-foot .tw-pub-inner { padding-top: 16px; padding-bottom: 16px; }
 .tw-pub-foot a { color: #5f6b7a; }
@@ -27,7 +25,6 @@ body.tw-public {
     .tw-pub-nav { width: 100%; }
     .tw-pub-nav a { flex: 1; text-align: center; padding: 8px 6px; font-size: 14px; }
     .tw-pub-main { padding: 16px 10px 40px; }
-    .tw-pub-main .tw-app { padding: 18px 14px; border-radius: 10px; }
     .tw-pub-foot .tw-pub-inner { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 
