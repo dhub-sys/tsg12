@@ -145,7 +145,7 @@ final class TW_Backup {
         global $wpdb;
         if (!class_exists('ZipArchive')) return new WP_Error('zip', 'Η επέκταση PHP ZipArchive δεν είναι διαθέσιμη στον server.');
         @set_time_limit(0);
-        $name = sprintf('tw-backup-%s-%s-%s.zip', current_time('Ymd-His'), $type, bin2hex(random_bytes(6)));
+        $name = sprintf('tw-backup-%s-%s-%s.zip', current_time('Ymd-His'), $type, bin2hex(random_bytes(16))); // 128-bit: not guessable even where the folder is not locked by the web server
         $path = self::dir() . '/' . $name;
         $zip = new ZipArchive();
         if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) return new WP_Error('zip', 'Δεν ήταν δυνατή η δημιουργία του αρχείου backup.');
