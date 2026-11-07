@@ -140,11 +140,42 @@ final class TW_Guard {
 
     /** Simple per-IP counter: false once $max requests of this kind were made within $window seconds. */
     public static function throttle($bucket, $max, $window) {
-        $key = 'tw_thr_' . $bucket . '_' . md5(TW_Util::client_ip());
-        $n = (int) get_transient($key);
-        if ($n >= $max) return false;
-        set_transient($key, $n + 1, $window);
-        return true;
+        return self::hit($bucket, $max, $window);
+    }
+
+    /**
+     * Counts one request in a per-IP bucket; false once $max were counted within $window seconds.
+     * The increment is a single conditional UPDATE, so simultaneous requests cannot slip past the limit.
+     */
+    public static function hit($bucket, $max, $window, $ip = null) {
+        global $wpdb;
+        $t = TW_DB::table('throttle');
+        $k = sha1($bucket . '|' . ($ip ?? TW_Util::client_ip()));
+        $now = TW_DB::now();
+        $exp = date('Y-m-d H:i:s', current_time('timestamp') + (int) $window);
+        $suppress = $wpdb->suppress_errors(true);
+        $wpdb->query($wpdb->prepare("INSERT INTO $t (k, n, expires_at) VALUES (%s, 0, %s)", $k, $exp)); // ignored if it exists
+        $wpdb->suppress_errors($suppress);
+        // A window that has ended starts again at 1.
+        if ($wpdb->query($wpdb->prepare("UPDATE $t SET n = 1, expires_at = %s WHERE k = %s AND expires_at <= %s", $exp, $k, $now))) return true;
+        return (bool) $wpdb->query($wpdb->prepare("UPDATE $t SET n = n + 1 WHERE k = %s AND n < %d", $k, (int) $max));
+    }
+
+    /** Current count in a bucket (0 when the window has ended). */
+    public static function hits($bucket, $ip = null) {
+        global $wpdb;
+        return (int) $wpdb->get_var($wpdb->prepare("SELECT n FROM " . TW_DB::table('throttle') . " WHERE k = %s AND expires_at > %s", sha1($bucket . '|' . ($ip ?? TW_Util::client_ip())), TW_DB::now()));
+    }
+
+    public static function reset($bucket, $ip = null) {
+        global $wpdb;
+        $wpdb->delete(TW_DB::table('throttle'), ['k' => sha1($bucket . '|' . ($ip ?? TW_Util::client_ip()))]);
+    }
+
+    /** Housekeeping (daily). */
+    public static function purge() {
+        global $wpdb;
+        $wpdb->query($wpdb->prepare("DELETE FROM " . TW_DB::table('throttle') . " WHERE expires_at < %s", TW_DB::now()));
     }
 
     // ------------------------------------------------------------------ stats

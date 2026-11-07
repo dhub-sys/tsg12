@@ -30,18 +30,38 @@ final class TW_Cron {
     }
 
     /** Claims a step; false if it was already processed. */
+    /** Messages already recorded for a batch of warranties: "wid|key|offset|channel" => true (null = not loaded). */
+    private static $claimed = null;
+
+    private static function preload_claims(array $ids) {
+        global $wpdb;
+        self::$claimed = [];
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            foreach ($wpdb->get_results("SELECT warranty_id, milestone_key, offset_days, channel FROM " . TW_DB::table('notifications') . " WHERE warranty_id IN (" . implode(',', array_map('intval', $chunk)) . ")") as $r) {
+                self::$claimed[$r->warranty_id . '|' . $r->milestone_key . '|' . (int) $r->offset_days . '|' . $r->channel] = true;
+            }
+        }
+    }
+
     public static function claim($wid, $key, $offset, $channel, $recipient) {
         global $wpdb;
         $t = TW_DB::table('notifications');
-        $exists = $wpdb->get_var($wpdb->prepare(
+        $ck = (int) $wid . '|' . $key . '|' . (int) $offset . '|' . $channel;
+        if (self::$claimed !== null && isset(self::$claimed[$ck])) return false; // known from the batch preload
+        // During the daily run the batch preload already says what exists; otherwise ask the database.
+        $exists = self::$claimed !== null ? null : $wpdb->get_var($wpdb->prepare(
             "SELECT id FROM $t WHERE warranty_id = %d AND milestone_key = %s AND offset_days = %d AND channel = %s",
             $wid, $key, $offset, $channel
         ));
         if ($exists) return false;
+        // The unique key (warranty, step, channel) still guarantees one message per step, even with two runs at once.
+        $suppress = $wpdb->suppress_errors(true);
         $ok = $wpdb->insert($t, [
             'warranty_id' => $wid, 'milestone_key' => $key, 'offset_days' => $offset,
             'channel' => $channel, 'recipient' => $recipient, 'status' => 'pending', 'created_at' => TW_DB::now(),
         ]);
+        $wpdb->suppress_errors($suppress);
+        if ($ok && self::$claimed !== null) self::$claimed[$ck] = true;
         return $ok ? (int) $wpdb->insert_id : false;
     }
 
@@ -105,6 +125,7 @@ final class TW_Cron {
      * @return array summary lines
      */
     public static function run($today = null) {
+        TW_Guard::purge();
         TW_Activity::auto_archive();
         global $wpdb;
         $today = $today ?: TW_Schedule::today();
@@ -112,7 +133,15 @@ final class TW_Cron {
         $catchup = max(0, (int) $s['catchup_days']);
         $digest = [];
 
-        $rows = $wpdb->get_results(TW_Warranty::select_sql() . " WHERE w.status IN ('active','expired') AND w.anonymized_at IS NULL");
+        // In batches of 1,000 (steady memory), with each batch's Service records and sent messages loaded at once.
+        $last_id = 0;
+        while (true) {
+        $rows = $wpdb->get_results($wpdb->prepare(TW_Warranty::select_sql() . " WHERE w.status IN ('active','expired') AND w.anonymized_at IS NULL AND w.id > %d ORDER BY w.id LIMIT 1000", $last_id));
+        if (!$rows) break;
+        $last_id = (int) end($rows)->id;
+        $ids = array_map(function ($r) { return (int) $r->id; }, $rows);
+        TW_Warranty::preload_services($ids);
+        self::preload_claims($ids);
         foreach ($rows as $w) {
             $registered = substr($w->created_at, 0, 10);
             $services = TW_Warranty::services($w->id);
@@ -178,6 +207,10 @@ final class TW_Cron {
                 }
             }
         }
+        if (count($rows) < 1000) break;
+        }
+        TW_Warranty::forget_services();
+        self::$claimed = null;
 
         self::retention($today);
         TW_OTP::purge();

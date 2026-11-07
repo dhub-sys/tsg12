@@ -240,6 +240,39 @@ final class TW_Admin {
 
     // ------------------------------------------------------------------ dashboard
 
+    /**
+     * Upcoming / overdue Service across active warranties up to $horizon (the schedule is computed, not stored).
+     * @return array of ['w' => warranty row, 'm' => milestone]
+     */
+    public static function upcoming_services($today, $horizon) {
+        global $wpdb;
+        $upcoming = [];
+        // Only warranties that can have a Service in the window are read (purchase dates that put a Service
+        // between "lock period ago" and the horizon, plus rejected submissions still open), then checked exactly.
+        $interval = (int) TW_Settings::get('service_interval_years');
+        $years = max(1, (int) TW_Settings::get('warranty_years'));
+        $from = TW_Schedule::add_days($today, -max(0, (int) TW_Settings::get('lock_offset')) - 1);
+        $ranges = []; $params = [];
+        for ($k = 1; $interval > 0 && $k * $interval < $years; $k++) {
+            $ranges[] = '(w.purchase_date BETWEEN %s AND %s)';
+            $params[] = TW_Schedule::add_years($from, -$k * $interval);
+            $params[] = TW_Schedule::add_years(TW_Schedule::add_days($horizon, 1), -$k * $interval);
+        }
+        $sv_table = TW_DB::table('services');
+        $rejected = "w.id IN (SELECT warranty_id FROM $sv_table WHERE review_status = 'rejected' AND resubmit_until >= " . $wpdb->prepare('%s', $today) . ')';
+        $cond = $ranges ? '(' . implode(' OR ', $ranges) . ' OR ' . $rejected . ')' : $rejected;
+        $cands = $wpdb->get_results($params ? $wpdb->prepare(TW_Warranty::select_sql() . " WHERE w.status = 'active' AND $cond", $params) : TW_Warranty::select_sql() . " WHERE w.status = 'active' AND $cond");
+        TW_Warranty::preload_services(array_map(function ($r) { return (int) $r->id; }, $cands));
+        foreach ($cands as $row) {
+            foreach (TW_Warranty::timeline($row) as $m) {
+                if ($m['type'] === 'service' && in_array($m['state'], ['upcoming', 'due', 'rejected'], true) && $m['due'] <= $horizon) {
+                    $upcoming[] = ['w' => $row, 'm' => $m];
+                }
+            }
+        }
+        return $upcoming;
+    }
+
     public static function page_dashboard() {
         global $wpdb;
         $s = TW_DB::table('serials');
@@ -251,16 +284,7 @@ final class TW_Admin {
         $exp60 = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $w WHERE status = 'active' AND warranty_end BETWEEN %s AND %s", $today, TW_Schedule::add_days($today, 60)));
         $last30 = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $w WHERE created_at >= %s", TW_Schedule::add_days($today, -30) . ' 00:00:00'));
 
-        // Upcoming / overdue Service across active warranties (computed, the schedule is not stored).
-        $upcoming = [];
-        $horizon = TW_Schedule::add_days($today, 60);
-        foreach ($wpdb->get_results(TW_Warranty::select_sql() . " WHERE w.status = 'active'") as $row) {
-            foreach (TW_Warranty::timeline($row) as $m) {
-                if ($m['type'] === 'service' && in_array($m['state'], ['upcoming', 'due', 'rejected'], true) && $m['due'] <= $horizon) {
-                    $upcoming[] = ['w' => $row, 'm' => $m];
-                }
-            }
-        }
+        $upcoming = self::upcoming_services($today, TW_Schedule::add_days($today, 60));
         usort($upcoming, function ($a, $b) { return strcmp($a['m']['due'], $b['m']['due']); });
         $recent = $wpdb->get_results(TW_Warranty::select_sql() . " ORDER BY w.created_at DESC LIMIT 10");
         $sv_t = TW_DB::table('services');
@@ -2260,6 +2284,7 @@ final class TW_Admin {
         $where = self::warranty_filters(['s' => self::q('s'), 'status' => self::q('status'), 'expiring' => (int) self::q('expiring'), 'from' => self::q('from'), 'to' => self::q('to')]);
         do {
             $rows = $wpdb->get_results($wpdb->prepare(TW_Warranty::select_sql() . " WHERE $where AND w.id > %d ORDER BY w.id LIMIT 2000", $last));
+            if (in_array('next_service', array_column($cols, 0), true)) TW_Warranty::preload_services(array_map(function ($r) { return (int) $r->id; }, $rows));
             foreach ($rows as $r) { $x->add($row($r)); $last = (int) $r->id; }
         } while (count($rows) === 2000);
         TW_DB::log_event('warranties_exported', ['filters' => array_filter($_GET), 'columns' => count($cols)]);

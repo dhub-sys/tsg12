@@ -36,20 +36,18 @@ final class TW_OTP {
     }
 
     /** @return true|WP_Error */
+    /**
+     * Counts one code sent and says whether it is allowed: at most MAX_SENDS_PER_HOUR_EMAIL per email and
+     * MAX_SENDS_PER_HOUR_IP per IP within an hour. Atomic counters, so a burst of parallel requests cannot exceed them.
+     * @return true|WP_Error
+     */
     public static function rate_limit_ok($email) {
-        global $wpdb;
-        $t = TW_DB::table('otps');
-        $since = date('Y-m-d H:i:s', current_time('timestamp') - HOUR_IN_SECONDS);
-        $by_email = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE email = %s AND created_at > %s", $email, $since));
-        if ($by_email >= self::MAX_SENDS_PER_HOUR_EMAIL) {
+        if (!TW_Guard::hit('otp_email|' . strtolower((string) $email), self::MAX_SENDS_PER_HOUR_EMAIL, HOUR_IN_SECONDS, '')) {
             return new WP_Error('rate', tw__('Έχουν σταλεί πολλοί κωδικοί σε αυτό το email. Δοκιμάστε ξανά σε λίγο.'));
         }
         $ip = TW_Util::client_ip();
-        if ($ip !== '') {
-            $by_ip = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE ip = %s AND created_at > %s", $ip, $since));
-            if ($by_ip >= self::MAX_SENDS_PER_HOUR_IP) {
-                return new WP_Error('rate', tw__('Πάρα πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο.'));
-            }
+        if ($ip !== '' && !TW_Guard::hit('otp_ip', self::MAX_SENDS_PER_HOUR_IP, HOUR_IN_SECONDS)) {
+            return new WP_Error('rate', tw__('Πάρα πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο.'));
         }
         return true;
     }

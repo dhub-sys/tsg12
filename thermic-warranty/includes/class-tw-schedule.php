@@ -26,7 +26,8 @@ final class TW_Schedule {
     }
 
     public static function today() {
-        return current_time('Y-m-d');
+        // Filterable for tests and simulations ("what would happen on that day").
+        return (string) apply_filters('tw_today', current_time('Y-m-d'));
     }
 
     public static function warranty_end($purchase_date) {

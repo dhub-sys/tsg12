@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.9.0';
+    const DB_VERSION = '1.11.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -56,7 +56,8 @@ final class TW_DB {
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
   UNIQUE KEY serial_no (serial_no),
-  KEY status (status)
+  KEY status (status),
+  KEY import_batch (import_batch)
 ) $c;");
 
         dbDelta("CREATE TABLE {$t('warranties')} (
@@ -92,7 +93,9 @@ final class TW_DB {
   KEY email (email),
   KEY status (status),
   KEY warranty_end (warranty_end),
-  KEY partner_vat (partner_vat)
+  KEY partner_vat (partner_vat),
+  KEY purchase_date (purchase_date),
+  KEY created_at (created_at)
 ) $c;");
 
         dbDelta("CREATE TABLE {$t('consents')} (
@@ -127,7 +130,9 @@ final class TW_DB {
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
   KEY email (email),
-  KEY token_hash (token_hash)
+  KEY token_hash (token_hash),
+  KEY ip_created (ip,created_at),
+  KEY created_at (created_at)
 ) $c;");
 
         // 1.3.0: every Service submission is kept (history), so (warranty, milestone) is no longer unique.
@@ -161,7 +166,9 @@ final class TW_DB {
   created_by bigint(20) unsigned NOT NULL DEFAULT 0,
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
-  KEY warranty_milestone (warranty_id,milestone_no)
+  KEY warranty_milestone (warranty_id,milestone_no),
+  KEY review (review_status,resubmit_until),
+  KEY created_at (created_at)
 ) $c;");
 
         dbDelta("CREATE TABLE {$t('notifications')} (
@@ -181,7 +188,8 @@ final class TW_DB {
   PRIMARY KEY  (id),
   UNIQUE KEY once_per_step (warranty_id,milestone_key,offset_days,channel),
   KEY provider_id (provider_id),
-  KEY created_at (created_at)
+  KEY created_at (created_at),
+  KEY delivery (delivery_status,delivery_at)
 ) $c;");
 
         dbDelta("CREATE TABLE {$t('events')} (
@@ -200,6 +208,15 @@ final class TW_DB {
   KEY created_at (created_at),
   KEY action (action),
   KEY actor (actor)
+) $c;");
+
+        // Rate limits (serial lookups, failed sign-ins): one row per bucket and IP, updated atomically.
+        dbDelta("CREATE TABLE {$t('throttle')} (
+  k char(40) NOT NULL,
+  n int(11) NOT NULL DEFAULT 0,
+  expires_at datetime NOT NULL,
+  PRIMARY KEY  (k),
+  KEY expires_at (expires_at)
 ) $c;");
 
         // Archived activity log entries (same columns and signatures; ids kept).

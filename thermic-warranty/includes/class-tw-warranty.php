@@ -174,7 +174,28 @@ final class TW_Warranty {
         TW_DB::log_event('status_' . $status, $note, $warranty->id, $warranty->serial_id, $actor);
     }
 
+    /** Services loaded in bulk for a batch of warranties (see preload_services()). */
+    private static $svc_cache = [];
+
+    /** Loads the Service records of many warranties with one query (lists, exports, the daily task). */
+    public static function preload_services(array $ids) {
+        global $wpdb;
+        self::$svc_cache = [];
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        if (!$ids) return;
+        foreach ($ids as $id) self::$svc_cache[$id] = [];
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            $rows = $wpdb->get_results("SELECT * FROM " . TW_DB::table('services') . " WHERE warranty_id IN (" . implode(',', $chunk) . ") ORDER BY warranty_id, milestone_no, id");
+            foreach ($rows as $r) self::$svc_cache[(int) $r->warranty_id][(int) $r->milestone_no] = $r; // latest per milestone
+        }
+    }
+
+    public static function forget_services($warranty_id = null) {
+        if ($warranty_id === null) self::$svc_cache = []; else unset(self::$svc_cache[(int) $warranty_id]);
+    }
+
     public static function services($warranty_id) {
+        if (array_key_exists((int) $warranty_id, self::$svc_cache)) return self::$svc_cache[(int) $warranty_id];
         global $wpdb;
         // Latest submission per milestone (all submissions are kept, see services_history()).
         $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM " . TW_DB::table('services') . " WHERE warranty_id = %d ORDER BY milestone_no, id", $warranty_id));
@@ -312,6 +333,7 @@ final class TW_Warranty {
             'created_by' => get_current_user_id(),
             'created_at' => TW_DB::now(),
         ]);
+        self::forget_services($w->id);
         TW_DB::log_event('service_recorded', ['milestone' => $milestone_no, 'date' => $date, 'by' => $by, 'technician_vat' => $technician_vat, 'genuine_parts' => $genuine ? 1 : 0], $w->id, $w->serial_id);
     }
 
@@ -339,6 +361,7 @@ final class TW_Warranty {
             'notes' => $notes,
             'created_at' => TW_DB::now(),
         ]);
+        self::forget_services($w->id);
         TW_DB::log_event('service_submitted', ['milestone' => $milestone_no, 'date' => $date, 'technician_vat' => $technician_vat], $w->id, $w->serial_id, 'customer:' . $w->email);
         return self::services($w->id)[(int) $milestone_no] ?? null;
     }

@@ -63,16 +63,12 @@ final class TW_Staff_Auth {
         return ['step' => 'login'];
     }
 
-    private static function fail_key() {
-        return 'tw_staff_fail_' . md5(TW_Util::client_ip());
-    }
-
     private static function blocked() {
-        return (int) get_transient(self::fail_key()) >= self::MAX_FAILS;
+        return TW_Guard::hits('staff_fail') >= self::MAX_FAILS;
     }
 
     private static function fail() {
-        set_transient(self::fail_key(), (int) get_transient(self::fail_key()) + 1, self::FAIL_WINDOW);
+        TW_Guard::hit('staff_fail', self::MAX_FAILS, self::FAIL_WINDOW); // atomic: parallel guesses are counted too
     }
 
     private static function team_user($email) {
@@ -131,7 +127,7 @@ final class TW_Staff_Auth {
         wp_set_current_user($user->ID);
         self::issue_cookie($user->ID);
         update_user_meta($user->ID, 'tw_last_login', TW_DB::now());
-        delete_transient(self::fail_key());
+        TW_Guard::reset('staff_fail');
         TW_DB::log_event('staff_login', ['ip' => TW_Util::client_ip()], 0, 0, 'admin:' . $user->user_login);
         wp_safe_redirect(TW_App::admin_url());
         exit;
