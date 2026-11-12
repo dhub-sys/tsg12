@@ -39,7 +39,7 @@ final class TW_Activity {
             'backup_settings' => 'Ρυθμίσεις αντιγράφων ασφαλείας', 'backup_created' => 'Δημιουργία αντιγράφου ασφαλείας', 'backup_downloaded' => 'Λήψη αντιγράφου ασφαλείας',
             'backup_deleted' => 'Διαγραφή αντιγράφου ασφαλείας', 'backup_restored' => 'Επαναφορά από αντίγραφο ασφαλείας', 'backup_failed' => 'Αποτυχία αντιγράφου ασφαλείας',
             'backup_sent' => 'Αποστολή αντιγράφου εκτός server', 'backup_send_failed' => 'Αποτυχία αποστολής αντιγράφου',
-            'serials_imported' => 'Εισαγωγή σειριακών', 'serial_void' => 'Ακύρωση σειριακού', 'serial_available' => 'Επαναφορά σειριακού',
+            'serials_imported' => 'Εισαγωγή σειριακών', 'serial_void' => 'Ακύρωση σειριακού', 'serial_available' => 'Επαναφορά σειριακού', 'serials_batch' => 'Αλλαγή παρτίδας σειριακών',
             'log_verified' => 'Έλεγχος ακεραιότητας ημερολογίου', 'log_archived' => 'Αρχειοθέτηση καταγραφών', 'warranty_viewed' => 'Προβολή καρτέλας από την ομάδα',
             'serials_exported' => 'Εξαγωγή σειριακών', 'warranties_exported' => 'Εξαγωγή εγγυήσεων', 'log_exported' => 'Εξαγωγή ημερολογίου',
         ];

@@ -264,14 +264,22 @@ final class TW_Importer {
         return $out;
     }
 
+    /** Batch names already used, newest first (suggestions in the forms). */
+    public static function batches($limit = 100) {
+        global $wpdb;
+        return $wpdb->get_col($wpdb->prepare("SELECT import_batch FROM " . TW_DB::table('serials') . " WHERE import_batch <> '' GROUP BY import_batch ORDER BY MAX(id) DESC LIMIT %d", (int) $limit));
+    }
+
     /**
      * Inserts records; existing serials are never overwritten.
+     * @param string $batch name of the batch (e.g. an order or delivery number); empty = automatic "IMP-date-time"
      * @return array inserted, duplicates (list), invalid (list), batch
      */
-    public static function import(array $records, $defaults = []) {
+    public static function import(array $records, $defaults = [], $batch = '') {
         global $wpdb;
         $t = TW_DB::table('serials');
-        $batch = 'IMP-' . current_time('Ymd-His');
+        $batch = mb_substr(trim(sanitize_text_field((string) $batch)), 0, 64);
+        if ($batch === '') $batch = 'IMP-' . current_time('Ymd-His');
         $result = ['inserted' => 0, 'duplicates' => [], 'invalid' => [], 'batch' => $batch];
         $seen = [];
         $valid = [];

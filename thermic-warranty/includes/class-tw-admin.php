@@ -17,7 +17,7 @@ final class TW_Admin {
 
     /** Actions accepted by the app router (POST, or GET for downloads). */
     public static function actions() {
-        return ['import', 'add_serial', 'serial_status', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
+        return ['import', 'add_serial', 'serial_status', 'serial_batch', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
             'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings'];
     }
@@ -753,6 +753,7 @@ final class TW_Admin {
                         <p class="description">Πρώτο φύλλο του .xlsx ή αρχείο .csv. Στήλες: <code>serial</code> (υποχρεωτική), <code>product_code</code>, <code>product_name</code>, <code>notes</code> – δεκτές και ελληνικές επικεφαλίδες (Σειριακός αριθμός, Κωδικός προϊόντος, Όνομα προϊόντος, Σημειώσεις). Χωρίς γραμμή επικεφαλίδων, οι στήλες διαβάζονται με αυτή τη σειρά. Υπάρχοντες σειριακοί δεν αλλάζουν.</p>
                         <p><label>Προεπιλεγμένος κωδικός προϊόντος (για κενά κελιά) <input type="text" name="default_code"></label></p>
                         <p><label>Προεπιλεγμένο όνομα προϊόντος (για κενά κελιά) <input type="text" name="default_name" class="regular-text"></label></p>
+<p><label>Παρτίδα <span class="description">(προαιρετικό)</span> <input type="text" name="batch" maxlength="64" list="tw-batches" placeholder="π.χ. Παραγγελία 2026-118 – κενό: αυτόματα"></label><span class="description">Ομαδοποιεί τους σειριακούς (π.χ. ανά παραγγελία, αποστολή ή προμηθευτή) για φίλτρο και εξαγωγή. Γράψτε όνομα υπάρχουσας παρτίδας για να προστεθούν σε αυτή.</span></p>
                         <p><button class="button button-primary">Εισαγωγή</button></p>
                     </form>
                 </div>
@@ -763,6 +764,7 @@ final class TW_Admin {
                         <p><label>Σειριακοί (ένας ανά γραμμή)<br><textarea name="serials" rows="5" class="large-text code" required></textarea></label></p>
                         <p><label>Κωδικός προϊόντος <input type="text" name="product_code"></label></p>
                         <p><label>Όνομα προϊόντος <input type="text" name="product_name" class="regular-text"></label></p>
+                        <p><label>Παρτίδα <span class="description">(προαιρετικό)</span> <input type="text" name="batch" maxlength="64" list="tw-batches" placeholder="π.χ. Παραγγελία 2026-118 – κενό: αυτόματα"></label><span class="description">Ομαδοποιεί τους σειριακούς (π.χ. ανά παραγγελία, αποστολή ή προμηθευτή) για φίλτρο και εξαγωγή. Γράψτε όνομα υπάρχουσας παρτίδας για να προστεθούν σε αυτή.</span></p>
                         <p><button class="button button-primary">Προσθήκη</button></p>
                     </form>
                 </div>
@@ -772,14 +774,29 @@ final class TW_Admin {
                 <?php self::get_form_fields('serials'); ?>
                 <input type="search" name="s" value="<?php echo esc_attr($s); ?>" placeholder="Σειριακός ή προϊόν">
                 <select name="status"><option value="">Όλοι</option><?php foreach ($labels as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($status, $k, false), esc_html($l)); ?></select>
-                <input type="text" name="batch" value="<?php echo esc_attr($batch); ?>" placeholder="Παρτίδα εισαγωγής">
+                <input type="text" name="batch" value="<?php echo esc_attr($batch); ?>" placeholder="Παρτίδα" list="tw-batches">
+                <datalist id="tw-batches"><?php foreach (TW_Importer::batches() as $b) echo '<option value="' . esc_attr($b) . '">'; ?></datalist>
                 <button class="button">Φίλτρο</button>
             </form>
+            <form method="post" action="<?php echo esc_url($post); ?>" id="tw-batch-form" class="tw-filters tw-batch-form">
+                <?php wp_nonce_field('tw_serial_batch'); ?><input type="hidden" name="action" value="tw_serial_batch">
+                <?php if ($batch !== '' && $total) : ?>
+                    <input type="hidden" name="old_batch" value="<?php echo esc_attr($batch); ?>">
+                    <strong>Διόρθωση παρτίδας:</strong>
+                    <label><input type="radio" name="scope" value="all" checked> όλοι οι <?php echo (int) $total; ?> σειριακοί της «<?php echo esc_html($batch); ?>»</label>
+                    <label><input type="radio" name="scope" value="selected"> μόνο οι επιλεγμένοι</label>
+                <?php else : ?>
+                    <input type="hidden" name="scope" value="selected">
+                    <strong>Επιλεγμένοι σειριακοί:</strong>
+                <?php endif; ?>
+                → νέα παρτίδα <input type="text" name="new_batch" maxlength="64" list="tw-batches" required placeholder="όνομα (νέο ή υπάρχον)">
+                <button class="button">Αλλαγή παρτίδας</button>
+            </form>
             <?php self::pagination($total, $paged); ?>
-            <table class="widefat striped"><thead><tr><th>Σειριακός</th><th>Κωδικός προϊόντος</th><th>Όνομα προϊόντος</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
-            <?php if (!$rows) echo '<tr><td colspan="8">Δεν βρέθηκαν σειριακοί.</td></tr>'; ?>
+            <table class="widefat striped"><thead><tr><th class="check-column"><input type="checkbox" onclick="document.querySelectorAll('.tw-batch-cb').forEach(function(c){c.checked=this.checked}.bind(this))" aria-label="Επιλογή όλων"></th><th>Σειριακός</th><th>Κωδικός προϊόντος</th><th>Όνομα προϊόντος</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
+            <?php if (!$rows) echo '<tr><td colspan="9">Δεν βρέθηκαν σειριακοί.</td></tr>'; ?>
             <?php foreach ($rows as $r) : ?>
-                <tr><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
+                <tr><th class="check-column"><input type="checkbox" class="tw-batch-cb" name="ids[]" value="<?php echo (int) $r->id; ?>" form="tw-batch-form"></th><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
                     <td><?php echo self::status_badge($r->status, $labels); ?></td>
                     <td><?php echo $r->wid ? self::warranty_link($r->wid, $r->warranty_code) : '—'; ?></td>
                     <td><a href="<?php echo esc_url(self::url('serials', ['batch' => $r->import_batch])); ?>"><?php echo esc_html($r->import_batch); ?></a></td>
@@ -1875,7 +1892,7 @@ final class TW_Admin {
         $res = TW_Importer::import(TW_Importer::to_records($rows), [
             'product_code' => sanitize_text_field(self::post('default_code')),
             'product_name' => sanitize_text_field(self::post('default_name')),
-        ]);
+        ], self::post('batch'));
         set_transient('tw_import_result_' . get_current_user_id(), $res, 600);
         self::back('tw-serials', ['batch' => $res['inserted'] ? $res['batch'] : null]);
     }
@@ -1906,9 +1923,34 @@ final class TW_Admin {
             if (trim($line) === '') continue;
             $records[] = ['serial' => TW_Util::normalize_serial($line), 'product_code' => sanitize_text_field(self::post('product_code')), 'product_name' => sanitize_text_field(self::post('product_name')), 'notes' => ''];
         }
-        $res = TW_Importer::import($records);
+        $res = TW_Importer::import($records, [], self::post('batch'));
         set_transient('tw_import_result_' . get_current_user_id(), $res, 600);
-        self::back('tw-serials');
+        self::back('tw-serials', ['batch' => $res['inserted'] ? $res['batch'] : null]);
+    }
+
+    /** Renames a whole batch, or moves the ticked serials to another (new or existing) batch. */
+    public static function handle_serial_batch() {
+        global $wpdb;
+        self::guard('tw_serial_batch');
+        $t = TW_DB::table('serials');
+        $new = mb_substr(trim(sanitize_text_field(self::post('new_batch'))), 0, 64);
+        $old = mb_substr(trim(sanitize_text_field(self::post('old_batch'))), 0, 64);
+        if ($new === '') { self::flash('Γράψτε το όνομα της νέας παρτίδας.', 'error'); self::back('tw-serials', ['batch' => $old ?: null]); }
+        if (self::post('scope') === 'all' && $old !== '') {
+            $n = (int) $wpdb->query($wpdb->prepare("UPDATE $t SET import_batch = %s WHERE import_batch = %s", $new, $old));
+            $what = 'όλοι οι σειριακοί της «' . $old . '»';
+        } else {
+            $ids = array_values(array_filter(array_map('intval', (array) ($_POST['ids'] ?? []))));
+            if (!$ids) { self::flash('Δεν επιλέξατε σειριακούς. Τικάρετε τα κουτάκια στη λίστα.', 'error'); self::back('tw-serials', ['batch' => $old ?: null]); }
+            $n = 0;
+            foreach (array_chunk($ids, 500) as $chunk) {
+                $n += (int) $wpdb->query($wpdb->prepare("UPDATE $t SET import_batch = %s WHERE id IN (" . implode(',', array_fill(0, count($chunk), '%d')) . ')', array_merge([$new], $chunk)));
+            }
+            $what = count($ids) . ' επιλεγμένοι σειριακοί';
+        }
+        TW_DB::log_event('serials_batch', ($old !== '' ? $old . ' → ' : '→ ') . $new . ' (' . $n . ')');
+        self::flash('Η παρτίδα άλλαξε σε «' . $new . '» για ' . $n . ' σειριακούς (' . $what . ').');
+        self::back('tw-serials', ['batch' => $new]);
     }
 
     public static function handle_serial_status() {
