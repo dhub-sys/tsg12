@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'serial_batch', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export', 'terms_save', 'terms_assign', 'terms_delete'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export', 'terms_save', 'terms_assign', 'terms_delete', 'claim_update', 'claim_file'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -29,6 +29,7 @@ final class TW_Admin {
             'warranties' => ['Εγγυήσεις & πελάτες', 'shield', 'page_warranties'],
             'serials' => ['Σειριακοί αριθμοί', 'barcode', 'page_serials'],
             'notifications' => ['Ειδοποιήσεις', 'bell', 'page_notifications'],
+            'claims' => ['Αιτήματα εγγύησης' . (($nc = TW_Claims::count_new()) ? ' (' . $nc . ')' : ''), 'wrench', 'page_claims'],
             'terms' => ['Όροι εγγύησης', 'file', 'page_terms'],
             'partners' => ['Συνεργάτες', 'pin', 'page_partners'],
         ];
@@ -66,6 +67,7 @@ final class TW_Admin {
             'upload' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
             'scroll' => '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
             'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+            'wrench' => '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
             'file' => '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
             'pin' => '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
             'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
@@ -661,12 +663,14 @@ final class TW_Admin {
             </details>
             <?php endif; ?>
 
+            <?php TW_Claims::admin_section($w); ?>
+
             <h2>Συγκαταθέσεις (αποδεικτικό GDPR)</h2>
-            <table class="widefat striped"><thead><tr><th>Ημ/νία</th><th>Τύπος</th><th>Απόφαση</th><th>Κείμενο που εμφανίστηκε</th><th>Έκδοση όρων</th><th>Πηγή</th><th>IP</th><th>Browser</th></tr></thead><tbody>
+            <table class="widefat striped"><thead><tr><th>Ημ/νία</th><th>Τύπος</th><th>Απόφαση</th><th>Κείμενο που εμφανίστηκε</th><th>Όροι</th><th>Πηγή</th><th>IP</th><th>Browser</th></tr></thead><tbody>
             <?php foreach ($consents as $c) : ?>
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($c->created_at)); ?></td><td><?php echo esc_html($consent_labels[$c->consent_type] ?? $c->consent_type); ?></td>
                     <td><?php echo $c->granted ? '✔ Αποδοχή' : '✘ Όχι'; ?></td><td><small><?php echo esc_html($c->label_text); ?></small></td>
-                    <td><?php if ($c->terms_version) : ?><?php echo esc_html(TW_Terms::name($c->terms_set ?: TW_Terms::BASE)); ?><br><a href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 's' => $c->terms_set ?: TW_Terms::BASE, 'v' => $c->terms_version, 'tl' => $c->lang], $post), 'tw_terms_view')); ?>" target="_blank">v<?php echo (int) $c->terms_version; ?><?php echo $c->lang === 'en' ? ' (EN)' : ''; ?></a><br><small title="SHA-256"><?php echo esc_html(substr($c->terms_hash, 0, 12)); ?>…</small><?php endif; ?></td>
+                    <td><?php if ($c->terms_version) : ?><?php echo esc_html(TW_Terms::name($c->terms_set ?: TW_Terms::BASE)); ?><br><a href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 's' => $c->terms_set ?: TW_Terms::BASE, 'v' => $c->terms_version, 'tl' => $c->lang], $post), 'tw_terms_view')); ?>" target="_blank">κείμενο που αποδέχθηκε<?php echo $c->lang === 'en' ? ' (EN)' : ''; ?></a><br><small title="SHA-256"><?php echo esc_html(substr($c->terms_hash, 0, 12)); ?>…</small><?php endif; ?></td>
                     <td><?php echo esc_html($c->source); ?></td><td><?php echo esc_html($c->ip); ?></td><td><small><?php echo esc_html($c->user_agent); ?></small></td></tr>
             <?php endforeach; ?>
             </tbody></table>
@@ -1872,9 +1876,9 @@ final class TW_Admin {
         $t = TW_Terms::version((int) ($_GET['s'] ?? TW_Terms::BASE) ?: TW_Terms::BASE, (int) ($_GET['v'] ?? 0), self::q('tl') === 'en' ? 'en' : 'el');
         if (!$t) wp_die('Δεν βρέθηκε.');
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!doctype html><meta charset="utf-8"><title>Όροι v' . (int) $t['version'] . '</title><body style="font-family:sans-serif;max-width:800px;margin:2em auto;line-height:1.5">';
-        echo '<p><strong>' . esc_html($t['set_name']) . ($t['lang'] === 'en' ? ' (English)' : '') . ' – έκδοση ' . (int) $t['version'] . '</strong> – δημοσίευση ' . esc_html(TW_Util::datetime_label($t['published_at'])) . '<br><small>SHA-256: ' . esc_html($t['hash']) . '</small></p><hr>';
-        echo wpautop(esc_html($t['text'])) . '</body>';
+        echo '<!doctype html><meta charset="utf-8"><title>' . esc_html($t['set_name']) . '</title><body style="font-family:sans-serif;max-width:800px;margin:2em auto;line-height:1.5">';
+        echo '<p><strong>' . esc_html($t['set_name']) . ($t['lang'] === 'en' ? ' (English)' : '') . '</strong> – κείμενο της ' . esc_html(TW_Util::datetime_label($t['published_at'])) . '<br><small>SHA-256: ' . esc_html($t['hash']) . '</small></p><hr>';
+        echo '<style>table{border-collapse:collapse;margin:1em 0}th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;vertical-align:top}th{background:#f3f4f6}</style>' . TW_Terms::html($t['text']) . '</body>';
         exit;
     }
 
@@ -1953,6 +1957,9 @@ final class TW_Admin {
         self::back('tw-serials', ['batch' => $new]);
     }
 
+    public static function page_claims() { TW_Claims::page(); }
+    public static function handle_claim_update() { TW_Claims::handle_update(); }
+    public static function handle_claim_file() { TW_Claims::handle_file(); }
     public static function page_terms() { TW_Terms::page(); }
     public static function handle_terms_save() { TW_Terms::handle_save(); }
     public static function handle_terms_assign() { TW_Terms::handle_assign(); }

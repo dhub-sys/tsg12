@@ -523,6 +523,29 @@
                 });
             });
 
+            content.querySelectorAll('.tw-claim-form').forEach(function (f) {
+                f.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    if (f.description.value.trim().length < 10) { alertBox(root, T('Περιγράψτε το πρόβλημα (τουλάχιστον 10 χαρακτήρες).')); markField(f, 'description'); return; }
+                    var input = f.querySelector('input[type=file]');
+                    var files = input ? input.files : [];
+                    if (files.length > 5) { alertBox(root, T('Επισυνάψτε έως %d αρχεία.').replace('%d', 5)); markField(f, 'claim_files[]'); return; }
+                    for (var i = 0; i < files.length; i++) {
+                        if (files[i].size > TW.maxMb * 1024 * 1024) { alertBox(root, T('Το αρχείο ξεπερνά το όριο των %d MB.').replace('%d', TW.maxMb)); markField(f, 'claim_files[]'); return; }
+                    }
+                    var fd = new FormData(f);
+                    fd.append('csrf', csrf);
+                    fd.append('warranty_id', f.getAttribute('data-warranty'));
+                    busy(f, true);
+                    post('portal_claim', fd).then(function (r) {
+                        busy(f, false);
+                        if (!r.success) { alertBox(root, r.data.message); markField(f, r.data.field); return; }
+                        load();
+                        alertBox(root, r.data.message, 'success');
+                    });
+                });
+            });
+
             var exp = content.querySelector('[data-action="export"]');
             if (exp) exp.addEventListener('click', function () {
                 post('portal_export', { csrf: csrf }).then(function (r) {

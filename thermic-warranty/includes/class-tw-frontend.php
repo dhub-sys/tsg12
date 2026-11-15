@@ -18,7 +18,7 @@ final class TW_Frontend {
         add_action('template_redirect', [__CLASS__, 'no_cache_on_our_pages']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
 
-        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_export', 'portal_erase', 'logout'];
+        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_claim', 'portal_export', 'portal_erase', 'logout'];
         foreach ($public as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
@@ -473,6 +473,37 @@ final class TW_Frontend {
         }
         do_action('tw_service_submitted', $w, $row);
         wp_send_json_success(['message' => sprintf(tw__('Το %dο Service καταχωρήθηκε και η εγγύηση συνεχίζει να ισχύει. Σας στείλαμε επιβεβαίωση με email· κρατήστε και την πρωτότυπη απόδειξη.'), $no)]);
+    }
+
+    /** Repair / replacement request for a product under warranty. */
+    public static function ajax_portal_claim() {
+        $s = self::require_session();
+        self::guard(false);
+        $w = self::owned_warranty($s);
+        if (!TW_Guard::hit('portal_claim', 10, 3600)) self::fail('Πολλές υποβολές. Δοκιμάστε ξανά αργότερα.', '', 429);
+        $can = TW_Claims::can_claim($w);
+        if ($can !== true) self::fail($can, '', 409);
+        $type = self::input('claim_type') === 'replace' ? 'replace' : 'repair';
+        $desc = trim(sanitize_textarea_field(self::input('description')));
+        if (mb_strlen($desc) < 10) self::fail('Περιγράψτε το πρόβλημα (τουλάχιστον 10 χαρακτήρες).', 'description');
+        $desc = mb_substr($desc, 0, 3000);
+        $phone_raw = self::input('contact_phone');
+        $phone = $phone_raw === '' ? '' : TW_Util::clean_phone($phone_raw);
+        if ($phone_raw !== '' && $phone === '') self::fail('Το τηλέφωνο δεν είναι έγκυρο.', 'contact_phone');
+        $uploads = TW_Claims::uploaded_list('claim_files');
+        if (count($uploads) > TW_Claims::MAX_FILES) self::fail(sprintf(tw__('Επισυνάψτε έως %d αρχεία.'), TW_Claims::MAX_FILES), 'claim_files');
+        $files = [];
+        foreach ($uploads as $up) {
+            $f = TW_Util::store_invoice($up, tw__('του συνημμένου'));
+            if (is_wp_error($f)) {
+                foreach ($files as $done) if ($p = TW_Util::invoice_path($done['file'])) @unlink($p);
+                self::fail($f->get_error_message(), 'claim_files');
+            }
+            $files[] = $f;
+        }
+        $c = TW_Claims::create($w, $type, $desc, $phone, $files);
+        if (is_wp_error($c)) self::fail($c->get_error_message(), '');
+        wp_send_json_success(['message' => sprintf(tw__('Το αίτημά σας #%d καταχωρήθηκε. Σας στείλαμε επιβεβαίωση με email και θα σας ενημερώσουμε για την εξέλιξή του.'), (int) $c->id)]);
     }
 
     public static function ajax_portal_export() {

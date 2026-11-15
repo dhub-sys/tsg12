@@ -53,6 +53,7 @@ final class TW_Privacy {
                 'marketing_opt_in' => (int) $w->marketing_opt_in,
                 'registered_at' => $w->created_at,
                 'consents' => $consents,
+                'claims' => TW_Claims::export_rows($w->id),
                 'services' => array_values(array_map(function ($s) {
                     return ['milestone' => (int) $s->milestone_no, 'date' => $s->performed_date, 'by' => $s->performed_by,
                         'technician_vat' => $s->technician_vat, 'receipt_number' => $s->receipt_number, 'receipt_date' => $s->receipt_date, 'receipt_uploaded' => $s->receipt_file ? 'yes' : 'no', 'review_status' => $s->review_status];

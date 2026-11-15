@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.14.0';
+    const DB_VERSION = '1.15.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -217,6 +217,26 @@ final class TW_DB {
         // Terms sets (1.28): everything accepted before belongs to the base set.
         $wpdb->query("UPDATE {$t('warranties')} SET terms_set = 1 WHERE terms_set = 0");
         $wpdb->query("UPDATE {$t('consents')} SET terms_set = 1 WHERE terms_set = 0 AND terms_version > 0");
+
+        // Warranty claims (repair / replacement) submitted by customers from «Οι εγγυήσεις μου».
+        dbDelta("CREATE TABLE {$t('claims')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  warranty_id bigint(20) unsigned NOT NULL,
+  type varchar(20) NOT NULL DEFAULT 'repair',
+  description text NULL,
+  contact_phone varchar(40) NOT NULL DEFAULT '',
+  files text NULL,
+  status varchar(20) NOT NULL DEFAULT 'new',
+  reply text NULL,
+  admin_note text NULL,
+  lang varchar(2) NOT NULL DEFAULT 'el',
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  closed_at datetime NULL,
+  PRIMARY KEY  (id),
+  KEY warranty_id (warranty_id),
+  KEY status (status)
+) $c;");
 
         // Partners / authorized Service network (public finder: country → region → area).
         dbDelta("CREATE TABLE {$t('partners')} (

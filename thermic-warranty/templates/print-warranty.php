@@ -149,13 +149,13 @@ $printed = sprintf('Εκτύπωση: %s – %s', TW_Util::datetime_label(TW_DB:
 
         <h2 class="section">Συγκαταθέσεις (αποδεικτικό GDPR)</h2>
         <table class="grid">
-            <thead><tr><th>Ημ/νία</th><th>Θέμα</th><th>Απόφαση</th><th>Έκδοση όρων</th><th>Πηγή</th><th>IP</th></tr></thead>
+            <thead><tr><th>Ημ/νία</th><th>Θέμα</th><th>Απόφαση</th><th>Όροι</th><th>Πηγή</th><th>IP</th></tr></thead>
             <tbody>
             <?php foreach ($consents as $c) : ?>
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($c->created_at)); ?></td>
                     <td><?php echo esc_html($consent_labels[$c->consent_type] ?? $c->consent_type); ?></td>
                     <td><span class="pill <?php echo $c->granted ? 'pill-yes' : 'pill-no'; ?>"><?php echo $c->granted ? '✔ Αποδοχή' : '✘ Όχι'; ?></span></td>
-                    <td><?php echo $c->terms_version ? esc_html(TW_Terms::name($c->terms_set ?: TW_Terms::BASE)) . ' v' . (int) $c->terms_version . ' <small class="mono">' . esc_html(substr($c->terms_hash, 0, 10)) . '</small>' : '—'; ?></td>
+                    <td><?php echo $c->terms_version ? esc_html(TW_Terms::name($c->terms_set ?: TW_Terms::BASE)) . ' <small class="mono">' . esc_html(substr($c->terms_hash, 0, 10)) . '</small>' : '—'; ?></td>
                     <td><?php echo esc_html($source_labels[$c->source] ?? $c->source); ?></td>
                     <td class="mono"><?php echo esc_html($c->ip ?: '—'); ?></td></tr>
             <?php endforeach; ?>

@@ -123,7 +123,12 @@ final class TW_Terms {
         return null;
     }
 
-    /** Saves the text as a new version if it changed. Returns the current version number. */
+    /**
+     * Saves the text of a set. For the team, editing never makes a new version: a new version is a new set.
+     * Internally the text is overwritten in place as long as nobody has accepted it; once a customer has,
+     * the accepted wording is kept as a hidden archived revision (the consent points to it with its SHA-256),
+     * so the record of what each customer accepted never changes. Returns the current revision number.
+     */
     public static function save_text($set, $text, $lang = 'el') {
         $text = trim(str_replace("\r\n", "\n", (string) $text));
         $hash = hash('sha256', $text);
@@ -131,10 +136,54 @@ final class TW_Terms {
         $current = $versions ? end($versions) : null;
         if ($current && $current['hash'] === $hash) return (int) $current['version'];
         if (!$current && $text === '') return 0;
-        $n = $current ? (int) $current['version'] + 1 : 1;
-        $versions[] = ['version' => $n, 'text' => $text, 'hash' => $hash, 'published_at' => TW_DB::now()];
+        $row = ['text' => $text, 'hash' => $hash, 'published_at' => TW_DB::now()];
+        if ($current && !self::revision_accepted($set, (int) $current['version'], $lang)) {
+            $versions[count($versions) - 1] = ['version' => (int) $current['version']] + $row;
+            $n = (int) $current['version'];
+        } else {
+            $n = $current ? (int) $current['version'] + 1 : 1;
+            $versions[] = ['version' => $n] + $row;
+        }
         update_option(self::option($set, $lang), $versions, false);
         return $n;
+    }
+
+    /** Whether any customer accepted this revision of the text. */
+    public static function revision_accepted($set, $revision, $lang) {
+        global $wpdb;
+        return (bool) $wpdb->get_var($wpdb->prepare("SELECT 1 FROM " . TW_DB::table('consents') . " WHERE consent_type = 'terms' AND terms_set = %d AND terms_version = %d AND lang = %s LIMIT 1", (int) $set, (int) $revision, $lang === 'en' ? 'en' : 'el'));
+    }
+
+    /** Tags and attributes the terms editor may produce (everything else is removed on save). */
+    public static function allowed_html() {
+        $cell = ['colspan' => true, 'rowspan' => true];
+        return [
+            'h2' => [], 'h3' => [], 'h4' => [], 'p' => [], 'br' => [], 'hr' => [], 'blockquote' => [],
+            'strong' => [], 'b' => [], 'em' => [], 'i' => [], 'u' => [], 'sup' => [], 'sub' => [],
+            'ul' => [], 'ol' => [], 'li' => [],
+            'table' => [], 'thead' => [], 'tbody' => [], 'tr' => [], 'th' => $cell, 'td' => $cell,
+            'a' => ['href' => true, 'target' => true, 'rel' => true],
+        ];
+    }
+
+    /** Cleans editor HTML before saving. */
+    public static function clean_html($html) {
+        $html = preg_replace('#<(script|style|iframe|object|embed|noscript|template)\b[^>]*>.*?</\1\s*>#is', '', (string) $html);
+        $html = wp_kses($html, self::allowed_html(), ['http', 'https', 'mailto', 'tel']);
+        $html = preg_replace('#<(p|h[2-4]|li)>\s*(?:<br\s*/?>)?\s*</\1>#i', '', $html); // empty blocks (table cells stay)
+        return trim($html);
+    }
+
+    /** HTML for display: formatted text from the editor, or older plain text turned into paragraphs. */
+    public static function html($text) {
+        $text = (string) $text;
+        if (preg_match('#<(p|h[2-4]|ul|ol|table|strong|em|br|blockquote)\b#i', $text)) return wp_kses($text, self::allowed_html(), ['http', 'https', 'mailto', 'tel']);
+        return wpautop(esc_html($text));
+    }
+
+    /** «Ενημέρωση: 15/11/2026» – what customers see instead of a version number. */
+    public static function updated_label($t) {
+        return sprintf(tw__('Τελευταία ενημέρωση όρων: %s'), TW_Util::date_label(substr((string) $t['published_at'], 0, 10)));
     }
 
     /** All options holding terms (for backups). */
@@ -161,9 +210,14 @@ final class TW_Terms {
 
     /** The uploaded PDF only if it belongs to the current version of the text (otherwise it shows outdated terms). */
     public static function pdf_current($set, $lang = 'el') {
+        return self::pdf($set, $lang);
+    }
+
+    /** The text was changed after the PDF was uploaded (the team should check the PDF is up to date). */
+    public static function pdf_older_than_text($set, $lang) {
         $m = self::pdf($set, $lang);
         $v = self::versions($set, $lang);
-        return ($m && $v && (int) $m['version'] === (int) end($v)['version']) ? $m : null;
+        return $m && $v && end($v)['published_at'] > $m['uploaded_at'];
     }
 
     private static function set_pdf_meta($set, $lang, $meta) {
@@ -246,8 +300,8 @@ final class TW_Terms {
                 'set' => (int) $id,
                 'version' => (int) $t['version'],
                 'lang' => $t['lang'],
-                'html' => wpautop(esc_html($t['text'])),
-                'label' => sprintf(tw__('Έκδοση όρων: %1$d (%2$s)'), (int) $t['version'], TW_Util::datetime_label($t['published_at'])) . ' · ' . self::period_label($id),
+                'html' => self::html($t['text']),
+                'label' => self::period_label($id) . ' · ' . self::updated_label($t),
             ];
         }
         return $out;
@@ -287,12 +341,20 @@ final class TW_Terms {
         return wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 's' => (int) $set, 'v' => (int) $version, 'tl' => $lang], TW_Admin::url()), 'tw_terms_view');
     }
 
+    /** Last update + link; older accepted wordings (if any) as a small archive for the record. */
     private static function history($set, $lang) {
-        $out = [];
-        foreach (array_reverse(self::versions($set, $lang)) as $tv) {
-            $out[] = sprintf('<a href="%s" target="_blank">v%d</a> <small>(%s)</small>', esc_url(self::view_link($set, $tv['version'], $lang)), (int) $tv['version'], esc_html(TW_Util::date_label(substr($tv['published_at'], 0, 10))));
+        $v = self::versions($set, $lang);
+        if (!$v) return '—';
+        $cur = end($v);
+        $out = sprintf('<a href="%s" target="_blank">%s</a>', esc_url(self::view_link($set, $cur['version'], $lang)), esc_html(TW_Util::date_label(substr($cur['published_at'], 0, 10))));
+        $old = array_slice(array_reverse($v), 1);
+        if ($old) {
+            $links = array_map(function ($tv) use ($set, $lang) {
+                return sprintf('<a href="%s" target="_blank">%s</a>', esc_url(self::view_link($set, $tv['version'], $lang)), esc_html(TW_Util::date_label(substr($tv['published_at'], 0, 10))));
+            }, $old);
+            $out .= '<br><small class="description" title="Προηγούμενες διατυπώσεις που έχουν αποδεχθεί πελάτες· φυλάσσονται για το αρχείο.">αρχείο: ' . implode(', ', $links) . '</small>';
         }
-        return $out ? implode(' &nbsp; ', $out) : '—';
+        return $out;
     }
 
     public static function page() {
@@ -315,11 +377,11 @@ final class TW_Terms {
                     <li>το σετ με την πιο πρόσφατη ημερομηνία <strong>«Ισχύει για αγορές από»</strong> που είναι ίδια ή προγενέστερη της ημερομηνίας αγοράς, αλλιώς</li>
                     <li>τους <strong>Βασικούς όρους</strong>.</li>
                 </ol>
-                <p>Κάθε αλλαγή κειμένου δημιουργεί νέα έκδοση του σετ· οι παλαιότερες φυλάσσονται και για κάθε πελάτη καταγράφονται σετ, έκδοση και γλώσσα που αποδέχθηκε. Οι αλλαγές ισχύουν για νέες ενεργοποιήσεις· όσοι έχουν ήδη ενεργοποιήσει κρατούν τους όρους που αποδέχθηκαν.</p>
+                <p>Κάθε σετ είναι μία <strong>έκδοση όρων</strong>: για νέα έκδοση προσθέτετε νέο σετ. Η διόρθωση του κειμένου ενός σετ δεν αλλάζει έκδοση. Για κάθε πελάτη φυλάσσεται ακριβώς το κείμενο που αποδέχθηκε (με αποτύπωμα SHA-256), ακόμη κι αν διορθωθεί αργότερα· όσοι έχουν ήδη ενεργοποιήσει κρατούν τους όρους που αποδέχθηκαν.</p>
                 <p><strong>Σήμερα, για αγορές σημερινής ημερομηνίας, ισχύει:</strong> <?php echo esc_html(self::name($latest)); ?>. Στη σελίδα του site: <code>[<?php echo esc_html(TW_Terms_Public::SHORTCODE); ?>]</code> (οι πιο πρόσφατοι όροι, με αναζήτηση όρων ανά σειριακό ή ημερομηνία αγοράς).</p>
             </div>
 
-            <table class="widefat striped"><thead><tr><th>Σετ όρων</th><th>Ισχύει για αγορές από</th><th>Σειριακοί με ανάθεση</th><th>Πελάτες που τους αποδέχθηκαν</th><th>Εκδόσεις (EL)</th><th>Εκδόσεις (EN)</th><th>PDF</th><th></th></tr></thead><tbody>
+            <table class="widefat striped"><thead><tr><th>Σετ όρων</th><th>Ισχύει για αγορές από</th><th>Σειριακοί με ανάθεση</th><th>Πελάτες που τους αποδέχθηκαν</th><th>Κείμενο (EL)</th><th>Κείμενο (EN)</th><th>PDF</th><th></th></tr></thead><tbody>
             <?php foreach ($sets as $id => $st) : $assigned = self::assigned_count($id); ?>
                 <tr<?php echo (int) $id === $latest ? ' style="font-weight:600"' : ''; ?>>
                     <td><?php echo esc_html($st['name']); ?><?php echo (int) $id === $latest ? ' <span class="tw-badge tw-badge--active">ισχύει σήμερα</span>' : ''; ?><?php echo !self::versions($id, 'el') ? ' <span class="tw-badge tw-badge--void">χωρίς κείμενο</span>' : ''; ?></td>
@@ -328,7 +390,7 @@ final class TW_Terms {
                     <td><?php echo (int) self::accepted_count($id); ?></td>
                     <td><?php echo self::history($id, 'el'); // phpcs:ignore ?></td>
                     <td><?php echo self::history($id, 'en'); // phpcs:ignore ?></td>
-                    <td><?php $pl = []; foreach (['el', 'en'] as $x) { if (self::pdf($id, $x)) $pl[] = strtoupper($x) . (self::pdf_current($id, $x) ? '' : ' (παλιά έκδοση)'); } echo $pl ? esc_html(implode(' · ', $pl)) : '<span class="description">αυτόματο</span>'; ?></td>
+                    <td><?php $pl = []; foreach (['el', 'en'] as $x) { if (self::pdf($id, $x)) $pl[] = strtoupper($x) . (self::pdf_older_than_text($id, $x) ? ' (έλεγχος)' : ''); } echo $pl ? esc_html(implode(' · ', $pl)) : '<span class="description">αυτόματο</span>'; ?></td>
                     <td><a class="button" href="<?php echo esc_url(TW_Admin::url('terms', ['edit' => $id]) . '#tw-terms-form'); ?>">Επεξεργασία</a></td>
                 </tr>
             <?php endforeach; ?>
@@ -347,15 +409,16 @@ final class TW_Terms {
                         <?php else : ?>
                             <p class="description">Οι βασικοί όροι ισχύουν όταν δεν ταιριάζει κανένα άλλο σετ (για αγορές πριν από το πρώτο σετ με ημερομηνία).</p>
                         <?php endif; ?>
-                        <p><label>Κείμενο όρων (Ελληνικά) <textarea name="text_el" rows="16" class="large-text" required><?php echo esc_textarea($el['text']); ?></textarea></label></p>
-                        <p><label>Terms (English) <span class="description">(προαιρετικό – χωρίς αγγλικό κείμενο, οι πελάτες στα αγγλικά βλέπουν τους ελληνικούς όρους του σετ)</span><textarea name="text_en" rows="10" class="large-text" lang="en"><?php echo esc_textarea($enx); ?></textarea></label></p>
+                        <p><label>Κείμενο όρων (Ελληνικά) <textarea name="text_el" rows="16" class="large-text" data-tw-rich><?php echo esc_textarea($el['text']); ?></textarea></label></p>
+                        <p><label>Terms (English) <span class="description">(προαιρετικό – χωρίς αγγλικό κείμενο, οι πελάτες στα αγγλικά βλέπουν τους ελληνικούς όρους του σετ)</span><textarea name="text_en" rows="10" class="large-text" lang="en" data-tw-rich><?php echo esc_textarea($enx); ?></textarea></label></p>
+                        <script src="<?php echo esc_url(TW_URL . 'assets/js/terms-editor.js?ver=' . TW_VERSION); ?>"></script>
                         <h3>PDF για λήψη από το site <span class="description">(προαιρετικό)</span></h3>
-                        <p class="description">Το «Λήψη PDF» της σελίδας όρων δίνει αυτό το αρχείο. Χωρίς PDF, ο επισκέπτης παίρνει αυτόματη σελίδα εκτύπωσης από το κείμενο, με το διάστημα ισχύος. Το PDF αντιστοιχεί στην έκδοση του κειμένου που ισχύει όταν το ανεβάζετε· αν αλλάξετε το κείμενο, ανεβάστε και νέο PDF (αλλιώς το site δίνει την αυτόματη σελίδα εκτύπωσης).</p>
+                        <p class="description">Το «Λήψη PDF» της σελίδας όρων δίνει αυτό το αρχείο. Χωρίς PDF, ο επισκέπτης παίρνει αυτόματη σελίδα εκτύπωσης από το κείμενο, με το διάστημα ισχύος. Αν διορθώσετε το κείμενο, ανεβάστε και το ενημερωμένο PDF.</p>
                         <?php foreach (['el' => 'PDF (Ελληνικά)', 'en' => 'PDF (English)'] as $pl => $plabel) : $pm = $id ? self::pdf($id, $pl) : null; $pv = $id && self::versions($id, $pl) ? (int) end(self::versions($id, $pl))['version'] : 0; ?>
                             <p><label><?php echo esc_html($plabel); ?> <input type="file" name="pdf_<?php echo esc_attr($pl); ?>" accept="application/pdf,.pdf"></label>
                             <?php if ($pm) : ?>
                                 <span class="description">Τώρα: <a href="<?php echo esc_url(TW_Terms_Public::pdf_url($id, $pl)); ?>" target="_blank"><?php echo esc_html($pm['name']); ?></a> (<?php echo esc_html(TW_Util::datetime_label($pm['uploaded_at'])); ?>)</span>
-                                <?php if ($pv && (int) $pm['version'] !== $pv) : ?><br><span class="tw-badge tw-badge--void">Προσοχή: το PDF ανέβηκε στην έκδοση v<?php echo (int) $pm['version']; ?> και το κείμενο είναι πλέον v<?php echo (int) $pv; ?>. Μέχρι να ανεβάσετε ενημερωμένο PDF, το site δίνει την αυτόματη σελίδα εκτύπωσης.</span><?php endif; ?>
+                                <?php if (self::pdf_older_than_text($id, $pl)) : ?><br><span class="tw-badge tw-badge--void">Το κείμενο άλλαξε μετά το ανέβασμα του PDF. Ελέγξτε ότι το PDF είναι ενημερωμένο.</span><?php endif; ?>
                                 <label><input type="checkbox" name="pdf_<?php echo esc_attr($pl); ?>_remove" value="1"> Αφαίρεση PDF</label>
                             <?php endif; ?></p>
                         <?php endforeach; ?>
@@ -403,27 +466,26 @@ final class TW_Terms {
                 }
             }
         }
-        $text_el = sanitize_textarea_field(wp_unslash($_POST['text_el'] ?? ''));
-        if (trim($text_el) === '') {
+        $text_el = self::clean_html(wp_unslash($_POST['text_el'] ?? ''));
+        if (trim(wp_strip_all_tags($text_el)) === '') {
             TW_Admin::flash('Συμπληρώστε το κείμενο των όρων στα ελληνικά.', 'error');
             TW_Admin::back('tw-terms', ['edit' => $id ?: 'new']);
         }
         $is_new = !$id;
         $id = self::save_set($id, sanitize_text_field(TW_Admin::post('name')), $from);
-        $before = self::versions($id, 'el') ? (int) self::current($id, 'el')['version'] : 0;
-        $v = self::save_text($id, $text_el, 'el');
+        $before = self::versions($id, 'el') ? self::current($id, 'el')['hash'] : '';
+        self::save_text($id, $text_el, 'el');
         $msg = $is_new ? 'Δημιουργήθηκε το σετ όρων «' . esc_html(self::name($id)) . '».' : 'Αποθηκεύτηκε.';
-        if ($v !== $before) {
-            $msg .= sprintf(' Νέα έκδοση v%d.', $v);
-            TW_DB::log_event('terms_published', ['set' => self::name($id), 'version' => $v]);
+        if (self::current($id, 'el')['hash'] !== $before) {
+            TW_DB::log_event('terms_published', ['set' => self::name($id), 'lang' => 'EL']);
         }
-        $en = trim(sanitize_textarea_field(wp_unslash($_POST['text_en'] ?? '')));
+        $en = self::clean_html(wp_unslash($_POST['text_en'] ?? ''));
+        if (trim(wp_strip_all_tags($en)) === '') $en = '';
         if ($en !== '' || self::versions($id, 'en')) {
-            $before_en = self::versions($id, 'en') ? (int) end(self::versions($id, 'en'))['version'] : 0;
-            $ve = self::save_text($id, $en, 'en');
-            if ($ve !== $before_en) {
-                $msg .= sprintf(' Νέα αγγλική έκδοση v%d.', $ve);
-                TW_DB::log_event('terms_published', ['set' => self::name($id), 'version' => $ve . ' (EN)']);
+            $before_en = self::versions($id, 'en') ? end(self::versions($id, 'en'))['hash'] : '';
+            self::save_text($id, $en, 'en');
+            if (end(self::versions($id, 'en'))['hash'] !== $before_en) {
+                TW_DB::log_event('terms_published', ['set' => self::name($id), 'lang' => 'EN']);
             }
         }
         $type = 'success';
@@ -518,8 +580,8 @@ final class TW_Terms_Public {
             'version' => (int) $t['version'],
             'lang' => $t['lang'],
             'period' => TW_Terms::period_label($set),
-            'label' => sprintf(tw__('Έκδοση όρων: %1$d (%2$s)'), (int) $t['version'], TW_Util::datetime_label($t['published_at'])),
-            'html' => wpautop(esc_html($t['text'])),
+            'label' => TW_Terms::updated_label($t),
+            'html' => TW_Terms::html($t['text']),
             // The uploaded PDF in the language of the text shown, otherwise the automatic printable page.
             'pdf' => TW_Terms::pdf_current($set, $t['lang']) ? self::pdf_url($set, $t['lang']) : self::print_url($set, (int) $t['version'], $t['lang']),
         ];
@@ -644,6 +706,9 @@ h1 { font-size: 20pt; margin: 0 0 4px; }
 .period { font-weight: 700; font-size: 12pt; margin: 0 0 4px; }
 .meta { color: #5f6b7a; font-size: 9pt; margin: 0 0 16px; }
 .text p { margin: 0 0 .7em; }
+.text h2 { font-size: 14pt; margin: 1em 0 .4em; } .text h3 { font-size: 12pt; margin: .9em 0 .35em; } .text ul, .text ol { margin: 0 0 .8em 1.4em; padding: 0; }
+.text table { border-collapse: collapse; margin: .6em 0 1em; } .text th, .text td { border: 1px solid #9aa1ab; padding: 5px 8px; vertical-align: top; text-align: left; } .text th { background: #eef0f3; }
+h2, h3, tr { page-break-inside: avoid; break-inside: avoid; }
 footer { margin-top: 24px; border-top: 1px solid #d6d9de; padding-top: 8px; color: #5f6b7a; font-size: 8.5pt; }
 .bar { text-align: center; margin: 0 0 16px; } .bar button { font: inherit; padding: 8px 18px; border-radius: 6px; border: 1px solid #1d2330; background: #1d2330; color: #fff; cursor: pointer; }
 @media print { .bar { display: none; } body { margin: 0; max-width: none; padding: 0; } }
@@ -651,8 +716,8 @@ footer { margin-top: 24px; border-top: 1px solid #d6d9de; padding-top: 8px; colo
 <div class="bar"><button type="button" onclick="window.print()"><?php echo esc_html(tw__('Αποθήκευση ως PDF / Εκτύπωση')); ?></button></div>
 <header><div><h1><?php tw_e('Όροι εγγύησης'); ?></h1><div><?php echo esc_html($s['company_name']); ?></div></div><?php echo $s['logo_url'] ? TW_App::logo_html('logo') : ''; // phpcs:ignore ?></header>
 <p class="period"><?php echo esc_html(TW_Terms::period_label($set)); ?></p>
-<p class="meta"><?php echo esc_html(sprintf(tw__('Έκδοση όρων: %1$d (%2$s)'), (int) $t['version'], TW_Util::datetime_label($t['published_at']))); ?></p>
-<div class="text"<?php echo $t['lang'] !== $lang ? ' lang="' . esc_attr($t['lang']) . '"' : ''; ?>><?php echo wpautop(esc_html($t['text'])); ?></div>
+<p class="meta"><?php echo esc_html(TW_Terms::updated_label($t)); ?></p>
+<div class="text"<?php echo $t['lang'] !== $lang ? ' lang="' . esc_attr($t['lang']) . '"' : ''; ?>><?php echo TW_Terms::html($t['text']); // sanitized ?></div>
 <footer><?php echo esc_html(sprintf(tw__('Εκτυπώθηκε %s'), TW_Util::datetime_label(TW_DB::now()))); ?> · SHA-256 <?php echo esc_html(substr($t['hash'], 0, 16)); ?>…</footer>
 <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });</script>
 </body></html><?php

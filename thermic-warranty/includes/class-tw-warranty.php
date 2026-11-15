@@ -466,6 +466,7 @@ final class TW_Warranty {
             if ($sv->receipt_file && ($p = TW_Util::invoice_path($sv->receipt_file))) @unlink($p);
         }
         $wpdb->update(TW_DB::table('services'), ['receipt_file' => '', 'receipt_original_name' => ''], ['warranty_id' => $w->id]);
+        TW_Claims::anonymize($w->id);
         // Activity log: replace the customer's email, phones and name, drop their IP, and sign the entries again.
         $anon = 'anon-' . $w->id . '@invalid';
         $repl = array_filter([(string) $w->email => $anon, (string) $w->phone_mobile => '', (string) $w->phone_landline => '', (string) $w->customer_name => '[ανωνυμοποιήθηκε]'], function ($v, $k) { return $k !== ''; }, ARRAY_FILTER_USE_BOTH);

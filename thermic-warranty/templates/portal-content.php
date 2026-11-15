@@ -136,6 +136,8 @@ $mlabels = TW_Settings::consent_labels($lang);
             ? sprintf(tw__('Για το Service απευθυνθείτε στον συνεργάτη από τον οποίο αγοράσατε το προϊόν (%1$s) ή απευθείας στη %2$s: %3$s. Το Service πρέπει να γίνεται με αυθεντικά ανταλλακτικά.'), $w->partner_email, $s['company_name'], $s['company_contact'])
             : sprintf(tw__('Για το Service απευθυνθείτε στον συνεργάτη από τον οποίο αγοράσατε το προϊόν ή απευθείας στη %1$s: %2$s. Το Service πρέπει να γίνεται με αυθεντικά ανταλλακτικά.'), $s['company_name'], $s['company_contact'])); ?></p>
 
+        <?php echo TW_Claims::portal_block($w); // phpcs:ignore -- escaped inside ?>
+
         <details class="tw-details">
             <summary><?php tw_e('Στοιχεία καταχώρησης'); ?></summary>
             <dl class="tw-dl">

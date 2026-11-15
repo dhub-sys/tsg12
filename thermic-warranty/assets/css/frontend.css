@@ -237,3 +237,25 @@
 .tw-terms-foot .tw-hint { margin: 0; }
 .tw-terms-foot .tw-btn { padding: 8px 16px; font-size: 15px; }
 @media (max-width: 760px) { .tw-app.tw-terms-finder { grid-template-columns: 1fr; } .tw-terms-finder .tw-card { padding: 18px 16px; } }
+
+/* Formatted terms (headings, lists, tables) wherever they are shown to customers */
+.tw-terms h2, .tw-terms-text h2 { font-size: 1.2em; margin: .9em 0 .4em; }
+.tw-terms h3, .tw-terms-text h3 { font-size: 1.07em; margin: .8em 0 .35em; }
+.tw-terms h2:first-child, .tw-terms-text h2:first-child, .tw-terms h3:first-child, .tw-terms-text h3:first-child { margin-top: 0; }
+.tw-terms ul, .tw-terms ol, .tw-terms-text ul, .tw-terms-text ol { margin: 0 0 .8em 1.4em; padding: 0; }
+.tw-terms table, .tw-terms-text table { border-collapse: collapse; margin: .6em 0 1em; max-width: 100%; display: block; overflow-x: auto; }
+.tw-terms th, .tw-terms td, .tw-terms-text th, .tw-terms-text td { border: 1px solid var(--tw-border); padding: 6px 10px; vertical-align: top; text-align: left; background: #fff; }
+.tw-terms th, .tw-terms-text th { background: #eef0f3; font-weight: 700; }
+
+/* Warranty claims in «Οι εγγυήσεις μου» */
+.tw-claims { margin: 18px 0 10px; padding-top: 14px; border-top: 1px solid var(--tw-border); }
+.tw-claims h5 { font-size: 1em; margin: 0 0 10px; }
+.tw-claim { border: 1px solid var(--tw-border); border-left: 4px solid #2563eb; border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; background: var(--tw-bg-soft); }
+.tw-claim p { margin: 4px 0; }
+.tw-claim--approved, .tw-claim--completed { border-left-color: var(--tw-ok); }
+.tw-claim--rejected { border-left-color: var(--tw-bad); }
+.tw-claim-state { display: inline-block; margin-left: 6px; font-size: 13px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: #fff; border: 1px solid var(--tw-border); }
+.tw-claim-reply { font-size: 15px; }
+.tw-claim-form .tw-choice { border: 0; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.tw-claim-form .tw-choice legend { font-weight: 600; margin-bottom: 6px; }
+.tw-claim-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--tw-border); border-radius: 6px; font: inherit; font-size: 16px; }

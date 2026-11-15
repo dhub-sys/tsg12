@@ -384,4 +384,56 @@ return [
     'Αποθήκευση ως PDF / Εκτύπωση' => 'Save as PDF / Print',
     'Εκτυπώθηκε %s' => 'Printed %s',
     'Δεν βρέθηκε.' => 'Not found.',
+    // Terms updates and warranty claims
+    'Τελευταία ενημέρωση όρων: %s' => 'Terms last updated: %s',
+    'Επισκευή' => 'Repair',
+    'Αντικατάσταση' => 'Replacement',
+    'Νέο – αναμένει έλεγχο' => 'New – awaiting review',
+    'Σε εξέλιξη' => 'In progress',
+    'Εγκρίθηκε' => 'Approved',
+    'Ολοκληρώθηκε' => 'Completed',
+    'Η εγγύηση αυτού του προϊόντος δεν είναι σε ισχύ, γι’ αυτό δεν μπορεί να υποβληθεί αίτημα εγγύησης. Για επισκευή εκτός εγγύησης επικοινωνήστε μαζί μας.' => 'The warranty of this product is not valid, so a warranty claim cannot be submitted. For an out-of-warranty repair, please contact us.',
+    'Υπάρχει ήδη ανοιχτό αίτημα για αυτό το προϊόν. Θα ενημερωθείτε με email για την εξέλιξή του.' => 'There is already an open request for this product. You will be informed by email about its progress.',
+    'Σφάλμα αποθήκευσης. Δοκιμάστε ξανά.' => 'Could not save. Please try again.',
+    'Λάβαμε το αίτημά σας #%1$d – S/N %2$s' => 'We received your request #%1$d – S/N %2$s',
+    'Αίτημα επισκευής ή αντικατάστασης' => 'Repair or replacement request',
+    'Απάντηση:' => 'Reply:',
+    'Νέο αίτημα εντός εγγύησης' => 'New warranty request',
+    'Τι ζητάτε;' => 'What do you need?',
+    'Περιγραφή του προβλήματος' => 'Description of the problem',
+    'Τι συμβαίνει, από πότε, πού είναι εγκατεστημένο το προϊόν…' => 'What happens, since when, where the product is installed…',
+    'Τηλέφωνο επικοινωνίας' => 'Contact phone',
+    'Φωτογραφίες ή έγγραφα (έως %1$d αρχεία, PDF, JPG ή PNG, έως %2$d MB το καθένα)' => 'Photos or documents (up to %1$d files, PDF, JPG or PNG, up to %2$d MB each)',
+    'Το αίτημα εξετάζεται σύμφωνα με τους όρους εγγύησης που αποδεχθήκατε. Θα σας ενημερώσουμε με email.' => 'Your request is reviewed under the warranty terms you accepted. We will keep you informed by email.',
+    'Υποβολή αιτήματος' => 'Submit request',
+    'Ενημέρωση για το αίτημά σας #%1$d – S/N %2$s' => 'Update on your request #%1$d – S/N %2$s',
+    'Οι εγγυήσεις μου: %s' => 'My warranties: %s',
+    'Πολλές υποβολές. Δοκιμάστε ξανά αργότερα.' => 'Too many submissions. Please try again later.',
+    'Περιγράψτε το πρόβλημα (τουλάχιστον 10 χαρακτήρες).' => 'Please describe the problem (at least 10 characters).',
+    'Το τηλέφωνο δεν είναι έγκυρο.' => 'The phone number is not valid.',
+    'Επισυνάψτε έως %d αρχεία.' => 'Attach up to %d files.',
+    'του συνημμένου' => 'of the attachment',
+    'Το αίτημά σας #%d καταχωρήθηκε. Σας στείλαμε επιβεβαίωση με email και θα σας ενημερώσουμε για την εξέλιξή του.' => 'Your request #%d has been submitted. We sent you a confirmation email and will keep you informed.',
+    'Αγαπητέ/ή %1$s,
+
+λάβαμε το αίτημά σας για %2$s του προϊόντος σας (S/N %3$s, κωδικός εγγύησης %4$s).
+
+Αριθμός αιτήματος: #%5$d
+
+Θα το εξετάσουμε και θα σας ενημερώσουμε με email. Μπορείτε να δείτε την εξέλιξή του στη σελίδα «Οι εγγυήσεις μου»: %6$s
+
+%7$s' => 'Dear %1$s,
+
+we received your request for the %2$s of your product (S/N %3$s, warranty code %4$s).
+
+Request number: #%5$d
+
+We will review it and let you know by email. You can follow its progress on the “My warranties” page: %6$s
+
+%7$s',
+    'Αγαπητέ/ή %1$s,
+
+το αίτημά σας #%2$d για το προϊόν με S/N %3$s: %4$s.' => 'Dear %1$s,
+
+your request #%2$d for the product with S/N %3$s: %4$s.',
 ];
