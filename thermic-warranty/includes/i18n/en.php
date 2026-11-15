@@ -438,4 +438,5 @@ We will review it and let you know by email. You can follow its progress on the 
 your request #%2$d for the product with S/N %3$s: %4$s.',
     'Σελίδα' => 'Page',
     'από' => 'of',
+    'Τελευταία ενημέρωση: %s' => 'Last updated: %s',
 ];

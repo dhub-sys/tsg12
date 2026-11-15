@@ -259,3 +259,12 @@
 .tw-claim-form .tw-choice { border: 0; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .tw-claim-form .tw-choice legend { font-weight: 600; margin-bottom: 6px; }
 .tw-claim-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--tw-border); border-radius: 6px; font: inherit; font-size: 16px; }
+
+/* [thermic_warranty_privacy]: the privacy policy text inside the theme's page. */
+.tw-privacy-text { line-height: 1.6; }
+.tw-privacy-text .tw-privacy-updated { font-size: .9em; opacity: .75; margin: 0 0 1.2em; }
+.tw-privacy-text table { width: 100%; border-collapse: collapse; margin: .6em 0 1.4em; font-size: .95em; }
+.tw-privacy-text th, .tw-privacy-text td { border: 1px solid rgba(0, 0, 0, .15); padding: 8px 10px; text-align: left; vertical-align: top; }
+.tw-privacy-text th { background: rgba(0, 0, 0, .04); font-weight: 600; }
+.tw-privacy-text ul, .tw-privacy-text ol { padding-left: 1.4em; }
+@media (max-width: 640px) { .tw-privacy-text table { display: block; overflow-x: auto; } }

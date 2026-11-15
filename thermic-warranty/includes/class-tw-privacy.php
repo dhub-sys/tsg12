@@ -103,3 +103,88 @@ final class TW_Privacy {
         ));
     }
 }
+
+/**
+ * Privacy policy texts (Greek and English), edited in Ρυθμίσεις → GDPR with the same toolbar as the terms,
+ * and shown on the site's pages with [thermic_warranty_privacy] in the visitor's language.
+ */
+final class TW_Privacy_Text {
+    const OPTION = 'tw_privacy_text';
+    const SHORTCODE = 'thermic_warranty_privacy';
+
+    public static function init() {
+        add_shortcode(self::SHORTCODE, [__CLASS__, 'shortcode']);
+    }
+
+    /** @return array lang => ['html' => string, 'updated_at' => Y-m-d H:i:s] */
+    public static function all() {
+        $v = get_option(self::OPTION, []);
+        return is_array($v) ? $v : [];
+    }
+
+    public static function get($lang) {
+        $all = self::all();
+        return !empty($all[$lang]['html']) ? $all[$lang] : null;
+    }
+
+    /** Saves a language's text; returns true if it changed. */
+    public static function save($lang, $html) {
+        $html = trim(str_replace("\r\n", "\n", TW_Terms::clean_html($html)));
+        if (trim(wp_strip_all_tags($html)) === '') $html = '';
+        $all = self::all();
+        if (($all[$lang]['html'] ?? '') === $html) return false;
+        $all[$lang] = ['html' => $html, 'updated_at' => TW_DB::now()];
+        update_option(self::OPTION, $all, false);
+        return true;
+    }
+
+    /** Suggested text, based on what the platform actually collects and sends (to be completed by the company). */
+    public static function template($lang) {
+        $f = TW_DIR . 'templates/privacy-template-' . ($lang === 'en' ? 'en' : 'el') . '.html';
+        return is_readable($f) ? (string) file_get_contents($f) : '';
+    }
+
+    public static function shortcode($atts = []) {
+        $atts = shortcode_atts(['lang' => ''], $atts, self::SHORTCODE);
+        $lang = TW_I18n::norm(sanitize_key($atts['lang'])) ?: TW_I18n::lang();
+        $t = self::get($lang) ?: self::get('el');
+        if (!$t) return '';
+        if (!wp_style_is('tw-front', 'registered')) TW_Frontend::register_assets();
+        wp_enqueue_style('tw-front');
+        $tl = self::get($lang) ? $lang : 'el';
+        return TW_I18n::with($lang, function () use ($t, $tl, $lang) {
+            return '<div class="tw-privacy-text"' . ($tl !== $lang ? ' lang="' . esc_attr($tl) . '"' : '') . '>'
+                . '<p class="tw-privacy-updated">' . esc_html(sprintf(tw__('Τελευταία ενημέρωση: %s'), TW_Util::date_label(substr($t['updated_at'], 0, 10)))) . '</p>'
+                . wp_kses($t['html'], TW_Terms::allowed_html()) . '</div>';
+        });
+    }
+
+    /** Rows of the GDPR settings tab (inside the settings form). */
+    public static function admin_rows() {
+        foreach (['el' => 'Ελληνικά', 'en' => 'English'] as $l => $ln) {
+            $t = self::get($l);
+            echo '<tr><th>Πολιτική απορρήτου (' . esc_html($ln) . ')</th><td>';
+            echo '<p class="description" style="margin-top:0">' . ($t ? 'Τελευταία ενημέρωση: ' . esc_html(TW_Util::datetime_label($t['updated_at'])) . '. ' : 'Δεν έχει συμπληρωθεί ακόμη. ') . ($l === 'en' ? 'Χωρίς αγγλικό κείμενο, η αγγλική σελίδα δείχνει το ελληνικό.' : '') . '</p>';
+            echo '<p><textarea aria-label="' . esc_attr('Πολιτική απορρήτου – ' . $ln) . '" id="tw-privacy-' . esc_attr($l) . '" name="privacy_text_' . esc_attr($l) . '" rows="14" class="large-text" lang="' . esc_attr($l) . '" data-tw-rich>' . esc_textarea($t['html'] ?? '') . '</textarea></p>';
+            echo '<p><button type="button" class="button" data-tw-privacy-tpl="' . esc_attr($l) . '">Φόρτωση προτεινόμενου κειμένου</button> <span class="description">Βασίζεται σε ό,τι συλλέγει και στέλνει πραγματικά η πλατφόρμα. Συμπληρώστε τα σημεία σε [αγκύλες] και ελέγξτε το με τον νομικό σας σύμβουλο.</span></p>';
+            echo '<template id="tw-privacy-tpl-' . esc_attr($l) . '">' . self::template($l) . '</template>'; // static file shipped with the plugin
+            echo '</td></tr>';
+        }
+        ?>
+        <tr><td colspan="2">
+            <script src="<?php echo esc_url(TW_URL . 'assets/js/terms-editor.js?ver=' . TW_VERSION); ?>"></script>
+            <script>
+            document.querySelectorAll('[data-tw-privacy-tpl]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var l = b.getAttribute('data-tw-privacy-tpl'), ta = document.getElementById('tw-privacy-' + l);
+                    var area = ta.closest('td').querySelector('.tw-rte-area');
+                    if (area && area.textContent.trim() && !confirm('Να αντικατασταθεί το τρέχον κείμενο με το προτεινόμενο;')) return;
+                    var html = document.getElementById('tw-privacy-tpl-' + l).innerHTML;
+                    if (area) { area.innerHTML = html; area.dispatchEvent(new Event('input')); area.focus(); } else ta.value = html;
+                });
+            });
+            </script>
+        </td></tr>
+        <?php
+    }
+}

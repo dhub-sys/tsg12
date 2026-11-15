@@ -1208,7 +1208,9 @@ final class TW_Admin {
                     <tr><td colspan="2"><p class="description">Αν κάτι πάει στραβά και δεν μπορείτε να συνδεθείτε, προσθέστε στο <code>wp-config.php</code> τη γραμμή <code>define('TW_DISABLE_TURNSTILE', true);</code> – το Turnstile σταματά αμέσως, το honeypot μένει.</p></td></tr>
                     <?php
                 elseif ($tab === 'privacy') :
-                    $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Σύνδεσμος στη φόρμα ενεργοποίησης. Κενό = η Πολιτική Απορρήτου της ιστοσελίδας.');
+                    $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Η σελίδα του site με την πολιτική απορρήτου, όπου βάλατε το shortcode <code>[' . TW_Privacy_Text::SHORTCODE . ']</code>. Μπαίνει ως σύνδεσμος στη φόρμα ενεργοποίησης και στις σελίδες της εφαρμογής. Κενό = η Πολιτική Απορρήτου της ιστοσελίδας (WordPress).');
+                    echo '<tr><th>Κείμενα πολιτικής απορρήτου</th><td><p class="description" style="margin-top:0">Γράψτε εδώ την πολιτική απορρήτου στα ελληνικά και στα αγγλικά, με την ίδια μπάρα μορφοποίησης όπως στους όρους εγγύησης. Στη σελίδα του site βάλτε το shortcode <code>[' . esc_html(TW_Privacy_Text::SHORTCODE) . ']</code>: δείχνει το κείμενο στη γλώσσα του επισκέπτη, με την ημερομηνία τελευταίας ενημέρωσης. Για συγκεκριμένη γλώσσα: <code>[' . esc_html(TW_Privacy_Text::SHORTCODE) . ' lang="en"]</code>.</p></td></tr>';
+                    TW_Privacy_Text::admin_rows();
                     $field('retention_months_after_end', 'Αυτόματη ανωνυμοποίηση (μήνες)', 'number', 'Μήνες μετά τη λήξη ή το κλείδωμα για αυτόματη ανωνυμοποίηση των προσωπικών στοιχείων. Το ιστορικό του προϊόντος μένει. 0 = απενεργοποιημένο. Ορίστε το σε συνεννόηση με τον νομικό σύμβουλο / DPO.', 'min="0"');
                     ?>
                     <tr><th>Αιτήματα διαγραφής</th><td><p class="description">Τα αιτήματα από την πύλη πελατών εμφανίζονται παρακάτω αφού ο πελάτης τα επιβεβαιώσει από το email του. Ενεργές εγγυήσεις διατηρούνται (ανάκληση εμπορικής συγκατάθεσης)· όσες έχουν λήξει ή κλειδωθεί ανωνυμοποιούνται.</p></td></tr>
@@ -1804,6 +1806,13 @@ final class TW_Admin {
             else $values[$k] = sanitize_text_field($v);
         }
         foreach ($checkboxes[$tab] ?? [] as $cb) $values[$cb] = empty($in[$cb]) ? 0 : 1;
+        if ($tab === 'privacy') {
+            foreach (['el', 'en'] as $pl) {
+                if (isset($_POST['privacy_text_' . $pl]) && TW_Privacy_Text::save($pl, wp_unslash((string) $_POST['privacy_text_' . $pl]))) {
+                    TW_DB::log_event('privacy_text_saved', ['lang' => strtoupper($pl)]);
+                }
+            }
+        }
         if (isset($values['warranty_years'])) $values['warranty_years'] = max(1, $values['warranty_years']);
         if ($tab === 'sms' && isset($values['sms_method'])) $values['sms_method'] = strtoupper($values['sms_method']) === 'GET' ? 'GET' : 'POST';
 
