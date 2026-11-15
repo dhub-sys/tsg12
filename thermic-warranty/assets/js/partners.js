@@ -5,7 +5,8 @@
         try { cfg = JSON.parse(root.getAttribute('data-tw-partners')); } catch (e) { return; }
         var $ = function (k) { return root.querySelector('[data-f="' + k + '"]'); };
         var sc = $('country'), sr = $('region'), sa = $('area'), list = $('list'), status = $('status');
-        var cmp = function (a, b) { return a.localeCompare(b, cfg.lang === 'en' ? 'en' : 'el'); };
+        // Alphabetical, ignoring accents and capitals (Άλφα = ΑΛΦΑ = αλφα); numbers in natural order.
+        var cmp = function (a, b) { return a.localeCompare(b, cfg.lang === 'en' ? 'en' : 'el', { sensitivity: 'base', numeric: true }); };
         var uniq = function (arr) { return arr.filter(function (v, i) { return v && arr.indexOf(v) === i; }).sort(cmp); };
         var label = function (country, r) { return country === 'GR' && cfg.regionsEn[r] ? cfg.regionsEn[r] : r; };
         var fill = function (sel, items, first, labelFn) {
@@ -38,7 +39,7 @@
             list.innerHTML = '';
             if (!sr.value) { status.textContent = sc.value === 'GR' ? cfg.t.pick : cfg.t.pick_other; return; }
             var ps = inCountry().filter(function (p) { return p.r === sr.value && (!sa.value || p.a === sa.value); });
-            ps.sort(function (a, b) { return cmp(a.a || '', b.a || '') || cmp(a.n, b.n); });
+            ps.sort(function (a, b) { return cmp(a.n, b.n); });
             status.textContent = ps.length === 0 ? cfg.t.none : (ps.length === 1 ? cfg.t.found1 : cfg.t.foundN.replace('%d', ps.length));
             ps.forEach(function (p) {
                 var card = el('article', 'tw-card tw-partner');
