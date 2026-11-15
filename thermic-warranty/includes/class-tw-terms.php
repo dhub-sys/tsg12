@@ -70,6 +70,8 @@ final class TW_Terms {
         if ($id === self::BASE) return new WP_Error('base', 'Οι βασικοί όροι δεν διαγράφονται.');
         if (self::accepted_count($id)) return new WP_Error('used', 'Δεν διαγράφεται: υπάρχουν πελάτες που αποδέχθηκαν αυτούς τους όρους. Μπορείτε να αφαιρέσετε την ημερομηνία και τους σειριακούς, ώστε να μην εφαρμόζεται σε νέες ενεργοποιήσεις.');
         $wpdb->update(TW_DB::table('serials'), ['terms_set' => 0], ['terms_set' => $id]);
+        self::remove_pdf($id, 'el');
+        self::remove_pdf($id, 'en');
         $sets = self::sets();
         unset($sets[$id]);
         update_option(self::SETS_OPTION, $sets, false);
@@ -142,6 +144,62 @@ final class TW_Terms {
             foreach (['el', 'en'] as $l) $out[self::option($id, $l)] = self::versions($id, $l);
         }
         return $out;
+    }
+
+    // ------------------------------------------------------------------ ready-made PDF per set and language
+
+    const PDF_DIR = 'terms';
+
+    /** @return array|null ['file', 'name', 'version', 'uploaded_at', 'path'] of the uploaded PDF, if any */
+    public static function pdf($set, $lang = 'el') {
+        $s = self::get($set);
+        $m = $s['pdf_' . ($lang === 'en' ? 'en' : 'el')] ?? null;
+        if (!is_array($m) || empty($m['file'])) return null;
+        $path = TW_Util::invoice_path($m['file']);
+        return $path ? $m + ['path' => $path] : null;
+    }
+
+    /** The uploaded PDF only if it belongs to the current version of the text (otherwise it shows outdated terms). */
+    public static function pdf_current($set, $lang = 'el') {
+        $m = self::pdf($set, $lang);
+        $v = self::versions($set, $lang);
+        return ($m && $v && (int) $m['version'] === (int) end($v)['version']) ? $m : null;
+    }
+
+    private static function set_pdf_meta($set, $lang, $meta) {
+        $sets = get_option(self::SETS_OPTION, []);
+        if (!isset($sets[(int) $set])) return;
+        if ($meta) $sets[(int) $set]['pdf_' . $lang] = $meta; else unset($sets[(int) $set]['pdf_' . $lang]);
+        update_option(self::SETS_OPTION, $sets, false);
+    }
+
+    /** Stores an uploaded PDF for a set and language (replacing the previous one). @return true|WP_Error */
+    public static function store_pdf($set, $lang, array $file) {
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || (int) $file['error'] !== UPLOAD_ERR_OK) {
+            return new WP_Error('upload', 'Το PDF δεν ανέβηκε σωστά.');
+        }
+        if ((int) $file['size'] > 20 * 1024 * 1024) return new WP_Error('upload', 'Το PDF ξεπερνά τα 20 MB.');
+        $fh = fopen($file['tmp_name'], 'rb');
+        $head = $fh ? fread($fh, 5) : '';
+        if ($fh) fclose($fh);
+        $check = wp_check_filetype_and_ext($file['tmp_name'], $file['name'], ['pdf' => 'application/pdf']);
+        if ($head !== '%PDF-' || empty($check['ext'])) return new WP_Error('upload', 'Επιτρέπονται μόνο αρχεία PDF.');
+        $dir = TW_Util::protect_upload_dir() . '/' . self::PDF_DIR;
+        if (!is_dir($dir)) wp_mkdir_p($dir);
+        $rel = self::PDF_DIR . '/' . bin2hex(random_bytes(16)) . '.pdf';
+        if (!@move_uploaded_file($file['tmp_name'], TW_Util::upload_dir() . '/' . $rel)) return new WP_Error('upload', 'Το PDF δεν αποθηκεύτηκε. Ελέγξτε τα δικαιώματα του φακέλου uploads.');
+        self::remove_pdf($set, $lang);
+        $name = sanitize_file_name(wp_basename($file['name'])) ?: 'terms.pdf';
+        if (strtolower(substr($name, -4)) !== '.pdf') $name .= '.pdf';
+        $cur = self::versions($set, $lang) ? end(self::versions($set, $lang)) : null;
+        self::set_pdf_meta($set, $lang, ['file' => $rel, 'name' => $name, 'version' => $cur ? (int) $cur['version'] : 0, 'uploaded_at' => TW_DB::now()]);
+        return true;
+    }
+
+    public static function remove_pdf($set, $lang) {
+        $m = self::pdf($set, $lang);
+        if ($m) @unlink($m['path']);
+        self::set_pdf_meta($set, $lang, null);
     }
 
     // ------------------------------------------------------------------ which set applies
@@ -261,7 +319,7 @@ final class TW_Terms {
                 <p><strong>Σήμερα, για αγορές σημερινής ημερομηνίας, ισχύει:</strong> <?php echo esc_html(self::name($latest)); ?>. Στη σελίδα του site: <code>[<?php echo esc_html(TW_Terms_Public::SHORTCODE); ?>]</code> (οι πιο πρόσφατοι όροι, με αναζήτηση όρων ανά σειριακό ή ημερομηνία αγοράς).</p>
             </div>
 
-            <table class="widefat striped"><thead><tr><th>Σετ όρων</th><th>Ισχύει για αγορές από</th><th>Σειριακοί με ανάθεση</th><th>Πελάτες που τους αποδέχθηκαν</th><th>Εκδόσεις (EL)</th><th>Εκδόσεις (EN)</th><th></th></tr></thead><tbody>
+            <table class="widefat striped"><thead><tr><th>Σετ όρων</th><th>Ισχύει για αγορές από</th><th>Σειριακοί με ανάθεση</th><th>Πελάτες που τους αποδέχθηκαν</th><th>Εκδόσεις (EL)</th><th>Εκδόσεις (EN)</th><th>PDF</th><th></th></tr></thead><tbody>
             <?php foreach ($sets as $id => $st) : $assigned = self::assigned_count($id); ?>
                 <tr<?php echo (int) $id === $latest ? ' style="font-weight:600"' : ''; ?>>
                     <td><?php echo esc_html($st['name']); ?><?php echo (int) $id === $latest ? ' <span class="tw-badge tw-badge--active">ισχύει σήμερα</span>' : ''; ?><?php echo !self::versions($id, 'el') ? ' <span class="tw-badge tw-badge--void">χωρίς κείμενο</span>' : ''; ?></td>
@@ -270,6 +328,7 @@ final class TW_Terms {
                     <td><?php echo (int) self::accepted_count($id); ?></td>
                     <td><?php echo self::history($id, 'el'); // phpcs:ignore ?></td>
                     <td><?php echo self::history($id, 'en'); // phpcs:ignore ?></td>
+                    <td><?php $pl = []; foreach (['el', 'en'] as $x) { if (self::pdf($id, $x)) $pl[] = strtoupper($x) . (self::pdf_current($id, $x) ? '' : ' (παλιά έκδοση)'); } echo $pl ? esc_html(implode(' · ', $pl)) : '<span class="description">αυτόματο</span>'; ?></td>
                     <td><a class="button" href="<?php echo esc_url(TW_Admin::url('terms', ['edit' => $id]) . '#tw-terms-form'); ?>">Επεξεργασία</a></td>
                 </tr>
             <?php endforeach; ?>
@@ -279,7 +338,7 @@ final class TW_Terms {
             <div class="tw-columns" id="tw-terms-form">
                 <div class="tw-panel">
                     <h2><?php echo $id ? 'Επεξεργασία: ' . esc_html($edit['name']) : 'Νέο σετ όρων'; ?></h2>
-                    <form method="post" action="<?php echo esc_url($post); ?>">
+                    <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_terms_save'); ?><input type="hidden" name="action" value="tw_terms_save"><input type="hidden" name="id" value="<?php echo (int) $id; ?>">
                         <p><label>Όνομα (για την ομάδα, π.χ. «Όροι από 15/11/2026») <input type="text" name="name" value="<?php echo esc_attr($edit['name']); ?>" maxlength="120" required></label></p>
                         <?php if ($id !== self::BASE) : ?>
@@ -290,6 +349,16 @@ final class TW_Terms {
                         <?php endif; ?>
                         <p><label>Κείμενο όρων (Ελληνικά) <textarea name="text_el" rows="16" class="large-text" required><?php echo esc_textarea($el['text']); ?></textarea></label></p>
                         <p><label>Terms (English) <span class="description">(προαιρετικό – χωρίς αγγλικό κείμενο, οι πελάτες στα αγγλικά βλέπουν τους ελληνικούς όρους του σετ)</span><textarea name="text_en" rows="10" class="large-text" lang="en"><?php echo esc_textarea($enx); ?></textarea></label></p>
+                        <h3>PDF για λήψη από το site <span class="description">(προαιρετικό)</span></h3>
+                        <p class="description">Το «Λήψη PDF» της σελίδας όρων δίνει αυτό το αρχείο. Χωρίς PDF, ο επισκέπτης παίρνει αυτόματη σελίδα εκτύπωσης από το κείμενο, με το διάστημα ισχύος. Το PDF αντιστοιχεί στην έκδοση του κειμένου που ισχύει όταν το ανεβάζετε· αν αλλάξετε το κείμενο, ανεβάστε και νέο PDF (αλλιώς το site δίνει την αυτόματη σελίδα εκτύπωσης).</p>
+                        <?php foreach (['el' => 'PDF (Ελληνικά)', 'en' => 'PDF (English)'] as $pl => $plabel) : $pm = $id ? self::pdf($id, $pl) : null; $pv = $id && self::versions($id, $pl) ? (int) end(self::versions($id, $pl))['version'] : 0; ?>
+                            <p><label><?php echo esc_html($plabel); ?> <input type="file" name="pdf_<?php echo esc_attr($pl); ?>" accept="application/pdf,.pdf"></label>
+                            <?php if ($pm) : ?>
+                                <span class="description">Τώρα: <a href="<?php echo esc_url(TW_Terms_Public::pdf_url($id, $pl)); ?>" target="_blank"><?php echo esc_html($pm['name']); ?></a> (<?php echo esc_html(TW_Util::datetime_label($pm['uploaded_at'])); ?>)</span>
+                                <?php if ($pv && (int) $pm['version'] !== $pv) : ?><br><span class="tw-badge tw-badge--void">Προσοχή: το PDF ανέβηκε στην έκδοση v<?php echo (int) $pm['version']; ?> και το κείμενο είναι πλέον v<?php echo (int) $pv; ?>. Μέχρι να ανεβάσετε ενημερωμένο PDF, το site δίνει την αυτόματη σελίδα εκτύπωσης.</span><?php endif; ?>
+                                <label><input type="checkbox" name="pdf_<?php echo esc_attr($pl); ?>_remove" value="1"> Αφαίρεση PDF</label>
+                            <?php endif; ?></p>
+                        <?php endforeach; ?>
                         <p><button class="button button-primary">Αποθήκευση</button> <a class="button" href="<?php echo esc_url(TW_Admin::url('terms')); ?>">Κλείσιμο</a></p>
                     </form>
                     <?php if ($id && $id !== self::BASE && !self::accepted_count($id)) : ?>
@@ -357,7 +426,25 @@ final class TW_Terms {
                 TW_DB::log_event('terms_published', ['set' => self::name($id), 'version' => $ve . ' (EN)']);
             }
         }
-        TW_Admin::flash($msg);
+        $type = 'success';
+        foreach (['el' => 'ελληνικό', 'en' => 'αγγλικό'] as $pl => $pname) {
+            if (!empty($_POST['pdf_' . $pl . '_remove'])) {
+                self::remove_pdf($id, $pl);
+                $msg .= ' Αφαιρέθηκε το ' . $pname . ' PDF.';
+                TW_DB::log_event('terms_pdf_removed', ['set' => self::name($id), 'lang' => strtoupper($pl)]);
+            }
+            if (!empty($_FILES['pdf_' . $pl]['name'])) {
+                $r = self::store_pdf($id, $pl, $_FILES['pdf_' . $pl]);
+                if (is_wp_error($r)) {
+                    $msg .= ' ' . ucfirst($pname) . ' PDF: ' . $r->get_error_message();
+                    $type = 'warning';
+                } else {
+                    $msg .= ' Ανέβηκε το ' . $pname . ' PDF.';
+                    TW_DB::log_event('terms_pdf_uploaded', ['set' => self::name($id), 'lang' => strtoupper($pl), 'file' => self::pdf($id, $pl)['name']]);
+                }
+            }
+        }
+        TW_Admin::flash($msg, $type);
         TW_Admin::back('tw-terms', ['edit' => $id]);
     }
 
@@ -417,7 +504,7 @@ final class TW_Terms_Public {
 
     public static function init() {
         add_shortcode(self::SHORTCODE, [__CLASS__, 'shortcode']);
-        foreach (['terms_lookup', 'terms_print'] as $a) {
+        foreach (['terms_lookup', 'terms_print', 'terms_pdf'] as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
         }
@@ -433,8 +520,29 @@ final class TW_Terms_Public {
             'period' => TW_Terms::period_label($set),
             'label' => sprintf(tw__('Έκδοση όρων: %1$d (%2$s)'), (int) $t['version'], TW_Util::datetime_label($t['published_at'])),
             'html' => wpautop(esc_html($t['text'])),
-            'pdf' => self::print_url($set, (int) $t['version'], $t['lang']),
+            // The uploaded PDF in the language of the text shown, otherwise the automatic printable page.
+            'pdf' => TW_Terms::pdf_current($set, $t['lang']) ? self::pdf_url($set, $t['lang']) : self::print_url($set, (int) $t['version'], $t['lang']),
         ];
+    }
+
+    public static function pdf_url($set, $lang) {
+        $m = TW_Terms::pdf($set, $lang);
+        return add_query_arg(['action' => 'tw_terms_pdf', 's' => (int) $set, 'l' => $lang, 'f' => $m ? substr(md5($m['file']), 0, 8) : ''], admin_url('admin-ajax.php'));
+    }
+
+    /** Serves the uploaded PDF of a set (public: the terms are public). */
+    public static function ajax_terms_pdf() {
+        $set = (int) ($_GET['s'] ?? 0);
+        $lang = TW_I18n::norm(sanitize_key(wp_unslash($_GET['l'] ?? ''))) ?: 'el';
+        $m = TW_Terms::get($set) ? TW_Terms::pdf($set, $lang) : null;
+        if (!$m) wp_die(esc_html(tw__('Δεν βρέθηκε.')), '', 404);
+        nocache_headers();
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . str_replace('"', '', $m['name']) . '"');
+        header('Content-Length: ' . filesize($m['path']));
+        header('X-Content-Type-Options: nosniff');
+        readfile($m['path']);
+        exit;
     }
 
     public static function print_url($set, $version, $lang) {
