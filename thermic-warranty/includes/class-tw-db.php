@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.16.0';
+    const DB_VERSION = '1.17.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -253,6 +253,7 @@ final class TW_DB {
   email varchar(190) NOT NULL DEFAULT '',
   website varchar(255) NOT NULL DEFAULT '',
   notes varchar(255) NOT NULL DEFAULT '',
+  map_url varchar(500) NOT NULL DEFAULT '',
   name_en varchar(190) NOT NULL DEFAULT '',
   area_en varchar(100) NOT NULL DEFAULT '',
   address_en varchar(255) NOT NULL DEFAULT '',

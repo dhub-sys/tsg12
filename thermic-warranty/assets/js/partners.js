@@ -57,7 +57,7 @@
                 if (p.w) item('', link(p.w, p.w.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''), true));
                 if (where) {
                     // Pin (UIkit «location» icon) opening the place in Google Maps.
-                    var pin = link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.q || p.n), '', true);
+                    var pin = link(p.m || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.q || p.n)), '', true);
                     pin.className = 'tw-partner-pin';
                     pin.title = cfg.t.map;
                     pin.setAttribute('aria-label', cfg.t.map + ': ' + p.n);

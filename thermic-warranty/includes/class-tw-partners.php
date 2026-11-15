@@ -36,6 +36,7 @@ final class TW_Partners {
         'email' => ['Email', ['email', 'e-mail']],
         'website' => ['Ιστότοπος', ['website', 'web', 'site', 'ιστότοπος', 'ιστοτοπος', 'url']],
         'notes' => ['Σημείωση', ['notes', 'note', 'σημείωση', 'σημειωση', 'σημειώσεις']],
+        'map_url' => ['Χάρτης Google', ['map_url', 'χάρτης google', 'χαρτης google', 'χάρτης', 'χαρτης', 'google maps', 'maps', 'map', 'google business profile', 'business profile']],
         'name_en' => ['Επωνυμία (EN)', ['name_en', 'επωνυμία (en)', 'name (en)', 'company (en)']],
         'area_en' => ['Περιοχή (EN)', ['area_en', 'περιοχή (en)', 'area (en)', 'city (en)']],
         'address_en' => ['Διεύθυνση (EN)', ['address_en', 'διεύθυνση (en)', 'address (en)']],
@@ -78,6 +79,12 @@ final class TW_Partners {
         if ($country === 'GR' && $region !== '') {
             $region = self::match_gr_region($region);
         }
+        // Google Maps / Business Profile link (the map pin opens it; empty = search by name and address).
+        $map_url = trim((string) ($in['map_url'] ?? ''));
+        if (preg_match('#^http://#i', $map_url)) $map_url = 'https://' . substr($map_url, 7);
+        elseif ($map_url !== '' && preg_match('#^[a-z][a-z0-9+.-]*:#i', $map_url) && !preg_match('#^https://#i', $map_url)) $map_url = ''; // other schemes
+        elseif ($map_url !== '' && !preg_match('#^https://#i', $map_url)) $map_url = 'https://' . $map_url;
+        $map_url = preg_match('#^https://#i', $map_url) ? mb_substr(esc_url_raw($map_url, ['https']), 0, 500) : '';
         $web = trim((string) ($in['website'] ?? ''));
         if ($web !== '' && !preg_match('#^https?://#i', $web)) $web = 'https://' . $web;
         $flag = function ($k) use ($in) {
@@ -96,6 +103,7 @@ final class TW_Partners {
             'email' => mb_substr(sanitize_email((string) ($in['email'] ?? '')), 0, 190),
             'website' => mb_substr(esc_url_raw($web), 0, 255),
             'notes' => $txt('notes', 255),
+            'map_url' => $map_url,
             'name_en' => $txt('name_en', 190),
             'area_en' => $txt('area_en', 100),
             'address_en' => $txt('address_en', 255),
@@ -199,6 +207,12 @@ final class TW_Partners {
         return (int) $wpdb->insert_id;
     }
 
+    /** What the map search looks for when there is no Google Maps link. */
+    public static function map_query($r) {
+        $names = self::countries();
+        return implode(', ', array_filter([$r->name, $r->address, $r->postcode, $r->area, $r->region, $names[$r->country] ?? '']));
+    }
+
     /** Same partner = same name and place (so a re-import updates instead of duplicating). */
     private static function find_same(array $row) {
         global $wpdb;
@@ -232,7 +246,7 @@ final class TW_Partners {
         $rows = $wpdb->get_results("SELECT * FROM $t WHERE $w ORDER BY country = 'GR' DESC, country, region, area, name LIMIT " . TW_Admin::PER_PAGE . ' OFFSET ' . (($paged - 1) * TW_Admin::PER_PAGE));
         $all = (int) $wpdb->get_var("SELECT COUNT(*) FROM $t");
         $edit = TW_Admin::q('edit') !== '' ? self::get((int) TW_Admin::q('edit')) : null;
-        $e = $edit ?: (object) ['id' => 0, 'name' => '', 'country' => 'GR', 'region' => '', 'area' => '', 'address' => '', 'postcode' => '', 'phone' => '', 'email' => '', 'website' => '', 'notes' => '', 'name_en' => '', 'area_en' => '', 'address_en' => '', 'notes_en' => '', 'is_service' => 1, 'active' => 1];
+        $e = $edit ?: (object) ['id' => 0, 'name' => '', 'country' => 'GR', 'region' => '', 'area' => '', 'address' => '', 'postcode' => '', 'phone' => '', 'email' => '', 'website' => '', 'map_url' => '', 'notes' => '', 'name_en' => '', 'area_en' => '', 'address_en' => '', 'notes_en' => '', 'is_service' => 1, 'active' => 1];
         $draft = get_transient('tw_partner_draft_' . get_current_user_id());
         if ($draft) { delete_transient('tw_partner_draft_' . get_current_user_id()); $e = (object) array_merge((array) $e, $draft); }
         $countries = self::countries();
@@ -270,6 +284,8 @@ final class TW_Partners {
                         <p><label>Τηλέφωνο <span class="description">(πολλά: χωρισμένα με κόμμα)</span> <input type="text" name="phone" value="<?php echo esc_attr($e->phone); ?>" maxlength="100"></label></p>
                         <p><label>Email <input type="email" name="email" value="<?php echo esc_attr($e->email); ?>" maxlength="190"></label></p>
                         <p><label>Ιστότοπος <input type="text" name="website" value="<?php echo esc_attr($e->website); ?>" maxlength="255" placeholder="www.example.gr"></label></p>
+                        <p><label>Χάρτης Google <span class="description">(σύνδεσμος του Google Maps ή του Google Business Profile – προαιρετικό)</span> <input type="url" name="map_url" value="<?php echo esc_attr($e->map_url); ?>" maxlength="500" placeholder="https://maps.app.goo.gl/…"></label>
+                        <span class="description">Στο Google Maps, ανοίξτε την επιχείρηση → «Κοινοποίηση» → «Αντιγραφή συνδέσμου». Η πινέζα στη σελίδα του site ανοίγει αυτόν τον σύνδεσμο· αν μείνει κενό, ανοίγει αναζήτηση στο Google Maps με την επωνυμία και τη διεύθυνση<?php if ($e->id && !$e->map_url) : ?> (<a href="<?php echo esc_url('https://www.google.com/maps/search/?api=1&query=' . rawurlencode(self::map_query($e))); ?>" target="_blank" rel="noopener">δοκιμή αναζήτησης</a>)<?php endif; ?>.</span></p>
                         <p><label>Σημείωση για τους πελάτες <span class="description">(προαιρετικό, π.χ. ωράριο)</span> <input type="text" name="notes" value="<?php echo esc_attr($e->notes); ?>" maxlength="255"></label></p>
                         <details class="tw-partner-en"<?php echo ($e->name_en . $e->area_en . $e->address_en . $e->notes_en) !== '' ? ' open' : ''; ?>>
                             <summary>English (αγγλική σελίδα) – προαιρετικό</summary>
@@ -299,7 +315,7 @@ final class TW_Partners {
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_partner_import'); ?><input type="hidden" name="action" value="tw_partner_import">
                         <p><input type="file" name="file" accept=".xlsx,.csv,.txt" required></p>
-                        <p class="description">Στήλες: <code>Επωνυμία</code> (υποχρεωτική), <code>Χώρα</code> (κενό = Ελλάδα), <code>Νομός / Περιφέρεια</code> (υποχρεωτική), <code>Περιοχή / Πόλη</code>, <code>Διεύθυνση</code>, <code>Τ.Κ.</code>, <code>Τηλέφωνο</code>, <code>Email</code>, <code>Ιστότοπος</code>, <code>Σημείωση</code>, <code>Εξουσιοδοτημένο Service</code> και <code>Ενεργός</code> (Ναι/Όχι, κενό = Ναι). Ο νομός γράφεται όπως θέλετε (π.χ. «Νομός Αττικής», «ΑΤΤΙΚΗ»). Συνεργάτης με ίδια επωνυμία, νομό και περιοχή ενημερώνεται, δεν διπλασιάζεται.</p>
+                        <p class="description">Στήλες: <code>Επωνυμία</code> (υποχρεωτική), <code>Χώρα</code> (κενό = Ελλάδα), <code>Νομός / Περιφέρεια</code> (υποχρεωτική), <code>Περιοχή / Πόλη</code>, <code>Διεύθυνση</code>, <code>Τ.Κ.</code>, <code>Τηλέφωνο</code>, <code>Email</code>, <code>Ιστότοπος</code>, <code>Σημείωση</code>, <code>Χάρτης Google</code> (σύνδεσμος Google Maps / Business Profile· αν λείπει η στήλη, κρατιέται ο σύνδεσμος που υπάρχει), <code>Εξουσιοδοτημένο Service</code> και <code>Ενεργός</code> (Ναι/Όχι, κενό = Ναι). Ο νομός γράφεται όπως θέλετε (π.χ. «Νομός Αττικής», «ΑΤΤΙΚΗ»). Συνεργάτης με ίδια επωνυμία, νομό και περιοχή ενημερώνεται, δεν διπλασιάζεται.</p>
                         <p><button class="button button-primary">Εισαγωγή</button></p>
                     </form>
                     <h2>Στη σελίδα του site</h2>
@@ -327,7 +343,7 @@ final class TW_Partners {
                     <td><?php echo esc_html($r->region); ?></td>
                     <td><?php echo esc_html($r->area); ?></td>
                     <td><?php echo esc_html(trim($r->address . ($r->postcode ? ', ' . $r->postcode : ''), ', ')); ?></td>
-                    <td><?php echo esc_html($r->phone); ?><?php if ($r->email) echo '<br>' . esc_html($r->email); ?><?php if ($r->website) echo '<br><a href="' . esc_url($r->website) . '" target="_blank" rel="noopener">' . esc_html(preg_replace('#^https?://(www\.)?#', '', untrailingslashit($r->website))) . '</a>'; ?></td>
+                    <td><?php echo esc_html($r->phone); ?><?php if ($r->email) echo '<br>' . esc_html($r->email); ?><?php if ($r->website) echo '<br><a href="' . esc_url($r->website) . '" target="_blank" rel="noopener">' . esc_html(preg_replace('#^https?://(www\.)?#', '', untrailingslashit($r->website))) . '</a>'; ?><?php echo '<br><a href="' . esc_url($r->map_url ?: 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode(self::map_query($r))) . '" target="_blank" rel="noopener" class="description">' . ($r->map_url ? '📍 Χάρτης Google' : '📍 αναζήτηση στον χάρτη') . '</a>'; ?></td>
                     <td><?php echo $r->is_service ? 'Ναι' : '—'; ?></td>
                     <td><?php echo $r->active ? 'Ενεργός' : 'Κρυφός'; ?></td>
                     <td style="white-space:nowrap"><a href="<?php echo esc_url(TW_Admin::url('partners', ['edit' => $r->id]) . '#tw-partner-form'); ?>">Επεξεργασία</a> ·
@@ -414,6 +430,7 @@ final class TW_Partners {
             [$row, $err] = self::clean($in);
             if ($err) { $res['errors'][] = 'Γραμμή ' . ($n + 2) . ($row['name'] !== '' ? ' (' . $row['name'] . ')' : '') . ': ' . $err; continue; }
             $id = self::find_same($row);
+            if (!isset($map['map_url']) && $id) unset($row['map_url']); // older Excel without the column: keep the saved link
             self::save($row, $id);
             $res[$id ? 'updated' : 'inserted']++;
         }
@@ -435,11 +452,11 @@ final class TW_Partners {
             if ($p) $w = $wpdb->prepare($w, $p);
             $countries = self::countries();
             foreach ($wpdb->get_results('SELECT * FROM ' . self::table() . " WHERE $w ORDER BY country, region, area, name") as $r) {
-                $x->add([$r->name, $countries[$r->country] ?? $r->country, $r->region, $r->area, $r->address, $r->postcode, $r->phone, $r->email, $r->website, $r->notes, $r->name_en, $r->area_en, $r->address_en, $r->notes_en, $r->is_service ? 'Ναι' : 'Όχι', $r->active ? 'Ναι' : 'Όχι']);
+                $x->add([$r->name, $countries[$r->country] ?? $r->country, $r->region, $r->area, $r->address, $r->postcode, $r->phone, $r->email, $r->website, $r->notes, $r->map_url, $r->name_en, $r->area_en, $r->address_en, $r->notes_en, $r->is_service ? 'Ναι' : 'Όχι', $r->active ? 'Ναι' : 'Όχι']);
             }
             TW_DB::log_event('partners_exported', '');
         } else {
-            $x->add(['Παράδειγμα Τεχνική Ο.Ε.', 'Ελλάδα', 'Αττική', 'Περιστέρι', 'Θηβών 100', '12134', '210 0000000', 'info@example.gr', 'www.example.gr', 'Δευ–Παρ 9:00–17:00', '', '', '', 'Mon–Fri 9:00–17:00', 'Ναι', 'Ναι']);
+            $x->add(['Παράδειγμα Τεχνική Ο.Ε.', 'Ελλάδα', 'Αττική', 'Περιστέρι', 'Θηβών 100', '12134', '210 0000000', 'info@example.gr', 'www.example.gr', 'Δευ–Παρ 9:00–17:00', 'https://maps.app.goo.gl/xxxxxxxx', '', '', '', 'Mon–Fri 9:00–17:00', 'Ναι', 'Ναι']);
         }
         $x->download(empty($_GET['template']) ? 'synergates-' . wp_date('Y-m-d') . '.xlsx' : 'protypo-synergaton.xlsx', 'Συνεργάτες');
         exit;
@@ -451,7 +468,7 @@ final class TW_Partners {
         global $wpdb;
         $atts = shortcode_atts(['service' => '1', 'country' => 'GR'], $atts, self::SHORTCODE);
         $where = 'active = 1' . ($atts['service'] === '0' ? '' : ' AND is_service = 1');
-        $rows = $wpdb->get_results('SELECT name, country, region, area, address, postcode, phone, email, website, notes, name_en, area_en, address_en, notes_en FROM ' . self::table() . " WHERE $where ORDER BY name");
+        $rows = $wpdb->get_results('SELECT name, country, region, area, address, postcode, phone, email, website, notes, map_url, name_en, area_en, address_en, notes_en FROM ' . self::table() . " WHERE $where ORDER BY name");
         $lang = TW_I18n::lang();
         $names = self::countries();
         $en = $lang === 'en';
@@ -462,7 +479,8 @@ final class TW_Partners {
                 'a' => $en ? self::en($r, 'area') : $r->area, 'ad' => $en ? self::en($r, 'address') : $r->address, 'pc' => $r->postcode,
                 'ph' => $r->phone, 'em' => $r->email, 'w' => $r->website, 'no' => $en ? self::en($r, 'notes') : $r->notes,
                 // The map search always uses the local (Greek) address: it finds the place more reliably.
-                'q' => implode(', ', array_filter([$r->name, $r->address, $r->postcode, $r->area, $r->region, $names[$r->country] ?? ''])),
+                'q' => self::map_query($r),
+                'm' => $r->map_url,
             ];
         }
         $countries = [];
