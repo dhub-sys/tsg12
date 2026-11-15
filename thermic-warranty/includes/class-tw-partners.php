@@ -36,6 +36,10 @@ final class TW_Partners {
         'email' => ['Email', ['email', 'e-mail']],
         'website' => ['Ιστότοπος', ['website', 'web', 'site', 'ιστότοπος', 'ιστοτοπος', 'url']],
         'notes' => ['Σημείωση', ['notes', 'note', 'σημείωση', 'σημειωση', 'σημειώσεις']],
+        'name_en' => ['Επωνυμία (EN)', ['name_en', 'επωνυμία (en)', 'name (en)', 'company (en)']],
+        'area_en' => ['Περιοχή (EN)', ['area_en', 'περιοχή (en)', 'area (en)', 'city (en)']],
+        'address_en' => ['Διεύθυνση (EN)', ['address_en', 'διεύθυνση (en)', 'address (en)']],
+        'notes_en' => ['Σημείωση (EN)', ['notes_en', 'σημείωση (en)', 'notes (en)']],
         'is_service' => ['Εξουσιοδοτημένο Service', ['is_service', 'service', 'εξουσιοδοτημένο service', 'εξουσιοδοτημενο service']],
         'active' => ['Ενεργός', ['active', 'ενεργός', 'ενεργος', 'εμφάνιση']],
     ];
@@ -92,6 +96,10 @@ final class TW_Partners {
             'email' => mb_substr(sanitize_email((string) ($in['email'] ?? '')), 0, 190),
             'website' => mb_substr(esc_url_raw($web), 0, 255),
             'notes' => $txt('notes', 255),
+            'name_en' => $txt('name_en', 190),
+            'area_en' => $txt('area_en', 100),
+            'address_en' => $txt('address_en', 255),
+            'notes_en' => $txt('notes_en', 255),
             'is_service' => $flag('is_service'),
             'active' => $flag('active'),
         ];
@@ -100,6 +108,54 @@ final class TW_Partners {
         if ($region === null) return [$row, 'Άγνωστος νομός «' . $txt('region', 100) . '».'];
         if ($row['region'] === '') return [$row, 'Συμπληρώστε ' . ($country === 'GR' ? 'τον νομό' : 'την περιφέρεια / πόλη') . '.'];
         return [$row, ''];
+    }
+
+    /**
+     * Greek → Latin (ELOT 743, simplified) for the English page when no English text was entered:
+     * «ΠΑΠΑΔΟΠΟΥΛΟΣ» → «PAPADOPOULOS», «Περιστέρι» → «Peristeri». Latin text passes through unchanged.
+     */
+    public static function translit($s) {
+        $s = (string) $s;
+        if ($s === '' || !preg_match('/\p{Greek}/u', $s)) return $s;
+        // Accents go; the diaeresis stays (ϊ, ϋ), so «οϋ» is not read as «ου».
+        $plain = strtr($s, ['ά' => 'α', 'έ' => 'ε', 'ή' => 'η', 'ί' => 'ι', 'ΐ' => 'ϊ', 'ό' => 'ο', 'ύ' => 'υ', 'ΰ' => 'ϋ', 'ώ' => 'ω',
+            'Ά' => 'Α', 'Έ' => 'Ε', 'Ή' => 'Η', 'Ί' => 'Ι', 'Ό' => 'Ο', 'Ύ' => 'Υ', 'Ώ' => 'Ω']);
+        $pairs = ['ου' => 'ou', 'αυ' => 'av', 'ευ' => 'ev', 'ηυ' => 'iv', 'γγ' => 'ng', 'γξ' => 'nx', 'γχ' => 'nch', 'θ' => 'th', 'χ' => 'ch', 'ψ' => 'ps'];
+        $single = ['α' => 'a', 'β' => 'v', 'γ' => 'g', 'δ' => 'd', 'ε' => 'e', 'ζ' => 'z', 'η' => 'i', 'ι' => 'i', 'κ' => 'k', 'λ' => 'l', 'μ' => 'm', 'ν' => 'n',
+            'ξ' => 'x', 'ο' => 'o', 'π' => 'p', 'ρ' => 'r', 'σ' => 's', 'ς' => 's', 'τ' => 't', 'υ' => 'y', 'φ' => 'f', 'ω' => 'o', 'ϊ' => 'i', 'ϋ' => 'y'];
+        $chars = preg_split('//u', $plain, -1, PREG_SPLIT_NO_EMPTY);
+        $out = '';
+        $n = count($chars);
+        for ($i = 0; $i < $n; $i++) {
+            $c = $chars[$i];
+            $lc = mb_strtolower($c);
+            $up = $c !== $lc;
+            $next = $chars[$i + 1] ?? '';
+            $prev = $i > 0 ? $chars[$i - 1] : ' ';
+            $word_start = !preg_match('/\p{L}/u', $prev);
+            $pair = $lc . mb_strtolower($next);
+            if ($pair === 'μπ' && $word_start) { $lat = 'b'; $len = 2; }
+            elseif ($pair === 'ντ' && $word_start) { $lat = 'd'; $len = 2; }
+            elseif ($pair === 'γκ') { $lat = $word_start ? 'g' : 'ng'; $len = 2; }
+            elseif (isset($pairs[$pair])) { $lat = $pairs[$pair]; $len = 2; }
+            elseif (isset($single[$lc])) { $lat = $single[$lc]; $len = 1; }
+            elseif (isset($pairs[$lc])) { $lat = $pairs[$lc]; $len = 1; }
+            else { $out .= $c; continue; }
+            if ($up) {
+                // ΘΩΜΑΣ → THOMAS, Θωμάς → Thomas: look at the next Greek letter to tell all-caps from a capital.
+                $look = $len === 2 ? $next : ($chars[$i + 1] ?? '');
+                $lat = ($look !== '' && preg_match('/\p{Lu}/u', $look)) ? strtoupper($lat) : ucfirst($lat);
+            }
+            $out .= $lat;
+            $i += $len - 1;
+        }
+        return $out;
+    }
+
+    /** The English text of a field: what was entered, or the automatic transliteration. */
+    public static function en($row, $field) {
+        $v = trim((string) ($row->{$field . '_en'} ?? ''));
+        return $v !== '' ? $v : self::translit((string) ($row->$field ?? ''));
     }
 
     /** «GR», «Ελλάδα», «Greece», «ελλαδα» → GR; empty → GR; unknown → ''. */
@@ -176,7 +232,7 @@ final class TW_Partners {
         $rows = $wpdb->get_results("SELECT * FROM $t WHERE $w ORDER BY country = 'GR' DESC, country, region, area, name LIMIT " . TW_Admin::PER_PAGE . ' OFFSET ' . (($paged - 1) * TW_Admin::PER_PAGE));
         $all = (int) $wpdb->get_var("SELECT COUNT(*) FROM $t");
         $edit = TW_Admin::q('edit') !== '' ? self::get((int) TW_Admin::q('edit')) : null;
-        $e = $edit ?: (object) ['id' => 0, 'name' => '', 'country' => 'GR', 'region' => '', 'area' => '', 'address' => '', 'postcode' => '', 'phone' => '', 'email' => '', 'website' => '', 'notes' => '', 'is_service' => 1, 'active' => 1];
+        $e = $edit ?: (object) ['id' => 0, 'name' => '', 'country' => 'GR', 'region' => '', 'area' => '', 'address' => '', 'postcode' => '', 'phone' => '', 'email' => '', 'website' => '', 'notes' => '', 'name_en' => '', 'area_en' => '', 'address_en' => '', 'notes_en' => '', 'is_service' => 1, 'active' => 1];
         $draft = get_transient('tw_partner_draft_' . get_current_user_id());
         if ($draft) { delete_transient('tw_partner_draft_' . get_current_user_id()); $e = (object) array_merge((array) $e, $draft); }
         $countries = self::countries();
@@ -215,6 +271,13 @@ final class TW_Partners {
                         <p><label>Email <input type="email" name="email" value="<?php echo esc_attr($e->email); ?>" maxlength="190"></label></p>
                         <p><label>Ιστότοπος <input type="text" name="website" value="<?php echo esc_attr($e->website); ?>" maxlength="255" placeholder="www.example.gr"></label></p>
                         <p><label>Σημείωση για τους πελάτες <span class="description">(προαιρετικό, π.χ. ωράριο)</span> <input type="text" name="notes" value="<?php echo esc_attr($e->notes); ?>" maxlength="255"></label></p>
+                        <details class="tw-partner-en"<?php echo ($e->name_en . $e->area_en . $e->address_en . $e->notes_en) !== '' ? ' open' : ''; ?>>
+                            <summary>English (αγγλική σελίδα) – προαιρετικό</summary>
+                            <p class="description">Ό,τι μείνει κενό εμφανίζεται στην αγγλική σελίδα με αυτόματη μεταγραφή σε λατινικούς χαρακτήρες (π.χ. «Περιστέρι» → «Peristeri»). Συμπληρώστε μόνο όπου θέλετε διαφορετική απόδοση. Ο νομός μεταφράζεται αυτόματα.</p>
+                            <?php foreach (['name_en' => ['Επωνυμία', 190, 'name'], 'area_en' => ['Περιοχή', 100, 'area'], 'address_en' => ['Διεύθυνση', 255, 'address'], 'notes_en' => ['Σημείωση', 255, 'notes']] as $k => $d) : ?>
+                                <p><label><?php echo esc_html($d[0]); ?> (EN) <input type="text" name="<?php echo esc_attr($k); ?>" value="<?php echo esc_attr($e->$k); ?>" maxlength="<?php echo (int) $d[1]; ?>" placeholder="<?php echo esc_attr(self::translit($e->{$d[2]})); ?>"></label></p>
+                            <?php endforeach; ?>
+                        </details>
                         <p><label><input type="checkbox" name="is_service" value="1" <?php checked((int) $e->is_service, 1); ?>> Εξουσιοδοτημένο Service</label>
                            <label><input type="checkbox" name="active" value="1" <?php checked((int) $e->active, 1); ?>> Εμφανίζεται στην αναζήτηση της σελίδας</label></p>
                         <p><button class="button button-primary"><?php echo $e->id ? 'Αποθήκευση' : 'Προσθήκη'; ?></button>
@@ -372,11 +435,11 @@ final class TW_Partners {
             if ($p) $w = $wpdb->prepare($w, $p);
             $countries = self::countries();
             foreach ($wpdb->get_results('SELECT * FROM ' . self::table() . " WHERE $w ORDER BY country, region, area, name") as $r) {
-                $x->add([$r->name, $countries[$r->country] ?? $r->country, $r->region, $r->area, $r->address, $r->postcode, $r->phone, $r->email, $r->website, $r->notes, $r->is_service ? 'Ναι' : 'Όχι', $r->active ? 'Ναι' : 'Όχι']);
+                $x->add([$r->name, $countries[$r->country] ?? $r->country, $r->region, $r->area, $r->address, $r->postcode, $r->phone, $r->email, $r->website, $r->notes, $r->name_en, $r->area_en, $r->address_en, $r->notes_en, $r->is_service ? 'Ναι' : 'Όχι', $r->active ? 'Ναι' : 'Όχι']);
             }
             TW_DB::log_event('partners_exported', '');
         } else {
-            $x->add(['Παράδειγμα Τεχνική Ο.Ε.', 'Ελλάδα', 'Αττική', 'Περιστέρι', 'Θηβών 100', '12134', '210 0000000', 'info@example.gr', 'www.example.gr', 'Δευ–Παρ 9:00–17:00', 'Ναι', 'Ναι']);
+            $x->add(['Παράδειγμα Τεχνική Ο.Ε.', 'Ελλάδα', 'Αττική', 'Περιστέρι', 'Θηβών 100', '12134', '210 0000000', 'info@example.gr', 'www.example.gr', 'Δευ–Παρ 9:00–17:00', '', '', '', 'Mon–Fri 9:00–17:00', 'Ναι', 'Ναι']);
         }
         $x->download(empty($_GET['template']) ? 'synergates-' . wp_date('Y-m-d') . '.xlsx' : 'protypo-synergaton.xlsx', 'Συνεργάτες');
         exit;
@@ -388,14 +451,18 @@ final class TW_Partners {
         global $wpdb;
         $atts = shortcode_atts(['service' => '1', 'country' => 'GR'], $atts, self::SHORTCODE);
         $where = 'active = 1' . ($atts['service'] === '0' ? '' : ' AND is_service = 1');
-        $rows = $wpdb->get_results('SELECT name, country, region, area, address, postcode, phone, email, website, notes FROM ' . self::table() . " WHERE $where ORDER BY name");
+        $rows = $wpdb->get_results('SELECT name, country, region, area, address, postcode, phone, email, website, notes, name_en, area_en, address_en, notes_en FROM ' . self::table() . " WHERE $where ORDER BY name");
         $lang = TW_I18n::lang();
         $names = self::countries();
+        $en = $lang === 'en';
         $data = [];
         foreach ($rows as $r) {
             $data[] = [
-                'n' => $r->name, 'c' => $r->country, 'r' => $r->region, 'a' => $r->area, 'ad' => $r->address, 'pc' => $r->postcode,
-                'ph' => $r->phone, 'em' => $r->email, 'w' => $r->website, 'no' => $r->notes,
+                'n' => $en ? self::en($r, 'name') : $r->name, 'c' => $r->country, 'r' => $r->region,
+                'a' => $en ? self::en($r, 'area') : $r->area, 'ad' => $en ? self::en($r, 'address') : $r->address, 'pc' => $r->postcode,
+                'ph' => $r->phone, 'em' => $r->email, 'w' => $r->website, 'no' => $en ? self::en($r, 'notes') : $r->notes,
+                // The map search always uses the local (Greek) address: it finds the place more reliably.
+                'q' => implode(', ', array_filter([$r->name, $r->address, $r->postcode, $r->area, $r->region, $names[$r->country] ?? ''])),
             ];
         }
         $countries = [];

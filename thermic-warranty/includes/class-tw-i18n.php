@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) exit;
  * customer emails and SMS). The console stays in Greek.
  *
  * Language, in order: explicit choice in the request (?lang= or the AJAX field tw_lang) → Polylang's current
- * language → the visitor's earlier choice (cookie) → the browser's language → Greek.
+ * or TranslatePress language → the visitor's earlier choice (cookie) → the browser's language → Greek.
  * Strings are written in Greek in the code and looked up in includes/i18n/en.php (Greek => English).
  */
 final class TW_I18n {
@@ -44,6 +44,8 @@ final class TW_I18n {
             if (isset($_REQUEST[$k]) && ($l = self::norm(sanitize_key(wp_unslash($_REQUEST[$k]))))) return $l;
         }
         if (function_exists('pll_current_language') && ($l = self::norm((string) pll_current_language('slug')))) return $l;
+        // TranslatePress (e.g. /en/… pages): its current language, e.g. «en_US».
+        if (!empty($GLOBALS['TRP_LANGUAGE']) && ($l = self::norm((string) $GLOBALS['TRP_LANGUAGE']))) return $l;
         if (isset($_COOKIE[self::COOKIE]) && ($l = self::norm(sanitize_key(wp_unslash($_COOKIE[self::COOKIE]))))) return $l;
         if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
             foreach (explode(',', (string) $_SERVER['HTTP_ACCEPT_LANGUAGE']) as $part) {

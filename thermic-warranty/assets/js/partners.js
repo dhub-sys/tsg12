@@ -52,7 +52,7 @@
                 if (p.em) { var li = el('li'); li.appendChild(link('mailto:' + p.em, p.em)); ul.appendChild(li); }
                 if (p.w) { var lw = el('li'); lw.appendChild(link(p.w, p.w.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''), true)); ul.appendChild(lw); }
                 if (where) {
-                    var q = [p.n, p.ad, p.pc, p.a, label(p.c, p.r), cfg.countries[p.c]].filter(Boolean).join(', ');
+                    var q = p.q || p.n;
                     var lm = el('li'); lm.appendChild(link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q), cfg.t.map, true)); ul.appendChild(lm);
                 }
                 card.appendChild(ul);
