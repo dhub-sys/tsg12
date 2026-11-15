@@ -37,7 +37,10 @@ $mlabels = TW_Settings::consent_labels($lang);
                 <dt><?php tw_e('Κλείδωμα'); ?></dt><dd><?php echo esc_html(TW_Util::datetime_label($w->locked_at)); ?> – <?php echo esc_html($w->lock_reason); ?></dd>
             <?php endif; ?>
         </dl>
-        <p><button type="button" class="tw-btn tw-btn--ghost tw-btn--sm" data-action="show-card" aria-expanded="false">🪪 <?php tw_e('Κάρτα εγγύησης'); ?></button></p>
+        <?php $tw_acc = TW_Terms::accepted($w->id); ?>
+        <p class="tw-portal-actions"><button type="button" class="tw-btn tw-btn--ghost tw-btn--sm" data-action="show-card" aria-expanded="false">🪪 <?php tw_e('Κάρτα εγγύησης'); ?></button>
+            <?php if ($tw_acc) : ?><a class="tw-btn tw-btn--ghost tw-btn--sm" href="<?php echo esc_url(TW_Terms_Public::portal_terms_url($w->id)); ?>" target="_blank" rel="noopener" title="<?php echo esc_attr(sprintf(tw__('Οι όροι που αποδεχθήκατε στις %s'), TW_Util::date_label(substr($tw_acc['accepted_at'], 0, 10)))); ?>">📄 <?php tw_e('Όροι εγγύησης (PDF)'); ?></a><?php endif; ?></p>
+        <?php if ($tw_acc) : ?><p class="tw-hint tw-portal-terms-hint"><?php echo esc_html(sprintf(tw__('Οι όροι εγγύησης που αποδεχθήκατε στις %s, όπως ίσχυαν για την αγορά σας.'), TW_Util::date_label(substr($tw_acc['accepted_at'], 0, 10)))); ?></p><?php endif; ?>
         <?php $next = TW_Warranty::next_service($w); ?>
         <div class="tw-done tw-card-view" hidden data-print-title="<?php echo esc_attr($w->warranty_code . ' - ' . $w->customer_name); ?>">
             <div class="tw-card-logo" hidden><?php echo TW_App::logo_html('tw-card-logo-img'); // phpcs:ignore -- shown only on the printed card ?></div>

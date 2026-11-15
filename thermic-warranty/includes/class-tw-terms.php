@@ -221,6 +221,27 @@ final class TW_Terms {
         return self::pdf($set, $lang);
     }
 
+    /**
+     * The terms a customer accepted for a warranty: set, revision, language and text (with its SHA-256), from
+     * the consent record. @return array|null ['set','version','lang','hash','text','published_at','accepted_at']
+     */
+    public static function accepted($wid) {
+        global $wpdb;
+        $c = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . TW_DB::table('consents') . " WHERE warranty_id = %d AND consent_type = 'terms' AND granted = 1 AND terms_version > 0 ORDER BY id DESC LIMIT 1", (int) $wid));
+        if (!$c) return null;
+        $set = (int) $c->terms_set ?: self::BASE;
+        $lang = TW_I18n::norm($c->lang) ?: 'el';
+        $t = self::version($set, (int) $c->terms_version, $lang);
+        if (!$t || ($c->terms_hash !== '' && !hash_equals((string) $c->terms_hash, (string) $t['hash']))) return null;
+        return $t + ['accepted_at' => $c->created_at];
+    }
+
+    /** The uploaded PDF if it was made for exactly this accepted text (same revision, uploaded after it). */
+    public static function pdf_for($t) {
+        $m = self::pdf($t['set'], $t['lang']);
+        return ($m && (int) $m['version'] === (int) $t['version'] && $m['uploaded_at'] >= $t['published_at']) ? $m : null;
+    }
+
     /** The text was changed after the PDF was uploaded (the team should check the PDF is up to date). */
     public static function pdf_older_than_text($set, $lang) {
         $m = self::pdf($set, $lang);
@@ -695,7 +716,7 @@ final class TW_Terms_Public {
 
     public static function init() {
         add_shortcode(self::SHORTCODE, [__CLASS__, 'shortcode']);
-        foreach (['terms_lookup', 'terms_print', 'terms_pdf'] as $a) {
+        foreach (['terms_lookup', 'terms_print', 'terms_pdf', 'portal_terms'] as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
         }
@@ -733,6 +754,37 @@ final class TW_Terms_Public {
         header('Content-Length: ' . filesize($m['path']));
         header('X-Content-Type-Options: nosniff');
         readfile($m['path']);
+        exit;
+    }
+
+    /** «Οι εγγυήσεις μου»: the terms this customer accepted for this warranty (needs the portal session). */
+    public static function portal_terms_url($wid) {
+        return add_query_arg(['action' => 'tw_portal_terms', 'w' => (int) $wid], admin_url('admin-ajax.php'));
+    }
+
+    public static function ajax_portal_terms() {
+        $s = TW_Frontend::session();
+        $w = $s ? TW_Warranty::get((int) ($_GET['w'] ?? 0)) : null;
+        if (!$s || !$w || $w->email !== $s->email || $w->anonymized_at) {
+            wp_die(esc_html(tw__('Η σύνδεση έληξε. Συνδεθείτε ξανά στις «Οι εγγυήσεις μου».')), '', 403);
+        }
+        $t = TW_Terms::accepted($w->id);
+        if (!$t) wp_die(esc_html(tw__('Δεν βρέθηκε.')), '', 404);
+        TW_DB::log_event('portal_terms_viewed', ['set' => TW_Terms::name($t['set']), 'lang' => strtoupper($t['lang'])], $w->id, $w->serial_id, 'customer:' . $w->email);
+        $m = TW_Terms::pdf_for($t);
+        if ($m) {
+            nocache_headers();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . str_replace('"', '', $m['name']) . '"');
+            header('Content-Length: ' . filesize($m['path']));
+            header('X-Content-Type-Options: nosniff');
+            readfile($m['path']);
+            exit;
+        }
+        // No PDF for this exact text: the print page of the accepted text, in its language.
+        TW_I18n::with($t['lang'], function () use ($t, $w) {
+            self::render_print($t, TW_Terms::period_label($t['set']), '', sprintf(tw__('Τους αποδεχθήκατε στις %1$s κατά την ενεργοποίηση της εγγύησης %2$s.'), TW_Util::datetime_label($t['accepted_at']), $w->warranty_code));
+        });
         exit;
     }
 
@@ -825,7 +877,7 @@ final class TW_Terms_Public {
      * header (logo, title, period) and footer (company, contact, version) on every page, page numbers from
      * @page margin boxes, and the watermark of Ρυθμίσεις → Εφαρμογή & εμφάνιση. $note: shown on screen only.
      */
-    public static function render_print($t, $period, $note = '') {
+    public static function render_print($t, $period, $note = '', $extra = '') {
         $s = TW_Settings::all();
         $lang = TW_I18n::lang();
         [$c1, $c2] = TW_App::colors();
@@ -854,6 +906,7 @@ body { font-size: 10.5pt; line-height: 1.55; }
 .toolbar .note { background: #fff7e6; color: #5c3b00; border-radius: 6px; padding: 6px 10px; max-width: 640px; }
 .terms-period { margin: 0 0 1mm; font-size: 11.5pt; font-weight: 700; color: #111827; }
 .terms-meta { margin: 0 0 5mm; font-size: 8.5pt; color: #4b5563; }
+.terms-accepted { margin: -3mm 0 5mm; padding: 2.5mm 4mm; border-left: 3pt solid #15803d; background: #ecfdf3; font-size: 9.5pt; }
 .terms-text p { margin: 0 0 .7em; }
 .terms-text h2 { font-size: 13pt; margin: 1.1em 0 .45em; padding-left: 2.5mm; border-left: 3pt solid var(--brand); break-after: avoid; }
 .terms-text h3 { font-size: 11.5pt; margin: 1em 0 .4em; break-after: avoid; }
@@ -902,6 +955,7 @@ body { font-size: 10.5pt; line-height: 1.55; }
     <tbody><tr><td>
         <p class="terms-period"><?php echo esc_html($period); ?></p>
         <p class="terms-meta"><?php echo esc_html(TW_Terms::updated_label($t)); ?> · <?php echo esc_html(sprintf(tw__('Εκτυπώθηκε %s'), TW_Util::datetime_label(TW_DB::now()))); ?></p>
+        <?php if ($extra !== '') : ?><p class="terms-accepted"><?php echo esc_html($extra); ?></p><?php endif; ?>
         <div class="terms-text"<?php echo $t['lang'] !== $lang ? ' lang="' . esc_attr($t['lang']) . '"' : ''; ?>><?php echo TW_Terms::html($t['text']); // sanitized ?></div>
     </td></tr></tbody>
 </table>
