@@ -155,7 +155,7 @@ $printed = sprintf('Εκτύπωση: %s – %s', TW_Util::datetime_label(TW_DB:
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($c->created_at)); ?></td>
                     <td><?php echo esc_html($consent_labels[$c->consent_type] ?? $c->consent_type); ?></td>
                     <td><span class="pill <?php echo $c->granted ? 'pill-yes' : 'pill-no'; ?>"><?php echo $c->granted ? '✔ Αποδοχή' : '✘ Όχι'; ?></span></td>
-                    <td><?php echo $c->terms_version ? 'v' . (int) $c->terms_version . ' <small class="mono">' . esc_html(substr($c->terms_hash, 0, 10)) . '</small>' : '—'; ?></td>
+                    <td><?php echo $c->terms_version ? esc_html(TW_Terms::name($c->terms_set ?: TW_Terms::BASE)) . ' v' . (int) $c->terms_version . ' <small class="mono">' . esc_html(substr($c->terms_hash, 0, 10)) . '</small>' : '—'; ?></td>
                     <td><?php echo esc_html($source_labels[$c->source] ?? $c->source); ?></td>
                     <td class="mono"><?php echo esc_html($c->ip ?: '—'); ?></td></tr>
             <?php endforeach; ?>

@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.13.0';
+    const DB_VERSION = '1.14.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -52,10 +52,12 @@ final class TW_DB {
   product_name varchar(255) NOT NULL DEFAULT '',
   status varchar(20) NOT NULL DEFAULT 'available',
   import_batch varchar(64) NOT NULL DEFAULT '',
+  terms_set int(11) NOT NULL DEFAULT 0,
   notes text NULL,
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
   UNIQUE KEY serial_no (serial_no),
+  KEY terms_set (terms_set),
   KEY status (status),
   KEY import_batch (import_batch)
 ) $c;");
@@ -87,6 +89,7 @@ final class TW_DB {
   anonymized_at datetime NULL,
   created_at datetime NOT NULL,
   updated_at datetime NOT NULL,
+  terms_set int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY  (id),
   UNIQUE KEY warranty_code (warranty_code),
   UNIQUE KEY serial_id (serial_id),
@@ -103,6 +106,7 @@ final class TW_DB {
   warranty_id bigint(20) unsigned NOT NULL,
   consent_type varchar(30) NOT NULL,
   granted tinyint(1) NOT NULL DEFAULT 0,
+  terms_set int(11) NOT NULL DEFAULT 0,
   terms_version int(11) NOT NULL DEFAULT 0,
   terms_hash char(64) NOT NULL DEFAULT '',
   label_text text NULL,
@@ -209,6 +213,10 @@ final class TW_DB {
   KEY action (action),
   KEY actor (actor)
 ) $c;");
+
+        // Terms sets (1.28): everything accepted before belongs to the base set.
+        $wpdb->query("UPDATE {$t('warranties')} SET terms_set = 1 WHERE terms_set = 0");
+        $wpdb->query("UPDATE {$t('consents')} SET terms_set = 1 WHERE terms_set = 0 AND terms_version > 0");
 
         // Partners / authorized Service network (public finder: country → region → area).
         dbDelta("CREATE TABLE {$t('partners')} (

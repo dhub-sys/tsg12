@@ -55,6 +55,11 @@ final class TW_Warranty {
         }
         $now = TW_DB::now();
         $code = self::new_code();
+        if (empty($data['terms_set'])) {
+            $sr = self::serial_by_id($serial_id);
+            $data['terms_set'] = TW_Terms::resolve($sr ? $sr->terms_set : 0, $data['purchase_date']);
+        }
+        $data['terms_set'] = (int) $data['terms_set'];
         $row = array_merge($data, [
             'warranty_code' => $code,
             'serial_id' => (int) $serial_id,
@@ -72,13 +77,13 @@ final class TW_Warranty {
 
         // Consents are recorded with the exact texts and terms version the customer saw, in their language.
         $lang = TW_I18n::norm($data['lang'] ?? '') ?: 'el';
-        $terms = TW_Settings::current_terms($lang);
+        $terms = TW_Terms::current($data['terms_set'], $lang);
         $cl = TW_Settings::consent_labels($lang);
         $labels = ['terms' => $cl['terms'], 'data_accuracy' => $cl['accuracy'], 'marketing' => $cl['marketing']];
         foreach ($labels as $type => $label) {
             self::record_consent($wid, $type, !empty($consents[$type]), $label, 'registration', $type === 'terms' ? $terms : null, $type === 'terms' ? $terms['lang'] : $lang);
         }
-        TW_DB::log_event('activated', ['warranty_code' => $code, 'terms_version' => $terms['version'] . ($terms['lang'] === 'en' ? ' (EN)' : ''), 'lang' => $lang === 'en' ? 'English' : 'Ελληνικά'], $wid, $serial_id, 'customer:' . $data['email']);
+        TW_DB::log_event('activated', ['warranty_code' => $code, 'terms_version' => $terms['set_name'] . ' v' . $terms['version'] . ($terms['lang'] === 'en' ? ' (EN)' : ''), 'lang' => $lang === 'en' ? 'English' : 'Ελληνικά'], $wid, $serial_id, 'customer:' . $data['email']);
         return self::get($wid);
     }
 
@@ -88,6 +93,7 @@ final class TW_Warranty {
             'warranty_id' => (int) $warranty_id,
             'consent_type' => $type,
             'granted' => $granted ? 1 : 0,
+            'terms_set' => $terms ? (int) ($terms['set'] ?? TW_Terms::BASE) : 0,
             'terms_version' => $terms ? (int) $terms['version'] : 0,
             'terms_hash' => $terms ? $terms['hash'] : '',
             'label_text' => $label,

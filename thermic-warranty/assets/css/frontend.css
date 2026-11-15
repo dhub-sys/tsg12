@@ -213,3 +213,27 @@
 .tw-partner-pin { display: inline-flex; vertical-align: middle; color: var(--tw-accent); line-height: 0; padding: 2px; border-radius: 6px; }
 .tw-partner-pin:hover, .tw-partner-pin:focus-visible { background: var(--tw-bg-soft); }
 .tw-partner .tw-hint { margin: 8px 0 0; }
+
+/* Warranty terms finder ([thermic_warranty_terms]) */
+.tw-app.tw-terms-finder { width: 100%; max-width: 1100px !important; margin-left: auto !important; margin-right: auto !important; display: grid; grid-template-columns: minmax(240px, 310px) 1fr; gap: 20px; align-items: start; }
+.tw-terms-finder .tw-card { margin: 0; padding: 22px 24px; border-radius: 14px; }
+.tw-terms-finder h3 { font-size: 1.2em; margin: 0 0 14px; }
+.tw-terms-field { display: block; font-weight: 700; margin: 0 0 6px; }
+.tw-terms-field > span { display: block; margin-bottom: 6px; }
+.tw-terms-finder input[type=date], .tw-terms-finder input[type=text] { width: 100%; padding: 10px 12px; border: 1px solid var(--tw-border); border-radius: 8px; font-size: 16px; background: #fff; color: inherit; font-weight: 400; }
+.tw-terms-finder .tw-hint { font-size: 14px; margin: 8px 0 0; font-weight: 400; }
+.tw-terms-examples-title { font-size: 14px; margin: 16px 0 6px; }
+.tw-terms-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.tw-chip { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--tw-border); background: var(--tw-bg-soft); color: inherit; cursor: pointer; }
+.tw-chip:hover, .tw-chip:focus-visible { border-color: var(--tw-accent); }
+.tw-terms-serial { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--tw-border); }
+.tw-terms-serial-row { display: flex !important; gap: 8px; margin: 0 !important; }
+.tw-terms-serial-row .tw-btn { padding: 8px 14px; font-size: 15px; white-space: nowrap; }
+.tw-terms-search .tw-alert { margin: 12px 0 0; font-size: 14px; }
+.tw-terms-period { font-weight: 700; margin: -6px 0 12px; }
+.tw-terms-text { max-height: 60vh; overflow-y: auto; border: 1px solid var(--tw-border); border-radius: 8px; padding: 12px 16px; background: var(--tw-bg-soft); font-size: 15px; }
+.tw-terms-text p { margin: 0 0 .7em; }
+.tw-terms-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 12px 0 0; }
+.tw-terms-foot .tw-hint { margin: 0; }
+.tw-terms-foot .tw-btn { padding: 8px 16px; font-size: 15px; }
+@media (max-width: 760px) { .tw-app.tw-terms-finder { grid-template-columns: 1fr; } .tw-terms-finder .tw-card { padding: 18px 16px; } }

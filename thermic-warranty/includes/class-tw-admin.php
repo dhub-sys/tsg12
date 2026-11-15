@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'serial_batch', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export', 'terms_save', 'terms_assign', 'terms_delete'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -29,6 +29,7 @@ final class TW_Admin {
             'warranties' => ['Εγγυήσεις & πελάτες', 'shield', 'page_warranties'],
             'serials' => ['Σειριακοί αριθμοί', 'barcode', 'page_serials'],
             'notifications' => ['Ειδοποιήσεις', 'bell', 'page_notifications'],
+            'terms' => ['Όροι εγγύησης', 'file', 'page_terms'],
             'partners' => ['Συνεργάτες', 'pin', 'page_partners'],
         ];
         if (self::can_admin()) {
@@ -65,6 +66,7 @@ final class TW_Admin {
             'upload' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
             'scroll' => '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
             'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+            'file' => '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
             'pin' => '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
             'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
         ];
@@ -664,7 +666,7 @@ final class TW_Admin {
             <?php foreach ($consents as $c) : ?>
                 <tr><td><?php echo esc_html(TW_Util::datetime_label($c->created_at)); ?></td><td><?php echo esc_html($consent_labels[$c->consent_type] ?? $c->consent_type); ?></td>
                     <td><?php echo $c->granted ? '✔ Αποδοχή' : '✘ Όχι'; ?></td><td><small><?php echo esc_html($c->label_text); ?></small></td>
-                    <td><?php if ($c->terms_version) : ?><a href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 'v' => $c->terms_version], $post), 'tw_terms_view')); ?>" target="_blank">v<?php echo (int) $c->terms_version; ?></a><br><small title="SHA-256"><?php echo esc_html(substr($c->terms_hash, 0, 12)); ?>…</small><?php endif; ?></td>
+                    <td><?php if ($c->terms_version) : ?><?php echo esc_html(TW_Terms::name($c->terms_set ?: TW_Terms::BASE)); ?><br><a href="<?php echo esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 's' => $c->terms_set ?: TW_Terms::BASE, 'v' => $c->terms_version, 'tl' => $c->lang], $post), 'tw_terms_view')); ?>" target="_blank">v<?php echo (int) $c->terms_version; ?><?php echo $c->lang === 'en' ? ' (EN)' : ''; ?></a><br><small title="SHA-256"><?php echo esc_html(substr($c->terms_hash, 0, 12)); ?>…</small><?php endif; ?></td>
                     <td><?php echo esc_html($c->source); ?></td><td><?php echo esc_html($c->ip); ?></td><td><small><?php echo esc_html($c->user_agent); ?></small></td></tr>
             <?php endforeach; ?>
             </tbody></table>
@@ -719,6 +721,8 @@ final class TW_Admin {
         if ($s !== '') { $where[] = '(s.serial_no LIKE %s OR s.product_name LIKE %s OR s.product_code LIKE %s)'; $l = '%' . $wpdb->esc_like($s) . '%'; array_push($params, $l, $l, $l); }
         if ($status !== '') { $where[] = 's.status = %s'; $params[] = $status; }
         if ($batch !== '') { $where[] = 's.import_batch = %s'; $params[] = $batch; }
+        $fterms = self::q('terms_set');
+        if ($fterms !== '') { $where[] = 's.terms_set = %d'; $params[] = (int) $fterms; }
         $wsql = implode(' AND ', $where);
         if ($params) $wsql = $wpdb->prepare($wsql, $params);
         $paged = max(1, (int) self::q('paged'));
@@ -777,6 +781,7 @@ final class TW_Admin {
                 <input type="search" name="s" value="<?php echo esc_attr($s); ?>" placeholder="Σειριακός ή προϊόν">
                 <select name="status"><option value="">Όλοι</option><?php foreach ($labels as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($status, $k, false), esc_html($l)); ?></select>
                 <input type="text" name="batch" value="<?php echo esc_attr($batch); ?>" placeholder="Παρτίδα" list="tw-batches">
+                <select name="terms_set"><option value="">Όροι: όλοι</option><option value="0"<?php selected($fterms, '0'); ?>>Κατά ημ/νία αγοράς</option><?php foreach (TW_Terms::sets() as $tid => $ts) if ((int) $tid !== TW_Terms::BASE) printf('<option value="%d"%s>%s</option>', (int) $tid, selected($fterms, (string) $tid, false), esc_html($ts['name'])); ?></select>
                 <datalist id="tw-batches"><?php foreach (TW_Importer::batches() as $b) echo '<option value="' . esc_attr($b) . '">'; ?></datalist>
                 <button class="button">Φίλτρο</button>
             </form>
@@ -795,13 +800,14 @@ final class TW_Admin {
                 <button class="button">Αλλαγή παρτίδας</button>
             </form>
             <?php self::pagination($total, $paged); ?>
-            <table class="widefat striped"><thead><tr><th class="check-column"><input type="checkbox" onclick="document.querySelectorAll('.tw-batch-cb').forEach(function(c){c.checked=this.checked}.bind(this))" aria-label="Επιλογή όλων"></th><th>Σειριακός</th><th>Κωδικός προϊόντος</th><th>Όνομα προϊόντος</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
-            <?php if (!$rows) echo '<tr><td colspan="9">Δεν βρέθηκαν σειριακοί.</td></tr>'; ?>
+            <table class="widefat striped"><thead><tr><th class="check-column"><input type="checkbox" onclick="document.querySelectorAll('.tw-batch-cb').forEach(function(c){c.checked=this.checked}.bind(this))" aria-label="Επιλογή όλων"></th><th>Σειριακός</th><th>Κωδικός προϊόντος</th><th>Όνομα προϊόντος</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Όροι</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
+            <?php if (!$rows) echo '<tr><td colspan="10">Δεν βρέθηκαν σειριακοί.</td></tr>'; ?>
             <?php foreach ($rows as $r) : ?>
                 <tr><th class="check-column"><input type="checkbox" class="tw-batch-cb" name="ids[]" value="<?php echo (int) $r->id; ?>" form="tw-batch-form"></th><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
                     <td><?php echo self::status_badge($r->status, $labels); ?></td>
                     <td><?php echo $r->wid ? self::warranty_link($r->wid, $r->warranty_code) : '—'; ?></td>
                     <td><a href="<?php echo esc_url(self::url('serials', ['batch' => $r->import_batch])); ?>"><?php echo esc_html($r->import_batch); ?></a></td>
+                    <td><?php echo $r->terms_set ? '<a href="' . esc_url(self::url('serials', ['terms_set' => $r->terms_set])) . '">' . esc_html(TW_Terms::name($r->terms_set)) . '</a>' : '<span class="description">κατά ημ/νία αγοράς</span>'; ?></td>
                     <td><?php echo esc_html(TW_Util::datetime_label($r->created_at)); ?></td>
                     <td><?php if ($r->status !== 'registered') : $to = $r->status === 'void' ? 'available' : 'void'; ?>
                         <form method="post" action="<?php echo esc_url($post); ?>"><?php wp_nonce_field('tw_serial_status'); ?>
@@ -1019,21 +1025,13 @@ final class TW_Admin {
                     $field('service_notify_company', 'Email για κάθε υποβολή Service', 'checkbox', 'Αποστολή email στην εταιρεία κάθε φορά που ένας πελάτης καταχωρεί Service. Χωρίς αυτό, οι υποβολές φαίνονται στην καρτέλα κάθε εγγύησης και στην Επισκόπηση.');
                     $field('max_registration_delay_days', 'Προθεσμία ενεργοποίησης (ημέρες)', 'number', 'Μέγιστες ημέρες από την αγορά έως την ενεργοποίηση. 0 = χωρίς όριο.', 'min="0"');
                 elseif ($tab === 'terms') : ?>
-                    <tr><th>Όροι εγγύησης</th><td>
-                        <textarea name="terms_text" rows="18" class="large-text"><?php echo esc_textarea($terms['text']); ?></textarea>
-                        <p class="description">Τρέχουσα έκδοση: <strong>v<?php echo (int) $terms['version']; ?></strong> (<?php echo esc_html(TW_Util::datetime_label($terms['published_at'])); ?>). Κάθε αλλαγή δημιουργεί νέα έκδοση· οι παλαιότερες φυλάσσονται, και για κάθε πελάτη καταγράφεται ποια έκδοση αποδέχθηκε.</p>
-                        <p><?php foreach (array_reverse(TW_Settings::terms_versions()) as $tv) printf('<a href="%s" target="_blank">v%d</a> (%s) &nbsp; ', esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 'v' => $tv['version']], $post), 'tw_terms_view')), (int) $tv['version'], esc_html(TW_Util::date_label(substr($tv['published_at'], 0, 10)))); ?></p>
-                    </td></tr>
+                    <tr><th>Όροι εγγύησης</th><td><p>Τα κείμενα των όρων, οι εκδόσεις τους και η ανάθεσή τους σε ημερομηνίες αγοράς ή σειριακούς ορίζονται στην ενότητα <a href="<?php echo esc_url(self::url('terms')); ?>"><strong>Όροι εγγύησης</strong></a>. Εδώ ρυθμίζετε τα κείμενα των checkbox της ενεργοποίησης.</p></td></tr>
                     <?php
                     $field('terms_label', 'Checkbox όρων (υποχρεωτικό)', 'textarea');
                     $field('accuracy_label', 'Checkbox ορθότητας στοιχείων (υποχρεωτικό)', 'textarea');
                     $field('marketing_label', 'Checkbox εμπορικών ενημερώσεων (προαιρετικό, αρχικά αποεπιλεγμένο)', 'textarea');
                     ?>
                     <tr><td colspan="2"><h2 style="margin:12px 0 0">English – για πελάτες που χρησιμοποιούν την πλατφόρμα στα αγγλικά</h2></td></tr>
-                    <tr><th>Terms (English)</th><td>
-                        <textarea name="terms_text_en" rows="14" class="large-text" lang="en"><?php echo esc_textarea($terms_en['text']); ?></textarea>
-                        <p class="description"><?php if ($terms_en['version']) : ?>Τρέχουσα αγγλική έκδοση: <strong>v<?php echo (int) $terms_en['version']; ?></strong> (<?php echo esc_html(TW_Util::datetime_label($terms_en['published_at'])); ?>). <?php foreach (array_reverse(TW_Settings::terms_versions('en')) as $tv) printf('<a href="%s" target="_blank">v%d</a> ', esc_url(wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 'v' => $tv['version'], 'tl' => 'en'], $post), 'tw_terms_view')), (int) $tv['version']); ?><?php else : ?><strong>Δεν υπάρχει ακόμη αγγλικό κείμενο:</strong> οι πελάτες στα αγγλικά βλέπουν και αποδέχονται τους ελληνικούς όρους.<?php endif; ?> Οι αγγλικοί όροι έχουν δική τους αρίθμηση εκδόσεων· σε κάθε πελάτη καταγράφεται γλώσσα και έκδοση που αποδέχθηκε. Προτείνεται εγκεκριμένη μετάφραση.</p>
-                    </td></tr>
                     <?php
                     $field('terms_label_en', 'Terms checkbox (English)', 'textarea');
                     $field('accuracy_label_en', 'Accuracy checkbox (English)', 'textarea');
@@ -1871,11 +1869,11 @@ final class TW_Admin {
     public static function handle_terms_view() {
         if (!current_user_can(self::cap())) wp_die('', 403);
         check_admin_referer('tw_terms_view');
-        $t = TW_Settings::terms_version((int) ($_GET['v'] ?? 0), self::q('tl') === 'en' ? 'en' : 'el');
+        $t = TW_Terms::version((int) ($_GET['s'] ?? TW_Terms::BASE) ?: TW_Terms::BASE, (int) ($_GET['v'] ?? 0), self::q('tl') === 'en' ? 'en' : 'el');
         if (!$t) wp_die('Δεν βρέθηκε.');
         header('Content-Type: text/html; charset=utf-8');
         echo '<!doctype html><meta charset="utf-8"><title>Όροι v' . (int) $t['version'] . '</title><body style="font-family:sans-serif;max-width:800px;margin:2em auto;line-height:1.5">';
-        echo '<p><strong>Έκδοση ' . (int) $t['version'] . '</strong> – δημοσίευση ' . esc_html(TW_Util::datetime_label($t['published_at'])) . '<br><small>SHA-256: ' . esc_html($t['hash']) . '</small></p><hr>';
+        echo '<p><strong>' . esc_html($t['set_name']) . ($t['lang'] === 'en' ? ' (English)' : '') . ' – έκδοση ' . (int) $t['version'] . '</strong> – δημοσίευση ' . esc_html(TW_Util::datetime_label($t['published_at'])) . '<br><small>SHA-256: ' . esc_html($t['hash']) . '</small></p><hr>';
         echo wpautop(esc_html($t['text'])) . '</body>';
         exit;
     }
@@ -1955,6 +1953,10 @@ final class TW_Admin {
         self::back('tw-serials', ['batch' => $new]);
     }
 
+    public static function page_terms() { TW_Terms::page(); }
+    public static function handle_terms_save() { TW_Terms::handle_save(); }
+    public static function handle_terms_assign() { TW_Terms::handle_assign(); }
+    public static function handle_terms_delete() { TW_Terms::handle_delete(); }
     public static function page_partners() { TW_Partners::page(); }
     public static function handle_partner_save() { TW_Partners::handle_save(); }
     public static function handle_partner_delete() { TW_Partners::handle_delete(); }

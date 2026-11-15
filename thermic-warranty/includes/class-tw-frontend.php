@@ -170,13 +170,13 @@ final class TW_Frontend {
         $serial = self::usable_serial(self::input('serial'));
         $res = TW_OTP::verify('register', $email, self::input('code'), $serial->id);
         if (is_wp_error($res)) self::fail($res->get_error_message(), 'code');
-        $terms = TW_Settings::current_terms();
         wp_send_json_success([
             'token' => $res['token'],
             'product' => trim($serial->product_name . ($serial->product_code ? ' (' . $serial->product_code . ')' : '')),
             'serial' => $serial->serial,
             'email' => $email,
-            'terms_version' => (int) $terms['version'],
+            // Terms that apply to this product; the form shows the right one once the purchase date is entered.
+            'terms' => TW_Terms::candidates($serial, TW_I18n::lang()),
         ]);
     }
 
@@ -238,8 +238,9 @@ final class TW_Frontend {
         ];
         if (!$consents['terms']) self::fail('Για να ολοκληρωθεί η ενεργοποίηση πρέπει να αποδεχθείτε τους όρους εγγύησης.', 'consent_terms');
         if (!$consents['data_accuracy']) self::fail('Επιβεβαιώστε ότι τα στοιχεία είναι σωστά.', 'consent_accuracy');
-        $terms = TW_Settings::current_terms(TW_I18n::lang());
-        if ((int) self::input('terms_version') !== (int) $terms['version'] || self::input('terms_lang') !== $terms['lang']) {
+        $terms_set = TW_Terms::resolve($serial->terms_set, $purchase);
+        $terms = TW_Terms::current($terms_set, TW_I18n::lang());
+        if ((int) self::input('terms_set') !== $terms_set || (int) self::input('terms_version') !== (int) $terms['version'] || self::input('terms_lang') !== $terms['lang']) {
             self::fail('Οι όροι εγγύησης ενημερώθηκαν στο μεταξύ. Ανανεώστε τη σελίδα, διαβάστε τους και αποδεχθείτε τους ξανά.', 'consent_terms', 409);
         }
 
@@ -268,6 +269,7 @@ final class TW_Frontend {
             'invoice_original_name' => $invoice['name'],
             'purchase_date' => $purchase,
             'lang' => TW_I18n::lang(),
+            'terms_set' => $terms_set,
         ], $consents);
         if (is_wp_error($w)) {
             if ($invoice['file']) @unlink(TW_Util::invoice_path($invoice['file']));

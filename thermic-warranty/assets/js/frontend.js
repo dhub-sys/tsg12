@@ -249,6 +249,7 @@
                 state.product = r.data.product;
                 state.verifiedEmail = r.data.email;
                 state.serial = r.data.serial;
+                state.terms = r.data.terms || [];
                 try { sessionStorage.setItem('tw_reg', JSON.stringify(state)); } catch (e2) {}
                 fillDetails();
                 show(4);
@@ -258,6 +259,41 @@
         function fillDetails() {
             productLine(f4.querySelector('.tw-product'), T('Προϊόν') + ': ');
             bind(f4, { email: state.verifiedEmail });
+            showTerms();
+        }
+
+        // The terms that come with this product: the serial's own set, or the latest set whose «from» date is on
+        // or before the purchase date. Until the date is entered (and more than one set could apply) nothing can be accepted.
+        function showTerms() {
+            var list = state.terms || [];
+            var date = f4.purchase_date ? f4.purchase_date.value : '';
+            var pick = null;
+            if (list.length === 1) pick = list[0];
+            else if (date) list.forEach(function (t) { if (t.from === '' || t.from <= date) pick = t; });
+            var box = f4.querySelector('[data-terms-box]');
+            var label = f4.querySelector('[data-terms-label]');
+            var accept = f4.consent_terms;
+            if (!pick) {
+                box.innerHTML = '<p class="tw-hint"></p>';
+                box.firstChild.textContent = T('Συμπληρώστε την ημερομηνία αγοράς για να δείτε τους όρους εγγύησης που ισχύουν για το προϊόν σας.');
+                label.textContent = '';
+                f4.terms_set.value = f4.terms_version.value = f4.terms_lang.value = '';
+                accept.checked = false;
+                accept.disabled = true;
+                return;
+            }
+            if (f4.terms_set.value !== String(pick.set) || f4.terms_version.value !== String(pick.version)) accept.checked = false;
+            box.innerHTML = pick.html; // server-escaped text
+            if (pick.lang !== (TW.lang || 'el')) box.setAttribute('lang', pick.lang); else box.removeAttribute('lang');
+            label.textContent = pick.label;
+            f4.terms_set.value = pick.set;
+            f4.terms_version.value = pick.version;
+            f4.terms_lang.value = pick.lang;
+            accept.disabled = false;
+        }
+        if (f4.purchase_date) {
+            f4.purchase_date.addEventListener('change', showTerms);
+            f4.purchase_date.addEventListener('input', showTerms);
         }
 
         root.querySelectorAll('[data-action="resend"]').forEach(function (b) {

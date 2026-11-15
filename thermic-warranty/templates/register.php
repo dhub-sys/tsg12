@@ -2,7 +2,6 @@
 /** @var array $s settings  @var string $privacy */
 if (!defined('ABSPATH')) exit;
 $lang = TW_I18n::lang();
-$terms = TW_Settings::current_terms($lang);
 $labels = TW_Settings::consent_labels($lang);
 ?>
 <div class="tw-app tw-register" data-tw="register" lang="<?php echo esc_attr($lang); ?>">
@@ -136,10 +135,12 @@ $labels = TW_Settings::consent_labels($lang);
 
         <fieldset>
             <legend><?php tw_e('Όροι εγγύησης'); ?></legend>
-            <div class="tw-terms" tabindex="0" aria-label="<?php echo esc_attr(tw__('Κείμενο όρων εγγύησης')); ?>"<?php echo $terms['lang'] !== $lang ? ' lang="' . esc_attr($terms['lang']) . '"' : ''; ?>><?php echo wpautop(esc_html($terms['text'])); ?></div>
-            <p class="tw-hint"><?php echo esc_html(sprintf(tw__('Έκδοση όρων: %1$d (%2$s)'), (int) $terms['version'], TW_Util::datetime_label($terms['published_at']))); ?></p>
-            <input type="hidden" name="terms_version" value="<?php echo (int) $terms['version']; ?>">
-            <input type="hidden" name="terms_lang" value="<?php echo esc_attr($terms['lang']); ?>">
+            <?php // Filled from the verification step: the terms that apply to this product and purchase date. ?>
+            <div class="tw-terms" tabindex="0" data-terms-box aria-label="<?php echo esc_attr(tw__('Κείμενο όρων εγγύησης')); ?>"><p class="tw-hint"><?php tw_e('Συμπληρώστε την ημερομηνία αγοράς για να δείτε τους όρους εγγύησης που ισχύουν για το προϊόν σας.'); ?></p></div>
+            <p class="tw-hint" data-terms-label></p>
+            <input type="hidden" name="terms_set" value="">
+            <input type="hidden" name="terms_version" value="">
+            <input type="hidden" name="terms_lang" value="">
 
             <label class="tw-check"><input type="checkbox" name="consent_terms" value="1" required> <span><?php echo esc_html($labels['terms']); ?> <span class="tw-req">*</span></span></label>
             <label class="tw-check"><input type="checkbox" name="consent_accuracy" value="1" required> <span><?php echo esc_html($labels['accuracy']); ?> <span class="tw-req">*</span></span></label>

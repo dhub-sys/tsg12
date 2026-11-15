@@ -117,7 +117,7 @@ $review_labels = array_map('tw__', ['pending' => 'Καταχωρήθηκε', 'ap
                 <tbody>
                 <?php foreach ($consents as $c) : ?>
                     <tr><td><?php echo esc_html(TW_Util::datetime_label($c->created_at)); ?></td>
-                        <td><?php echo esc_html($consent_labels[$c->consent_type] ?? $c->consent_type); ?><?php echo $c->terms_version ? ' (' . esc_html(sprintf(tw__('όροι έκδοσης %d'), (int) $c->terms_version)) . ')' : ''; ?></td>
+                        <td><?php echo esc_html($consent_labels[$c->consent_type] ?? $c->consent_type); ?><?php echo $c->terms_version ? ' (' . esc_html(sprintf(tw__('όροι έκδοσης %d'), (int) $c->terms_version)) . ') – ' . esc_html(TW_Terms::period_label($c->terms_set ?: TW_Terms::BASE)) : ''; ?></td>
                         <td><?php tw_e($c->granted ? 'Ναι' : 'Όχι'); ?></td>
                         <td><?php echo esc_html($source_labels[$c->source] ?? $c->source); ?><?php echo $c->ip ? ', IP ' . esc_html($c->ip) : ''; ?></td></tr>
                 <?php endforeach; ?>

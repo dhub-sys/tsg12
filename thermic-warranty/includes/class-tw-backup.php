@@ -176,7 +176,7 @@ final class TW_Backup {
         }
         $settings = TW_Settings::all();
         foreach (self::SECRET_SETTINGS as $k) unset($settings[$k]);
-        $zip->addFromString('options.json', wp_json_encode(['tw_settings' => $settings, 'tw_terms_versions' => TW_Settings::terms_versions()], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $zip->addFromString('options.json', wp_json_encode(['tw_settings' => $settings, 'tw_terms_versions' => TW_Settings::terms_versions(), 'tw_terms_all' => TW_Terms::all_options()], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         $encrypt('options.json');
 
         $files = 0;
@@ -281,6 +281,12 @@ final class TW_Backup {
                 // …and this site's backup configuration (schedule, encryption, off-site destination).
                 foreach ($current as $k => $v) if (strpos($k, 'backup_') === 0) $settings[$k] = $v;
                 update_option(TW_Settings::OPTION, $settings, false);
+            }
+            if (isset($options['tw_terms_all']) && is_array($options['tw_terms_all'])) {
+                // Terms sets (1.28+): the sets list and every set's Greek/English versions.
+                foreach ($options['tw_terms_all'] as $name => $val) {
+                    if (is_array($val) && ($name === TW_Terms::SETS_OPTION || strpos($name, TW_Settings::TERMS_OPTION) === 0)) update_option($name, $val, false);
+                }
             }
             if (isset($options['tw_terms_versions']) && is_array($options['tw_terms_versions'])) {
                 update_option(TW_Settings::TERMS_OPTION, $options['tw_terms_versions'], false);

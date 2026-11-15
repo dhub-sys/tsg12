@@ -19,7 +19,7 @@ final class TW_Activity {
             'serials' => ['Σειριακοί', ['serial_*', 'serials_imported']],
             'access' => ['Συνδέσεις & ασφάλεια', ['staff_*', 'access_blocked', 'ip_lock_*', 'log_verified', 'log_archived']],
             'team' => ['Ομάδα', ['team_*']],
-            'settings' => ['Ρυθμίσεις', ['settings_saved', 'terms_published', 'logo_uploaded', 'remote_*', 'backup_settings']],
+            'settings' => ['Ρυθμίσεις', ['settings_saved', 'terms_*', 'logo_uploaded', 'remote_*', 'backup_settings']],
             'backups' => ['Αντίγραφα ασφαλείας', ['backup_created', 'backup_downloaded', 'backup_deleted', 'backup_restored', 'backup_failed', 'backup_sent', 'backup_send_failed']],
             'exports' => ['Εξαγωγές', ['*_exported']],
         ];
@@ -39,7 +39,7 @@ final class TW_Activity {
             'backup_settings' => 'Ρυθμίσεις αντιγράφων ασφαλείας', 'backup_created' => 'Δημιουργία αντιγράφου ασφαλείας', 'backup_downloaded' => 'Λήψη αντιγράφου ασφαλείας',
             'backup_deleted' => 'Διαγραφή αντιγράφου ασφαλείας', 'backup_restored' => 'Επαναφορά από αντίγραφο ασφαλείας', 'backup_failed' => 'Αποτυχία αντιγράφου ασφαλείας',
             'backup_sent' => 'Αποστολή αντιγράφου εκτός server', 'backup_send_failed' => 'Αποτυχία αποστολής αντιγράφου',
-            'serials_imported' => 'Εισαγωγή σειριακών', 'serial_void' => 'Ακύρωση σειριακού', 'serial_available' => 'Επαναφορά σειριακού', 'serials_batch' => 'Αλλαγή παρτίδας σειριακών', 'partner_added' => 'Προσθήκη συνεργάτη', 'partner_updated' => 'Αλλαγή συνεργάτη', 'partner_deleted' => 'Αφαίρεση συνεργάτη', 'partners_imported' => 'Εισαγωγή συνεργατών', 'partners_exported' => 'Εξαγωγή συνεργατών',
+            'serials_imported' => 'Εισαγωγή σειριακών', 'serial_void' => 'Ακύρωση σειριακού', 'serial_available' => 'Επαναφορά σειριακού', 'serials_batch' => 'Αλλαγή παρτίδας σειριακών', 'terms_assigned' => 'Ανάθεση όρων σε σειριακούς', 'terms_unassigned' => 'Αφαίρεση ανάθεσης όρων', 'terms_deleted' => 'Διαγραφή σετ όρων', 'partner_added' => 'Προσθήκη συνεργάτη', 'partner_updated' => 'Αλλαγή συνεργάτη', 'partner_deleted' => 'Αφαίρεση συνεργάτη', 'partners_imported' => 'Εισαγωγή συνεργατών', 'partners_exported' => 'Εξαγωγή συνεργατών',
             'log_verified' => 'Έλεγχος ακεραιότητας ημερολογίου', 'log_archived' => 'Αρχειοθέτηση καταγραφών', 'warranty_viewed' => 'Προβολή καρτέλας από την ομάδα',
             'serials_exported' => 'Εξαγωγή σειριακών', 'warranties_exported' => 'Εξαγωγή εγγυήσεων', 'log_exported' => 'Εξαγωγή ημερολογίου',
         ];
