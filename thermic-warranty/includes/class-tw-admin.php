@@ -1039,8 +1039,8 @@ final class TW_Admin {
                     </td></tr>
                     <?php
                     ?>
-                    <tr><th>Εκτύπωση καρτέλας (PDF)</th><td>
-                        <p class="description" style="margin-top:0">Υδατογράφημα (watermark) σε κάθε σελίδα της εκτυπωμένης καρτέλας εγγύησης.</p>
+                    <tr><th>Εκτύπωση καρτέλας &amp; όρων (PDF)</th><td>
+                        <p class="description" style="margin-top:0">Υδατογράφημα (watermark) σε κάθε σελίδα της εκτυπωμένης καρτέλας εγγύησης και του PDF των όρων εγγύησης.</p>
                         <p><select name="s[pdf_watermark]" id="tw-wm-type">
                             <?php foreach (['text' => 'Κείμενο', 'logo' => 'Λογότυπο', 'none' => 'Χωρίς υδατογράφημα'] as $k => $l) printf('<option value="%s"%s>%s</option>', esc_attr($k), selected($s['pdf_watermark'], $k, false), esc_html($l)); ?>
                         </select>

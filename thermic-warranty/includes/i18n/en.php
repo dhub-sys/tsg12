@@ -436,4 +436,6 @@ We will review it and let you know by email. You can follow its progress on the 
 το αίτημά σας #%2$d για το προϊόν με S/N %3$s: %4$s.' => 'Dear %1$s,
 
 your request #%2$d for the product with S/N %3$s: %4$s.',
+    'Σελίδα' => 'Page',
+    'από' => 'of',
 ];

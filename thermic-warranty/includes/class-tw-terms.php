@@ -820,41 +820,96 @@ final class TW_Terms_Public {
         exit;
     }
 
-    /** The printable page of a terms text (the browser saves it as PDF). $note: shown on screen only. */
+    /**
+     * The printable page of a terms text (the browser saves it as PDF), laid out like the warranty card:
+     * header (logo, title, period) and footer (company, contact, version) on every page, page numbers from
+     * @page margin boxes, and the watermark of Ρυθμίσεις → Εφαρμογή & εμφάνιση. $note: shown on screen only.
+     */
     public static function render_print($t, $period, $note = '') {
         $s = TW_Settings::all();
         $lang = TW_I18n::lang();
+        [$c1, $c2] = TW_App::colors();
+        $updated = TW_Util::date_label(substr((string) $t['published_at'], 0, 10));
+        // Document title = suggested PDF file name.
+        $title = tw__('Όροι εγγύησης') . ' - ' . $s['company_name'] . ' - ' . str_replace('/', '-', $updated);
+        $wm_type = $s['pdf_watermark'];
+        $wm_opacity = max(0, min(100, (int) $s['pdf_watermark_opacity'])) / 100;
+        $wm_text = trim((string) $s['pdf_watermark_text']) !== '' ? $s['pdf_watermark_text'] : $s['company_name'];
+        $contact = TW_Settings::company_contact($lang);
+        $css = function ($v) { return str_replace(['"', '\\', "\n"], ['', '', ' '], $v); };
         nocache_headers();
         header('Content-Type: text/html; charset=utf-8');
-        $title = tw__('Όροι εγγύησης') . ' – ' . $s['company_name'];
         ?><!doctype html>
 <html lang="<?php echo esc_attr($lang); ?>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
 <title><?php echo esc_html($title); ?></title>
-<link rel="stylesheet" href="<?php echo esc_url(TW_URL . 'assets/css/fonts.css?ver=' . TW_VERSION); ?>">
+<link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/fonts.css')); ?>">
+<link rel="stylesheet" href="<?php echo esc_url(TW_App::asset('assets/css/print.css')); ?>">
 <style>
-@page { size: A4; margin: 18mm 16mm; }
-body { font-family: 'Geom', Arial, sans-serif; color: #1d2330; line-height: 1.55; font-size: 11pt; max-width: 760px; margin: 24px auto; padding: 0 16px; }
-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 2px solid #1d2330; padding-bottom: 10px; margin-bottom: 14px; }
-header img { max-height: 48px; max-width: 200px; }
-h1 { font-size: 20pt; margin: 0 0 4px; }
-.period { font-weight: 700; font-size: 12pt; margin: 0 0 4px; }
-.meta { color: #5f6b7a; font-size: 9pt; margin: 0 0 16px; }
-.text p { margin: 0 0 .7em; }
-.text h2 { font-size: 14pt; margin: 1em 0 .4em; } .text h3 { font-size: 12pt; margin: .9em 0 .35em; } .text ul, .text ol { margin: 0 0 .8em 1.4em; padding: 0; }
-.text table { border-collapse: collapse; margin: .6em 0 1em; } .text th, .text td { border: 1px solid #9aa1ab; padding: 5px 8px; vertical-align: top; text-align: left; } .text th { background: #eef0f3; }
-h2, h3, tr { page-break-inside: avoid; break-inside: avoid; }
-footer { margin-top: 24px; border-top: 1px solid #d6d9de; padding-top: 8px; color: #5f6b7a; font-size: 8.5pt; }
-.bar { text-align: center; margin: 0 0 16px; } .note { background: #fff7e6; border: 1px solid #f2d39b; border-radius: 6px; padding: 8px 12px; font-size: 10pt; margin: 0 0 10px; } .bar button { font: inherit; padding: 8px 18px; border-radius: 6px; border: 1px solid #1d2330; background: #1d2330; color: #fff; cursor: pointer; }
-@media print { .bar { display: none; } body { margin: 0; max-width: none; padding: 0; } }
+:root { --brand: <?php echo esc_html($c1); ?>; --side: <?php echo esc_html($c2); ?>; --wm-opacity: <?php echo esc_html((string) $wm_opacity); ?>; }
+@page { size: A4; margin: 14mm 12mm 16mm;
+    @bottom-right { content: "<?php echo esc_html($css(tw__('Σελίδα'))); ?> " counter(page) " <?php echo esc_html($css(tw__('από'))); ?> " counter(pages); font: 8.5pt 'Geom', Arial, sans-serif; color: #4b5563; }
+    @bottom-left { content: "<?php echo esc_html($css(tw__('Όροι εγγύησης') . ' · ' . $s['company_name'])); ?>"; font: 8.5pt 'Geom', Arial, sans-serif; color: #4b5563; } }
+body { font-size: 10.5pt; line-height: 1.55; }
+.toolbar .note { background: #fff7e6; color: #5c3b00; border-radius: 6px; padding: 6px 10px; max-width: 640px; }
+.terms-period { margin: 0 0 1mm; font-size: 11.5pt; font-weight: 700; color: #111827; }
+.terms-meta { margin: 0 0 5mm; font-size: 8.5pt; color: #4b5563; }
+.terms-text p { margin: 0 0 .7em; }
+.terms-text h2 { font-size: 13pt; margin: 1.1em 0 .45em; padding-left: 2.5mm; border-left: 3pt solid var(--brand); break-after: avoid; }
+.terms-text h3 { font-size: 11.5pt; margin: 1em 0 .4em; break-after: avoid; }
+.terms-text h4 { font-size: 10.5pt; margin: .9em 0 .35em; break-after: avoid; }
+.terms-text ul, .terms-text ol { margin: 0 0 .8em 1.4em; padding: 0; }
+.terms-text li { margin: .15em 0; }
+.terms-text blockquote { margin: .6em 0 1em; padding: 2.5mm 4mm; border-left: 3pt solid var(--brand); background: #f6f7f9; break-inside: avoid; }
+.terms-text hr { border: 0; border-top: .8pt solid #9ca3af; margin: 1em 0; }
+.terms-text a { color: inherit; }
+.terms-text table { width: 100%; border-collapse: collapse; margin: .6em 0 1em; border: 1pt solid #9ca3af; }
+.terms-text th, .terms-text td { border: .6pt solid #c4c9d1; padding: 1.7mm 2.4mm; text-align: left; vertical-align: top; }
+.terms-text th { background: color-mix(in srgb, var(--brand) 12%, #fff); font-weight: 700; }
+.terms-text tr { break-inside: avoid; }
+.doc-foot .mono { font-size: 7.5pt; }
+/* Printed: the footer is fixed at the bottom of every page (also the last, half-empty one); the table footer
+   only keeps its space so the text never runs under it. */
+.fixed-foot { display: none; }
+@media print { .fixed-foot { display: flex; position: fixed; left: 1.5pt; right: 1.5pt; bottom: 0; margin: 0; padding-bottom: 0; background: #fff; z-index: 3; } table.page > tfoot .doc-foot { visibility: hidden; } }
 </style></head><body>
-<?php if ($note !== '') : ?><div class="bar note"><?php echo esc_html($note); ?></div><?php endif; ?>
-<div class="bar"><button type="button" onclick="window.print()"><?php echo esc_html(tw__('Αποθήκευση ως PDF / Εκτύπωση')); ?></button></div>
-<header><div><h1><?php tw_e('Όροι εγγύησης'); ?></h1><div><?php echo esc_html($s['company_name']); ?></div></div><?php echo $s['logo_url'] ? TW_App::logo_html('logo') : ''; // phpcs:ignore ?></header>
-<p class="period"><?php echo esc_html($period); ?></p>
-<p class="meta"><?php echo esc_html(TW_Terms::updated_label($t)); ?></p>
-<div class="text"<?php echo $t['lang'] !== $lang ? ' lang="' . esc_attr($t['lang']) . '"' : ''; ?>><?php echo TW_Terms::html($t['text']); // sanitized ?></div>
-<footer><?php echo esc_html(sprintf(tw__('Εκτυπώθηκε %s'), TW_Util::datetime_label(TW_DB::now()))); ?> · SHA-256 <?php echo esc_html(substr($t['hash'], 0, 16)); ?>…</footer>
-<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });</script>
+<div class="toolbar">
+    <button type="button" onclick="window.print()"><?php echo esc_html(tw__('Αποθήκευση ως PDF / Εκτύπωση')); ?></button>
+    <?php if ($note !== '') : ?><span class="note"><?php echo esc_html($note); ?></span><?php endif; ?>
+</div>
+<?php if ($wm_type !== 'none' && $wm_opacity > 0) : ?>
+    <div class="watermark" aria-hidden="true">
+        <?php if ($wm_type === 'logo' && $s['logo_url']) : ?><img src="<?php echo esc_url($s['logo_url']); ?>" alt="">
+        <?php else : ?><span><?php echo esc_html($wm_text); ?></span><?php endif; ?>
+    </div>
+<?php endif; ?>
+<table class="page">
+    <thead><tr><td>
+        <header class="doc-head">
+            <div class="brand"><?php if ($s['logo_url']) : ?><img src="<?php echo esc_url($s['logo_url']); ?>" alt="<?php echo esc_attr($s['company_name']); ?>"><?php else : ?><span class="brand-text"><?php echo esc_html($s['company_name']); ?></span><?php endif; ?></div>
+            <div class="head-meta">
+                <div class="doc-title"><?php tw_e('Όροι εγγύησης'); ?></div>
+                <div class="doc-code"><?php echo esc_html(rtrim($period, '.')); ?></div>
+            </div>
+        </header>
+    </td></tr></thead>
+    <tfoot><tr><td>
+        <footer class="doc-foot">
+            <span><?php echo esc_html($contact === '' ? $s['company_name'] : (mb_stripos($contact, $s['company_name']) === 0 ? $contact : $s['company_name'] . ' – ' . $contact)); ?></span>
+            <span><?php echo esc_html(TW_Terms::updated_label($t)); ?> · <span class="mono">SHA-256 <?php echo esc_html(substr($t['hash'], 0, 12)); ?>…</span></span>
+        </footer>
+    </td></tr></tfoot>
+    <tbody><tr><td>
+        <p class="terms-period"><?php echo esc_html($period); ?></p>
+        <p class="terms-meta"><?php echo esc_html(TW_Terms::updated_label($t)); ?> · <?php echo esc_html(sprintf(tw__('Εκτυπώθηκε %s'), TW_Util::datetime_label(TW_DB::now()))); ?></p>
+        <div class="terms-text"<?php echo $t['lang'] !== $lang ? ' lang="' . esc_attr($t['lang']) . '"' : ''; ?>><?php echo TW_Terms::html($t['text']); // sanitized ?></div>
+    </td></tr></tbody>
+</table>
+<footer class="doc-foot fixed-foot">
+            <span><?php echo esc_html($contact === '' ? $s['company_name'] : (mb_stripos($contact, $s['company_name']) === 0 ? $contact : $s['company_name'] . ' – ' . $contact)); ?></span>
+            <span><?php echo esc_html(TW_Terms::updated_label($t)); ?> · <span class="mono">SHA-256 <?php echo esc_html(substr($t['hash'], 0, 12)); ?>…</span></span>
+        </footer>
+<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 400); });</script>
 </body></html><?php
     }
 }
