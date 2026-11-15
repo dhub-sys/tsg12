@@ -29,7 +29,7 @@ final class TW_Admin {
             'warranties' => ['Εγγυήσεις & πελάτες', 'shield', 'page_warranties'],
             'serials' => ['Σειριακοί αριθμοί', 'barcode', 'page_serials'],
             'notifications' => ['Ειδοποιήσεις', 'bell', 'page_notifications'],
-            'claims' => ['Αιτήματα εγγύησης' . (($nc = TW_Claims::count_new()) ? ' (' . $nc . ')' : ''), 'wrench', 'page_claims'],
+            'claims' => ['Αιτήματα εγγύησης', 'wrench', 'page_claims'],
             'terms' => ['Όροι εγγύησης', 'file', 'page_terms'],
             'partners' => ['Συνεργάτες', 'pin', 'page_partners'],
         ];
@@ -42,6 +42,51 @@ final class TW_Admin {
         $screens['help'] = ['Οδηγός χρήσης', 'book', 'page_help'];
         $screens['changelog'] = ['Ιστορικό εκδόσεων', 'history', 'page_changelog'];
         return $screens;
+    }
+
+    /**
+     * Side menu: single items and collapsible groups (only the screens this user can open).
+     * @return array list of ['key' => screen] or ['group' => id, 'label', 'icon', 'items' => [keys]]
+     */
+    public static function nav() {
+        $screens = self::screens();
+        $groups = [
+            'manage' => ['Διαχείριση εγγυήσεων', 'layers', ['warranties', 'serials', 'claims', 'terms']],
+            'ops' => ['Λειτουργία & ασφάλεια', 'lock', ['notifications', 'team', 'backups', 'log', 'settings']],
+        ];
+        $order = ['dashboard', 'manage', 'partners', 'ops', 'help', 'changelog'];
+        $out = [];
+        foreach ($order as $k) {
+            if (isset($groups[$k])) {
+                $items = array_values(array_filter($groups[$k][2], function ($x) use ($screens) { return isset($screens[$x]); }));
+                if ($items) $out[] = ['group' => $k, 'label' => $groups[$k][0], 'icon' => $groups[$k][1], 'items' => $items];
+            } elseif (isset($screens[$k])) {
+                $out[] = ['key' => $k];
+            }
+        }
+        // Screens not placed above (e.g. added later) still appear, at the end.
+        $placed = [];
+        foreach ($out as $o) $placed = array_merge($placed, isset($o['items']) ? $o['items'] : [$o['key']]);
+        foreach (array_diff(array_keys($screens), $placed) as $k) $out[] = ['key' => $k];
+        return $out;
+    }
+
+    /** Unread counts for the menu: claims nobody opened, problem notifications nobody looked at. */
+    public static function badges() {
+        return array_filter([
+            'claims' => TW_Claims::count_unseen(),
+            'notifications' => self::notifications_unseen(),
+        ]);
+    }
+
+    /** Notifications that failed or were not delivered, not yet seen on the Ειδοποιήσεις screen. */
+    private static function problem_sql() {
+        return "(status = 'failed' OR delivery_status IN ('failed','complaint'))";
+    }
+
+    public static function notifications_unseen() {
+        global $wpdb;
+        return (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . TW_DB::table('notifications') . ' WHERE seen_at IS NULL AND ' . self::problem_sql());
     }
 
     /**
@@ -68,6 +113,9 @@ final class TW_Admin {
             'scroll' => '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
             'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
             'wrench' => '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+            'layers' => '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+            'lock' => '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+            'chevron' => '<path d="m6 9 6 6 6-6"/>',
             'file' => '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
             'pin' => '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
             'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
@@ -689,7 +737,7 @@ final class TW_Admin {
         <?php
     }
 
-    private static function notifications_table($rows, $with_warranty) {
+    private static function notifications_table($rows, $with_warranty, array $unseen = []) {
         $ch = ['email' => 'Email', 'sms' => 'SMS', 'partner' => 'Email συνεργάτη'];
         $st = ['sent' => 'Στάλθηκε', 'failed' => 'Απέτυχε η αποστολή', 'pending' => 'Σε εξέλιξη', 'skipped' => 'Παραλείφθηκε'];
         $dl = TW_Brevo::status_labels();
@@ -697,7 +745,8 @@ final class TW_Admin {
         echo '<table class="widefat striped"><thead><tr><th>Ημ/νία</th>' . ($with_warranty ? '<th>Εγγύηση</th>' : '') . '<th>Βήμα</th><th>Κανάλι</th><th>Παραλήπτης</th><th>Αποτέλεσμα</th></tr></thead><tbody>';
         if (!$rows) echo '<tr><td colspan="6">Καμία.</td></tr>';
         foreach ($rows as $n) {
-            echo '<tr><td>' . esc_html(TW_Util::datetime_label($n->created_at)) . '</td>';
+            $new = in_array((int) $n->id, $unseen, true);
+            echo '<tr' . ($new ? ' class="tw-unread"' : '') . '><td>' . esc_html(TW_Util::datetime_label($n->created_at)) . ($new ? ' <span class="tw-new-dot">νέο</span>' : '') . '</td>';
             if ($with_warranty) echo '<td>' . self::warranty_link($n->warranty_id, $n->serial ?? ('#' . $n->warranty_id)) . '</td>';
             echo '<td>' . esc_html(TW_Cron::row_label($n)) . '</td><td>' . esc_html($ch[$n->channel] ?? $n->channel) . '</td><td>' . esc_html($n->recipient) . '</td><td>';
             if ($n->status === 'sent' && $n->delivery_status !== '') {
@@ -835,12 +884,16 @@ final class TW_Admin {
         if ($status === 'undelivered') $where = "WHERE n.delivery_status IN ('failed','complaint')";
         elseif ($status === 'delivered') $where = "WHERE n.delivery_status = 'delivered'";
         else $where = $status ? $wpdb->prepare('WHERE n.status = %s', $status) : '';
+        // Problems nobody has looked at yet: highlighted this time, then marked as read (menu badge).
+        $unseen = array_map('intval', $wpdb->get_col("SELECT id FROM $n WHERE seen_at IS NULL AND " . self::problem_sql()));
+        if ($unseen) $wpdb->query($wpdb->prepare("UPDATE $n SET seen_at = %s WHERE seen_at IS NULL AND " . self::problem_sql(), TW_DB::now()));
         $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $n n $where");
         $rows = $wpdb->get_results("SELECT n.*, s.serial_no AS serial FROM $n n LEFT JOIN " . TW_DB::table('warranties') . " w ON w.id = n.warranty_id LEFT JOIN " . TW_DB::table('serials') . " s ON s.id = w.serial_id $where ORDER BY n.id DESC LIMIT " . self::PER_PAGE . ' OFFSET ' . (($paged - 1) * self::PER_PAGE));
         ?>
         <div class="wrap tw-wrap">
             <h1>Ειδοποιήσεις</h1>
             <?php self::notice(); ?>
+            <?php if ($unseen) : ?><div class="notice notice-warning inline"><p><?php echo esc_html(sprintf(count($unseen) === 1 ? '1 ειδοποίηση δεν στάλθηκε ή δεν παραδόθηκε από την τελευταία φορά που ανοίξατε αυτή τη σελίδα.' : '%d ειδοποιήσεις δεν στάλθηκαν ή δεν παραδόθηκαν από την τελευταία φορά που ανοίξατε αυτή τη σελίδα.', count($unseen))); ?> Σημειώνονται με «νέο» και από τώρα θεωρούνται αναγνωσμένες. <a href="<?php echo esc_url(self::url('notifications', ['status' => 'undelivered'])); ?>">Δεν παραδόθηκαν</a> · <a href="<?php echo esc_url(self::url('notifications', ['status' => 'failed'])); ?>">Απέτυχε η αποστολή</a></p></div><?php endif; ?>
             <form method="post" action="<?php echo esc_url(self::url('notifications')); ?>" class="tw-inline-form">
                 <?php wp_nonce_field('tw_run_now'); ?><input type="hidden" name="action" value="tw_run_now">
                 <button class="button button-primary">Εκτέλεση ελέγχου ειδοποιήσεων τώρα</button>
@@ -848,7 +901,7 @@ final class TW_Admin {
             </form>
             <p><a href="<?php echo esc_url(self::url('notifications')); ?>">Όλες</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'failed'])); ?>">Απέτυχε η αποστολή</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'undelivered'])); ?>">Δεν παραδόθηκαν</a> | <a href="<?php echo esc_url(self::url('notifications', ['status' => 'delivered'])); ?>">Παραδόθηκαν</a></p>
             <?php if (!TW_Brevo::email_enabled() && !TW_Brevo::sms_enabled()) : ?><p class="description">Η επιβεβαίωση παράδοσης («Παραδόθηκε / Δεν παραδόθηκε») λειτουργεί όταν η αποστολή γίνεται μέσω Brevo (Ρυθμίσεις → Brevo).</p><?php endif; ?>
-            <?php self::pagination($total, $paged); self::notifications_table($rows, true); self::pagination($total, $paged); ?>
+            <?php self::pagination($total, $paged); self::notifications_table($rows, true, $unseen); self::pagination($total, $paged); ?>
         </div>
         <?php
     }

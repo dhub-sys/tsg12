@@ -262,14 +262,20 @@
             showTerms();
         }
 
-        // The terms that come with this product: the serial's own set, or the latest set whose «from» date is on
-        // or before the purchase date. Until the date is entered (and more than one set could apply) nothing can be accepted.
+        // The terms that come with this product: the serial's own set, or the set whose period contains the
+        // purchase date. Until the date is entered (and more than one set could apply) nothing can be accepted.
         function showTerms() {
             var list = state.terms || [];
             var date = f4.purchase_date ? f4.purchase_date.value : '';
             var pick = null;
             if (list.length === 1) pick = list[0];
-            else if (date) list.forEach(function (t) { if (t.from === '' || t.from <= date) pick = t; });
+            else if (date) {
+                // The period that contains the purchase date (the latest start wins); otherwise the base terms.
+                list.forEach(function (t) {
+                    if ((t.from === '' || t.from <= date) && (!t.to || date <= t.to) && (!pick || t.from >= pick.from)) pick = t;
+                });
+                if (!pick) list.forEach(function (t) { if (t.base) pick = t; });
+            }
             var box = f4.querySelector('[data-terms-box]');
             var label = f4.querySelector('[data-terms-label]');
             var accept = f4.consent_terms;

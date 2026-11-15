@@ -72,10 +72,29 @@
             clean(tmp);
             ta.value = tmp.innerHTML;
         }
-        function cmd(c, v) { area.focus(); document.execCommand(c, false, v || null); sync(); }
-        function cell() {
+        var savedRange = null;
+        function remember() {
             var sel = window.getSelection();
-            return sel.rangeCount ? closest(sel.getRangeAt(0).startContainer, 'td,th', area) : null;
+            if (sel.rangeCount && area.contains(sel.getRangeAt(0).commonAncestorContainer)) savedRange = sel.getRangeAt(0).cloneRange();
+        }
+        // Puts the caret back where it was when a toolbar control (e.g. the style list) took the focus.
+        function restore() {
+            var sel = window.getSelection();
+            var inside = sel.rangeCount && area.contains(sel.getRangeAt(0).commonAncestorContainer);
+            area.focus();
+            if (!inside && savedRange) { sel.removeAllRanges(); sel.addRange(savedRange); }
+        }
+        function cmd(c, v) {
+            restore();
+            try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+            document.execCommand(c, false, v || null);
+            sync();
+            state();
+        }
+        function cell() {
+            var sel = window.getSelection(), node = sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+            if ((!node || !area.contains(node)) && savedRange) node = savedRange.startContainer;
+            return node ? closest(node, 'td,th', area) : null;
         }
         function addRow() {
             var c = cell(); if (!c) return alert('Βάλτε τον κέρσορα μέσα σε κελί του πίνακα.');
@@ -113,6 +132,7 @@
         function table() {
             var cols = parseInt(prompt('Πόσες στήλες;', '3'), 10), rows = parseInt(prompt('Πόσες γραμμές (χωρίς την επικεφαλίδα);', '3'), 10);
             if (!(cols > 0 && rows > 0 && cols <= 12 && rows <= 60)) return;
+            restore();
             // Built with the DOM and placed after the current block: insertHTML mangles tables in some browsers.
             var t = document.createElement('table'), body = document.createElement('tbody');
             for (var r = 0; r <= rows; r++) {
@@ -161,55 +181,105 @@
                 wrap.appendChild(t);
                 src = t;
             } else {
-                area.innerHTML = src.value;
+                area.innerHTML = src.value.replace(/>\s*\n\s*</g, '><'); // the line breaks added for reading
                 clean(area);
                 wrap.removeChild(src);
                 src = false;
                 area.style.display = '';
                 sync();
             }
-            bar.querySelectorAll('button').forEach(function (b) { if (b.dataset.k !== 'src') b.disabled = !!src; });
+            wrap.classList.toggle('is-source', !!src);
+            bar.querySelector('[data-k="src"]').classList.toggle('is-on', !!src);
+            block.disabled = !!src;
+            if (src) bar.querySelectorAll('[data-state]').forEach(function (b) { b.classList.remove('is-on'); }); else state();
         }
 
+        var I = {
+            b: '<b>B</b>', i: '<i>I</i>', u: '<u>U</u>',
+            ul: '<svg viewBox="0 0 20 20"><circle cx="4" cy="5" r="1.4"/><circle cx="4" cy="10" r="1.4"/><circle cx="4" cy="15" r="1.4"/><path d="M8 5h9M8 10h9M8 15h9"/></svg>',
+            ol: '<svg viewBox="0 0 20 20"><path d="M8 5h9M8 10h9M8 15h9"/><text x="1.5" y="7" font-size="6">1</text><text x="1.5" y="12" font-size="6">2</text><text x="1.5" y="17" font-size="6">3</text></svg>',
+            table: '<svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><path d="M2.5 8h15M2.5 12.3h15M8 3.5v13M12.5 3.5v13"/></svg>',
+            row: '<svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="7" rx="1.5"/><path d="M10 12v6M7 15h6"/></svg>',
+            col: '<svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="7" height="15" rx="1.5"/><path d="M12 10h6M15 7v6"/></svg>',
+            delrow: '<svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="15" height="7" rx="1.5"/><path d="M7 15h6"/></svg>',
+            delcol: '<svg viewBox="0 0 20 20"><rect x="2.5" y="2.5" width="7" height="15" rx="1.5"/><path d="M12 10h6"/></svg>',
+            link: '<svg viewBox="0 0 20 20"><path d="M8.5 11.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5L10 5"/><path d="M11.5 8.5a3.5 3.5 0 0 0-5 0L4 11a3.5 3.5 0 0 0 5 5l1-1"/></svg>',
+            unlink: '<svg viewBox="0 0 20 20"><path d="M8.5 11.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5L10 5"/><path d="M11.5 8.5a3.5 3.5 0 0 0-5 0L4 11a3.5 3.5 0 0 0 5 5l1-1"/><path d="M3 3l14 14"/></svg>',
+            hr: '<svg viewBox="0 0 20 20"><path d="M2.5 10h15"/><path d="M5 5.5h10M5 14.5h10" opacity=".35"/></svg>',
+            clear: '<svg viewBox="0 0 20 20"><path d="M5 4h10M10 4l-3 12M4 17h6M13 12l4 4M17 12l-4 4"/></svg>',
+            undo: '<svg viewBox="0 0 20 20"><path d="M7 5L3 9l4 4"/><path d="M3 9h9a5 5 0 0 1 0 10h-2"/></svg>',
+            redo: '<svg viewBox="0 0 20 20"><path d="M13 5l4 4-4 4"/><path d="M17 9H8a5 5 0 0 0 0 10h2"/></svg>',
+            src: '<svg viewBox="0 0 20 20"><path d="M7 6l-4 4 4 4M13 6l4 4-4 4"/></svg>'
+        };
+        var block = document.createElement('select');
+        block.className = 'tw-rte-block';
+        block.title = 'Στυλ κειμένου';
+        block.setAttribute('aria-label', 'Στυλ κειμένου');
+        [['p', 'Κείμενο'], ['h2', 'Επικεφαλίδα'], ['h3', 'Υποεπικεφαλίδα'], ['h4', 'Μικρή επικεφαλίδα'], ['blockquote', 'Πλαίσιο σημείωσης']].forEach(function (o) {
+            var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; block.appendChild(op);
+        });
+        block.addEventListener('change', function () { cmd('formatBlock', '<' + block.value + '>'); });
+        bar.appendChild(block);
+
         var tools = [
-            ['p', 'Κείμενο', 'Κανονική παράγραφος', function () { cmd('formatBlock', '<p>'); }],
-            ['h2', 'H2', 'Επικεφαλίδα', function () { cmd('formatBlock', '<h2>'); }],
-            ['h3', 'H3', 'Υποεπικεφαλίδα', function () { cmd('formatBlock', '<h3>'); }],
             '|',
-            ['b', '<b>B</b>', 'Έντονα (Ctrl+B)', function () { cmd('bold'); }],
-            ['i', '<i>I</i>', 'Πλάγια (Ctrl+I)', function () { cmd('italic'); }],
-            ['u', '<u>U</u>', 'Υπογράμμιση (Ctrl+U)', function () { cmd('underline'); }],
+            ['b', I.b, 'Έντονα (Ctrl+B)', function () { cmd('bold'); }, 'bold'],
+            ['i', I.i, 'Πλάγια (Ctrl+I)', function () { cmd('italic'); }, 'italic'],
+            ['u', I.u, 'Υπογράμμιση (Ctrl+U)', function () { cmd('underline'); }, 'underline'],
             '|',
-            ['ul', '• Λίστα', 'Λίστα με κουκκίδες', function () { cmd('insertUnorderedList'); }],
-            ['ol', '1. Λίστα', 'Αριθμημένη λίστα', function () { cmd('insertOrderedList'); }],
+            ['ul', I.ul, 'Λίστα με κουκκίδες', function () { cmd('insertUnorderedList'); }, 'insertUnorderedList'],
+            ['ol', I.ol, 'Αριθμημένη λίστα', function () { cmd('insertOrderedList'); }, 'insertOrderedList'],
             '|',
-            ['table', '▦ Πίνακας', 'Εισαγωγή πίνακα', table],
-            ['row', '+ Γραμμή', 'Νέα γραμμή κάτω από την τρέχουσα', addRow],
-            ['col', '+ Στήλη', 'Νέα στήλη δεξιά της τρέχουσας', addCol],
-            ['delrow', '− Γραμμή', 'Διαγραφή τρέχουσας γραμμής', delRow],
-            ['delcol', '− Στήλη', 'Διαγραφή τρέχουσας στήλης', delCol],
+            ['table', I.table, 'Εισαγωγή πίνακα', table],
+            ['row', I.row, 'Νέα γραμμή κάτω από την τρέχουσα (κέρσορας μέσα σε πίνακα)', addRow, '', true],
+            ['col', I.col, 'Νέα στήλη δεξιά της τρέχουσας (κέρσορας μέσα σε πίνακα)', addCol, '', true],
+            ['delrow', I.delrow, 'Διαγραφή τρέχουσας γραμμής', delRow, '', true],
+            ['delcol', I.delcol, 'Διαγραφή τρέχουσας στήλης', delCol, '', true],
             '|',
-            ['link', '🔗', 'Σύνδεσμος', link],
-            ['hr', '―', 'Διαχωριστική γραμμή', function () { cmd('insertHorizontalRule'); }],
-            ['clear', 'Τx', 'Καθαρισμός μορφοποίησης', function () { cmd('removeFormat'); cmd('formatBlock', '<p>'); }],
+            ['link', I.link, 'Σύνδεσμος', link],
+            ['unlink', I.unlink, 'Αφαίρεση συνδέσμου', function () { cmd('unlink'); }],
+            ['hr', I.hr, 'Διαχωριστική γραμμή', function () { cmd('insertHorizontalRule'); }],
             '|',
-            ['undo', '↶', 'Αναίρεση (Ctrl+Z)', function () { cmd('undo'); }],
-            ['redo', '↷', 'Επανάληψη (Ctrl+Y)', function () { cmd('redo'); }],
-            ['src', '&lt;/&gt;', 'Προβολή/επεξεργασία HTML', source]
+            ['clear', I.clear, 'Καθαρισμός μορφοποίησης', function () { cmd('removeFormat'); cmd('formatBlock', '<p>'); }],
+            ['undo', I.undo, 'Αναίρεση (Ctrl+Z)', function () { cmd('undo'); }],
+            ['redo', I.redo, 'Επανάληψη (Ctrl+Y)', function () { cmd('redo'); }],
+            '>',
+            ['src', I.src, 'Προβολή/επεξεργασία κώδικα HTML', source]
         ];
         tools.forEach(function (t) {
-            if (t === '|') { var s = document.createElement('span'); s.className = 'tw-rte-sep'; bar.appendChild(s); return; }
+            if (t === '|' || t === '>') { var s = document.createElement('span'); s.className = t === '|' ? 'tw-rte-sep' : 'tw-rte-spacer'; bar.appendChild(s); return; }
             var b = document.createElement('button');
             b.type = 'button';
-            b.className = 'button';
+            b.className = 'tw-rte-btn';
             b.dataset.k = t[0];
+            if (t[4]) b.dataset.state = t[4];
+            if (t[5]) b.dataset.cell = '1';
             b.innerHTML = t[1];
             b.title = t[2];
             b.setAttribute('aria-label', t[2]);
             b.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep the text selection
-            b.addEventListener('click', t[3]);
+            b.addEventListener('click', function (e) { if (!b.classList.contains('is-off')) t[3](e); });
             bar.appendChild(b);
         });
+
+        // Active buttons (bold, list…), the current style in the list, and the table tools only inside a table.
+        function state() {
+            if (src) return;
+            var focused = document.activeElement === area;
+            bar.querySelectorAll('[data-state]').forEach(function (b) {
+                var on = false;
+                try { on = focused && document.queryCommandState(b.dataset.state); } catch (e) {}
+                b.classList.toggle('is-on', !!on);
+            });
+            var inCell = !!cell();
+            bar.querySelectorAll('[data-cell]').forEach(function (b) { b.classList.toggle('is-off', !inCell); });
+            var v = '';
+            try { v = String(document.queryCommandValue('formatBlock') || '').toLowerCase().replace(/[<>]/g, ''); } catch (e) {}
+            if (focused) block.value = /^(h2|h3|h4|blockquote)$/.test(v) ? v : 'p';
+        }
+        ['keyup', 'mouseup', 'focus'].forEach(function (ev) { area.addEventListener(ev, function () { remember(); state(); }); });
+        document.addEventListener('selectionchange', function () { if (document.activeElement === area) { remember(); state(); } });
+        state();
 
         area.addEventListener('input', sync);
         area.addEventListener('blur', sync);

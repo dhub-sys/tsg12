@@ -27,14 +27,18 @@ final class TW_Terms {
     public static function sets() {
         $sets = get_option(self::SETS_OPTION, []);
         if (!is_array($sets)) $sets = [];
+        foreach ($sets as $k => $v) $sets[$k] += ['from' => '', 'to' => ''];
         if (!isset($sets[self::BASE])) {
-            $sets[self::BASE] = ['id' => self::BASE, 'name' => 'Βασικοί όροι', 'from' => '', 'created_at' => TW_DB::now()];
+            $sets[self::BASE] = ['id' => self::BASE, 'name' => 'Βασικοί όροι', 'from' => '', 'to' => '', 'created_at' => TW_DB::now()];
             update_option(self::SETS_OPTION, $sets, false);
         }
+        // Base first, then by the start date (sets without dates, i.e. only for assigned serials, last).
         uasort($sets, function ($a, $b) {
             if ((int) $a['id'] === self::BASE) return -1;
             if ((int) $b['id'] === self::BASE) return 1;
-            return [$a['from'] === '' ? '9999' : $a['from'], $a['id']] <=> [$b['from'] === '' ? '9999' : $b['from'], $b['id']];
+            $ka = $a['from'] !== '' ? $a['from'] : ($a['to'] !== '' ? '0000' : '9999');
+            $kb = $b['from'] !== '' ? $b['from'] : ($b['to'] !== '' ? '0000' : '9999');
+            return [$ka, $a['id']] <=> [$kb, $b['id']];
         });
         return $sets;
     }
@@ -49,15 +53,19 @@ final class TW_Terms {
         return $s ? $s['name'] : '#' . (int) $id;
     }
 
-    /** Creates (id 0) or updates a set; returns its id. The base set always applies from the start. */
-    public static function save_set($id, $name, $from) {
+    /**
+     * Creates (id 0) or updates a set; returns its id. $from / $to (Y-m-d or '') are the purchase dates the set
+     * covers; an empty «to» means «until the next set by date starts».
+     */
+    public static function save_set($id, $name, $from, $to = '') {
         $sets = self::sets();
         $id = (int) $id;
         if (!$id) $id = max(array_keys($sets)) + 1;
         $old = $sets[$id] ?? ['id' => $id, 'created_at' => TW_DB::now()];
         $sets[$id] = array_merge($old, [
             'name' => mb_substr(trim($name), 0, 120) ?: ('Όροι #' . $id),
-            'from' => $id === self::BASE ? '' : $from,
+            'from' => $from,
+            'to' => $to,
         ]);
         update_option(self::SETS_OPTION, $sets, false);
         return $id;
@@ -68,7 +76,7 @@ final class TW_Terms {
         global $wpdb;
         $id = (int) $id;
         if ($id === self::BASE) return new WP_Error('base', 'Οι βασικοί όροι δεν διαγράφονται.');
-        if (self::accepted_count($id)) return new WP_Error('used', 'Δεν διαγράφεται: υπάρχουν πελάτες που αποδέχθηκαν αυτούς τους όρους. Μπορείτε να αφαιρέσετε την ημερομηνία και τους σειριακούς, ώστε να μην εφαρμόζεται σε νέες ενεργοποιήσεις.');
+        if (self::accepted_count($id)) return new WP_Error('used', 'Δεν διαγράφεται: υπάρχουν πελάτες που αποδέχθηκαν αυτούς τους όρους. Μπορείτε να αφαιρέσετε τις ημερομηνίες και τους σειριακούς, ώστε να μην εφαρμόζεται σε νέες ενεργοποιήσεις.');
         $wpdb->update(TW_DB::table('serials'), ['terms_set' => 0], ['terms_set' => $id]);
         self::remove_pdf($id, 'el');
         self::remove_pdf($id, 'en');
@@ -258,25 +266,48 @@ final class TW_Terms {
 
     // ------------------------------------------------------------------ which set applies
 
-    /** Sets that apply by purchase date: from-date => id, ascending ('' = base). */
-    private static function dated() {
-        $out = ['' => self::BASE];
+    /**
+     * Sets that apply by purchase date, ordered by start: [['id', 'from', 'to', 'base'], ...] with the effective
+     * end date: the set's own «to», otherwise the day before the next set by date starts ('' = open).
+     * The base set is always in the list (it is also the fallback when no period matches).
+     */
+    public static function ranges() {
+        $list = [];
         foreach (self::sets() as $id => $s) {
-            if ((int) $id !== self::BASE && $s['from'] !== '' && self::versions($id, 'el')) $out[$s['from']] = (int) $id;
+            $id = (int) $id;
+            $base = $id === self::BASE;
+            if (!$base && ($s['from'] === '' && $s['to'] === '')) continue; // only for assigned serials
+            if (!$base && !self::versions($id, 'el')) continue;
+            $list[] = ['id' => $id, 'from' => $s['from'], 'to' => $s['to'], 'own_to' => $s['to'] !== '', 'base' => $base];
         }
-        ksort($out, SORT_STRING);
-        return $out;
+        usort($list, function ($a, $b) { return [$a['from'], $a['base'] ? 0 : 1, $a['id']] <=> [$b['from'], $b['base'] ? 0 : 1, $b['id']]; });
+        foreach ($list as $i => $r) {
+            if ($r['own_to']) continue;
+            foreach ($list as $n) {
+                if ($n['from'] !== '' && $n['from'] > $r['from']) { $list[$i]['to'] = TW_Schedule::add_days($n['from'], -1); break; }
+            }
+        }
+        return array_map(function ($r) { unset($r['own_to']); return $r; }, $list);
+    }
+
+    /** The set whose period contains the date (the latest start wins on overlaps), else the base set. */
+    public static function by_date($date) {
+        $pick = null;
+        if ($date !== '') {
+            foreach (self::ranges() as $r) {
+                if (($r['from'] === '' || $r['from'] <= $date) && ($r['to'] === '' || $date <= $r['to'])) {
+                    if (!$pick || $r['from'] >= $pick['from']) $pick = $r;
+                }
+            }
+        }
+        return $pick ? (int) $pick['id'] : self::BASE;
     }
 
     /** The set for a product: the serial's own set if it has one, otherwise by purchase date. */
     public static function resolve($serial_set, $purchase_date) {
         $serial_set = (int) $serial_set;
         if ($serial_set && self::get($serial_set) && self::versions($serial_set, 'el')) return $serial_set;
-        $pick = self::BASE;
-        foreach (self::dated() as $from => $id) {
-            if ($from === '' || ($purchase_date !== '' && $from <= $purchase_date)) $pick = $id;
-        }
-        return $pick;
+        return self::by_date((string) $purchase_date);
     }
 
     /** The terms that apply to purchases made today («the most recent terms»). */
@@ -286,17 +317,20 @@ final class TW_Terms {
 
     /**
      * What the activation form needs to show the right terms as soon as the customer enters the purchase date:
-     * one entry if the serial has its own set, otherwise one per date (the form picks the latest «from» on or
-     * before the purchase date).
+     * one entry if the serial has its own set, otherwise one per period (the form picks the period that contains
+     * the purchase date, like by_date()).
      */
     public static function candidates($serial, $lang) {
         $own = (int) ($serial->terms_set ?? 0);
-        $pairs = ($own && self::get($own) && self::versions($own, 'el')) ? ['' => $own] : self::dated();
+        $pairs = ($own && self::get($own) && self::versions($own, 'el')) ? [['id' => $own, 'from' => '', 'to' => '', 'base' => true]] : self::ranges();
         $out = [];
-        foreach ($pairs as $from => $id) {
+        foreach ($pairs as $r) {
+            $id = $r['id'];
             $t = self::current($id, $lang);
             $out[] = [
-                'from' => $from,
+                'from' => $r['from'],
+                'to' => $r['to'],
+                'base' => !empty($r['base']),
                 'set' => (int) $id,
                 'version' => (int) $t['version'],
                 'lang' => $t['lang'],
@@ -312,16 +346,10 @@ final class TW_Terms {
      * applies only to assigned serials.
      */
     public static function period($set) {
-        $set = (int) $set;
-        $s = self::get($set);
-        if (!$s || ($set !== self::BASE && $s['from'] === '')) return null;
-        $froms = array_keys(self::dated());
-        $from = $set === self::BASE ? '' : $s['from'];
-        $to = '';
-        foreach ($froms as $f) {
-            if ($f !== '' && $f > $from) { $to = TW_Schedule::add_days($f, -1); break; }
+        foreach (self::ranges() as $r) {
+            if ($r['id'] === (int) $set) return ['from' => $r['from'], 'to' => $r['to']];
         }
-        return ['from' => $from, 'to' => $to];
+        return null;
     }
 
     /** «Για αγορές από 20/10/2026 έως 14/11/2026.» in the current customer language. */
@@ -341,27 +369,43 @@ final class TW_Terms {
         return wp_nonce_url(add_query_arg(['action' => 'tw_terms_view', 's' => (int) $set, 'v' => (int) $version, 'tl' => $lang], TW_Admin::url()), 'tw_terms_view');
     }
 
-    /** Last update + link; older accepted wordings (if any) as a small archive for the record. */
+    /** Last update of the text, linked to it. */
     private static function history($set, $lang) {
         $v = self::versions($set, $lang);
         if (!$v) return '—';
         $cur = end($v);
-        $out = sprintf('<a href="%s" target="_blank">%s</a>', esc_url(self::view_link($set, $cur['version'], $lang)), esc_html(TW_Util::date_label(substr($cur['published_at'], 0, 10))));
-        $old = array_slice(array_reverse($v), 1);
-        if ($old) {
-            $links = array_map(function ($tv) use ($set, $lang) {
-                return sprintf('<a href="%s" target="_blank">%s</a>', esc_url(self::view_link($set, $tv['version'], $lang)), esc_html(TW_Util::date_label(substr($tv['published_at'], 0, 10))));
-            }, $old);
-            $out .= '<br><small class="description" title="Προηγούμενες διατυπώσεις που έχουν αποδεχθεί πελάτες· φυλάσσονται για το αρχείο.">αρχείο: ' . implode(', ', $links) . '</small>';
+        return sprintf('<a href="%s" target="_blank" title="Προβολή του κειμένου">%s</a>', esc_url(self::view_link($set, $cur['version'], $lang)), esc_html(TW_Util::date_label(substr($cur['published_at'], 0, 10))));
+    }
+
+    /** Older wordings that customers accepted (kept for the record), shown in the edit form. */
+    private static function archive($set) {
+        $rows = [];
+        foreach (['el' => 'EL', 'en' => 'EN'] as $lang => $ln) {
+            $v = self::versions($set, $lang);
+            foreach (array_slice(array_reverse($v), 1) as $tv) {
+                $rows[] = sprintf('<li>%s · <a href="%s" target="_blank">%s</a></li>', $ln, esc_url(self::view_link($set, $tv['version'], $lang)), esc_html(TW_Util::datetime_label($tv['published_at'])));
+            }
         }
-        return $out;
+        if (!$rows) return '';
+        return '<details class="tw-terms-archive"><summary>Αρχείο προηγούμενων διατυπώσεων (' . count($rows) . ')</summary><p class="description">Διατυπώσεις που είχαν αποδεχθεί πελάτες πριν από διόρθωση του κειμένου· φυλάσσονται για το αρχείο.</p><ul>' . implode('', $rows) . '</ul></details>';
+    }
+
+    /** «από 01/01/2026 έως 14/11/2026» for the console list. */
+    private static function range_label($id, $st) {
+        $p = self::period($id);
+        $d = function ($x) { return esc_html(TW_Util::date_label($x)); };
+        if (!$p) return '<span class="description">μόνο σε σειριακούς με ανάθεση</span>';
+        $from = $p['from'] !== '' ? 'από ' . $d($p['from']) : 'από την αρχή';
+        $to = $p['to'] !== '' ? ' έως ' . $d($p['to']) : ' και μετά';
+        $note = ($p['to'] !== '' && $st['to'] === '') ? '<br><small class="description">η λήξη προκύπτει από το επόμενο σετ</small>' : '';
+        return $from . $to . $note;
     }
 
     public static function page() {
         $sets = self::sets();
         $post = TW_Admin::url();
         $edit_q = TW_Admin::q('edit');
-        $edit = $edit_q === 'new' ? ['id' => 0, 'name' => '', 'from' => '', 'created_at' => ''] : ($edit_q !== '' ? self::get((int) $edit_q) : null);
+        $edit = $edit_q === 'new' ? ['id' => 0, 'name' => '', 'from' => '', 'to' => '', 'created_at' => ''] : ($edit_q !== '' ? self::get((int) $edit_q) : null);
         $latest = self::latest();
         $batches = TW_Importer::batches();
         ?>
@@ -370,22 +414,24 @@ final class TW_Terms {
             <a class="page-title-action" href="<?php echo esc_url(TW_Admin::url('terms', ['edit' => 'new']) . '#tw-terms-form'); ?>">+ Νέο σετ όρων</a>
             <?php TW_Admin::notice(); ?>
 
-            <div class="tw-panel">
+            <details class="tw-panel tw-terms-intro">
+                <summary>Πώς επιλέγονται οι όροι για κάθε προϊόν</summary>
                 <p>Μπορείτε να έχετε πολλά σετ όρων, π.χ. «Όροι 2026» και «Όροι από 15/11/2026». Κάθε πελάτης βλέπει και αποδέχεται, κατά την ενεργοποίηση, το σετ που αντιστοιχεί στο προϊόν του:</p>
                 <ol>
                     <li>το σετ που έχει <strong>ανατεθεί στον σειριακό</strong> του (ανά σειριακό ή ανά παρτίδα), αλλιώς</li>
-                    <li>το σετ με την πιο πρόσφατη ημερομηνία <strong>«Ισχύει για αγορές από»</strong> που είναι ίδια ή προγενέστερη της ημερομηνίας αγοράς, αλλιώς</li>
+                    <li>το σετ του οποίου το <strong>διάστημα ισχύος</strong> («για αγορές από … έως …») περιέχει την ημερομηνία αγοράς (αν ταιριάζουν δύο, αυτό με την πιο πρόσφατη έναρξη), αλλιώς</li>
                     <li>τους <strong>Βασικούς όρους</strong>.</li>
                 </ol>
                 <p>Κάθε σετ είναι μία <strong>έκδοση όρων</strong>: για νέα έκδοση προσθέτετε νέο σετ. Η διόρθωση του κειμένου ενός σετ δεν αλλάζει έκδοση. Για κάθε πελάτη φυλάσσεται ακριβώς το κείμενο που αποδέχθηκε (με αποτύπωμα SHA-256), ακόμη κι αν διορθωθεί αργότερα· όσοι έχουν ήδη ενεργοποιήσει κρατούν τους όρους που αποδέχθηκαν.</p>
-                <p><strong>Σήμερα, για αγορές σημερινής ημερομηνίας, ισχύει:</strong> <?php echo esc_html(self::name($latest)); ?>. Στη σελίδα του site: <code>[<?php echo esc_html(TW_Terms_Public::SHORTCODE); ?>]</code> (οι πιο πρόσφατοι όροι, με αναζήτηση όρων ανά σειριακό ή ημερομηνία αγοράς).</p>
-            </div>
+                <p>Στη σελίδα του site: <code>[<?php echo esc_html(TW_Terms_Public::SHORTCODE); ?>]</code> (οι πιο πρόσφατοι όροι, με αναζήτηση όρων ανά σειριακό ή ημερομηνία αγοράς).</p>
+            </details>
+            <p class="tw-terms-today"><strong>Για αγορές με σημερινή ημερομηνία ισχύει:</strong> <?php echo esc_html(self::name($latest)); ?> <span class="description">· shortcode για το site: <code>[<?php echo esc_html(TW_Terms_Public::SHORTCODE); ?>]</code></span></p>
 
-            <table class="widefat striped"><thead><tr><th>Σετ όρων</th><th>Ισχύει για αγορές από</th><th>Σειριακοί με ανάθεση</th><th>Πελάτες που τους αποδέχθηκαν</th><th>Κείμενο (EL)</th><th>Κείμενο (EN)</th><th>PDF</th><th></th></tr></thead><tbody>
+            <table class="widefat striped tw-terms-table"><thead><tr><th>Σετ όρων</th><th>Ισχύει για αγορές</th><th>Σειριακοί με ανάθεση</th><th>Αποδοχές πελατών</th><th>Κείμενο EL</th><th>Κείμενο EN</th><th>PDF</th><th></th></tr></thead><tbody>
             <?php foreach ($sets as $id => $st) : $assigned = self::assigned_count($id); ?>
                 <tr<?php echo (int) $id === $latest ? ' style="font-weight:600"' : ''; ?>>
                     <td><?php echo esc_html($st['name']); ?><?php echo (int) $id === $latest ? ' <span class="tw-badge tw-badge--active">ισχύει σήμερα</span>' : ''; ?><?php echo !self::versions($id, 'el') ? ' <span class="tw-badge tw-badge--void">χωρίς κείμενο</span>' : ''; ?></td>
-                    <td><?php echo (int) $id === self::BASE ? 'από την αρχή' : ($st['from'] !== '' ? esc_html(TW_Util::date_label($st['from'])) : '<span class="description">μόνο σε σειριακούς με ανάθεση</span>'); ?></td>
+                    <td><?php echo self::range_label($id, $st); // phpcs:ignore ?></td>
                     <td><?php echo $assigned ? '<a href="' . esc_url(TW_Admin::url('serials', ['terms_set' => $id])) . '">' . (int) $assigned . '</a>' : '—'; ?></td>
                     <td><?php echo (int) self::accepted_count($id); ?></td>
                     <td><?php echo self::history($id, 'el'); // phpcs:ignore ?></td>
@@ -403,12 +449,16 @@ final class TW_Terms {
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_terms_save'); ?><input type="hidden" name="action" value="tw_terms_save"><input type="hidden" name="id" value="<?php echo (int) $id; ?>">
                         <p><label>Όνομα (για την ομάδα, π.χ. «Όροι από 15/11/2026») <input type="text" name="name" value="<?php echo esc_attr($edit['name']); ?>" maxlength="120" required></label></p>
-                        <?php if ($id !== self::BASE) : ?>
-                            <p><label>Ισχύει για αγορές από <span class="description">(προαιρετικό)</span> <input type="date" name="from" value="<?php echo esc_attr($edit['from']); ?>"></label>
-                            <span class="description">Για αγορές από αυτή την ημερομηνία και μετά, έως την ημερομηνία ενός νεότερου σετ. Κενό: εφαρμόζεται μόνο σε σειριακούς που του αναθέσετε.</span></p>
-                        <?php else : ?>
-                            <p class="description">Οι βασικοί όροι ισχύουν όταν δεν ταιριάζει κανένα άλλο σετ (για αγορές πριν από το πρώτο σετ με ημερομηνία).</p>
-                        <?php endif; ?>
+                        <fieldset class="tw-terms-dates">
+                            <legend>Διάστημα ισχύος <span class="description">(ημερομηνία αγοράς του προϊόντος)</span></legend>
+                            <p><label>Για αγορές από <input type="date" name="from" value="<?php echo esc_attr($edit['from']); ?>"></label>
+                               <label>έως <input type="date" name="to" value="<?php echo esc_attr($edit['to'] ?? ''); ?>"></label></p>
+                            <?php if ($id === self::BASE) : ?>
+                                <p class="description">Κενό «από»: από την αρχή. Κενό «έως»: μέχρι την έναρξη του επόμενου σετ. Οι βασικοί όροι εφαρμόζονται επίσης όταν η ημερομηνία αγοράς δεν ανήκει σε κανένα διάστημα.</p>
+                            <?php else : ?>
+                                <p class="description">Κενό «έως»: μέχρι την έναρξη του επόμενου σετ (ή χωρίς λήξη). Χωρίς καμία ημερομηνία, το σετ εφαρμόζεται μόνο σε σειριακούς που του αναθέσετε.</p>
+                            <?php endif; ?>
+                        </fieldset>
                         <p><label>Κείμενο όρων (Ελληνικά) <textarea name="text_el" rows="16" class="large-text" data-tw-rich><?php echo esc_textarea($el['text']); ?></textarea></label></p>
                         <p><label>Terms (English) <span class="description">(προαιρετικό – χωρίς αγγλικό κείμενο, οι πελάτες στα αγγλικά βλέπουν τους ελληνικούς όρους του σετ)</span><textarea name="text_en" rows="10" class="large-text" lang="en" data-tw-rich><?php echo esc_textarea($enx); ?></textarea></label></p>
                         <script src="<?php echo esc_url(TW_URL . 'assets/js/terms-editor.js?ver=' . TW_VERSION); ?>"></script>
@@ -422,6 +472,7 @@ final class TW_Terms {
                                 <label><input type="checkbox" name="pdf_<?php echo esc_attr($pl); ?>_remove" value="1"> Αφαίρεση PDF</label>
                             <?php endif; ?></p>
                         <?php endforeach; ?>
+                        <?php echo $id ? self::archive($id) : ''; // phpcs:ignore ?>
                         <p><button class="button button-primary">Αποθήκευση</button> <a class="button" href="<?php echo esc_url(TW_Admin::url('terms')); ?>">Κλείσιμο</a></p>
                     </form>
                     <?php if ($id && $id !== self::BASE && !self::accepted_count($id)) : ?>
@@ -456,8 +507,13 @@ final class TW_Terms {
         TW_Admin::guard('tw_terms_save');
         $id = (int) TW_Admin::post('id');
         if ($id && !self::get($id)) $id = 0;
-        $from = TW_Admin::post('from');
-        if ($from !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = '';
+        $date = function ($k) { $v = TW_Admin::post($k); return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : ''; };
+        $from = $date('from');
+        $to = $date('to');
+        if ($from !== '' && $to !== '' && $to < $from) {
+            TW_Admin::flash('Η ημερομηνία «έως» είναι πριν από την ημερομηνία «από».', 'error');
+            TW_Admin::back('tw-terms', ['edit' => $id ?: 'new']);
+        }
         if ($from !== '') {
             foreach (self::sets() as $sid => $st) {
                 if ((int) $sid !== $id && $st['from'] === $from) {
@@ -472,7 +528,12 @@ final class TW_Terms {
             TW_Admin::back('tw-terms', ['edit' => $id ?: 'new']);
         }
         $is_new = !$id;
-        $id = self::save_set($id, sanitize_text_field(TW_Admin::post('name')), $from);
+        $old_set = $id ? self::get($id) : null;
+        $id = self::save_set($id, sanitize_text_field(TW_Admin::post('name')), $from, $to);
+        if ($old_set && ($old_set['from'] !== $from || $old_set['to'] !== $to)) {
+            $fmt = function ($f, $t) { return ($f !== '' ? TW_Util::date_label($f) : '…') . ' – ' . ($t !== '' ? TW_Util::date_label($t) : '…'); };
+            TW_DB::log_event('terms_dates_changed', ['set' => self::name($id), 'range_before' => $fmt($old_set['from'], $old_set['to']), 'range_after' => $fmt($from, $to)]);
+        }
         $before = self::versions($id, 'el') ? self::current($id, 'el')['hash'] : '';
         self::save_text($id, $text_el, 'el');
         $msg = $is_new ? 'Δημιουργήθηκε το σετ όρων «' . esc_html(self::name($id)) . '».' : 'Αποθηκεύτηκε.';
@@ -619,15 +680,14 @@ final class TW_Terms_Public {
         // Dated sets (and the base set): the page finds the right one by purchase date without a round trip.
         $dated = [];
         $examples = [];
-        foreach (array_keys(TW_Terms::sets()) as $id) {
-            $p = TW_Terms::period($id);
-            if (!$p || !TW_Terms::versions($id, 'el')) continue;
-            $dated[] = ['from' => $p['from'], 'e' => self::entry($id)];
+        foreach (TW_Terms::ranges() as $p) {
+            $id = $p['id'];
+            if (!TW_Terms::versions($id, 'el')) continue;
+            $dated[] = ['from' => $p['from'], 'to' => $p['to'], 'base' => $p['base'], 'e' => self::entry($id)];
             // Example date inside each period (the first day, or the day before the next period for the base set).
             $ex = $p['from'] !== '' ? $p['from'] : ($p['to'] !== '' ? $p['to'] : '');
             if ($ex !== '' && $ex <= TW_Schedule::today()) $examples[] = $ex;
         }
-        usort($dated, function ($a, $b) { return strcmp($a['from'], $b['from']); });
         sort($examples);
         $latest = self::entry(TW_Terms::latest());
         $id = 'tw-terms-' . wp_unique_id();

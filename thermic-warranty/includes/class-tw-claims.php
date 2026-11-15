@@ -64,6 +64,18 @@ final class TW_Claims {
         return (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . self::table() . " WHERE status = 'new'");
     }
 
+    /** Claims nobody in the team has opened yet (menu badge). */
+    public static function count_unseen() {
+        global $wpdb;
+        return (int) $wpdb->get_var('SELECT COUNT(*) FROM ' . self::table() . ' WHERE seen_at IS NULL');
+    }
+
+    /** Opening the warranty card marks its claims as read. */
+    public static function mark_seen($wid) {
+        global $wpdb;
+        $wpdb->query($wpdb->prepare('UPDATE ' . self::table() . ' SET seen_at = %s WHERE warranty_id = %d AND seen_at IS NULL', TW_DB::now(), (int) $wid));
+    }
+
     public static function files($c) {
         $f = json_decode((string) $c->files, true);
         return is_array($f) ? $f : [];
@@ -217,8 +229,8 @@ final class TW_Claims {
             <table class="widefat striped"><thead><tr><th>#</th><th>Ημ/νία</th><th>Αίτημα</th><th>Κατάσταση</th><th>Πελάτης</th><th>Προϊόν / S/N</th><th>Περιγραφή</th><th></th></tr></thead><tbody>
             <?php if (!$rows) echo '<tr><td colspan="8">Δεν υπάρχουν αιτήματα.</td></tr>'; ?>
             <?php foreach ($rows as $c) : ?>
-                <tr>
-                    <td>#<?php echo (int) $c->id; ?></td>
+                <tr<?php echo $c->seen_at ? '' : ' class="tw-unread"'; ?>>
+                    <td>#<?php echo (int) $c->id; ?><?php echo $c->seen_at ? '' : ' <span class="tw-new-dot" title="Δεν το έχει ανοίξει κανείς ακόμη">νέο</span>'; ?></td>
                     <td><?php echo esc_html(TW_Util::datetime_label($c->created_at)); ?></td>
                     <td><?php echo $c->type === 'replace' ? 'Αντικατάσταση' : 'Επισκευή'; ?><?php echo self::files($c) ? ' <span class="description">· ' . count(self::files($c)) . ' συνημμένα</span>' : ''; ?></td>
                     <td><?php echo self::badge($c->status); // phpcs:ignore ?></td>
@@ -237,6 +249,7 @@ final class TW_Claims {
     /** Section on the warranty card in the console. */
     public static function admin_section($w) {
         $claims = self::for_warranty($w->id);
+        self::mark_seen($w->id);
         $post = TW_Admin::url();
         ?>
         <h2 id="tw-claims">Αιτήματα επισκευής / αντικατάστασης</h2>

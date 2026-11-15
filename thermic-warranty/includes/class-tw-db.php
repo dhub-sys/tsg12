@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.15.0';
+    const DB_VERSION = '1.16.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -188,6 +188,7 @@ final class TW_DB {
   delivery_status varchar(20) NOT NULL DEFAULT '',
   delivery_detail varchar(255) NOT NULL DEFAULT '',
   delivery_at datetime NULL,
+  seen_at datetime NULL,
   created_at datetime NOT NULL,
   PRIMARY KEY  (id),
   UNIQUE KEY once_per_step (warranty_id,milestone_key,offset_days,channel),
@@ -233,6 +234,7 @@ final class TW_DB {
   created_at datetime NOT NULL,
   updated_at datetime NOT NULL,
   closed_at datetime NULL,
+  seen_at datetime NULL,
   PRIMARY KEY  (id),
   KEY warranty_id (warranty_id),
   KEY status (status)

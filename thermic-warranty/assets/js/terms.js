@@ -20,11 +20,14 @@
             $('label').textContent = e.label;
             $('pdf').href = e.pdf;
         }
-        // The latest set whose «from» is on or before the purchase date ('' = the base set, from the start).
+        // The set whose period contains the purchase date (the latest start wins); otherwise the base terms.
         function byDate(d) {
-            var pick = null;
-            cfg.dated.forEach(function (x) { if (x.from === '' || x.from <= d) pick = x.e; });
-            return pick || cfg.latest;
+            var pick = null, base = null;
+            cfg.dated.forEach(function (x) {
+                if (x.base) base = x;
+                if ((x.from === '' || x.from <= d) && (!x.to || d <= x.to) && (!pick || x.from >= pick.from)) pick = x;
+            });
+            return (pick || base || { e: cfg.latest }).e;
         }
         function onDate() {
             message('');

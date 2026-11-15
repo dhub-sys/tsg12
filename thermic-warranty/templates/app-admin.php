@@ -2,6 +2,12 @@
 /** @var string $screen  @var array $screens  @var array $s */
 if (!defined('ABSPATH')) exit;
 $user = wp_get_current_user();
+// The screen is rendered first, so the menu counts already reflect what it marked as read (e.g. a claim opened now).
+ob_start();
+call_user_func(['TW_Admin', $screens[$screen][2]]);
+$tw_page = ob_get_clean();
+$tw_badges = TW_Admin::badges();
+$tw_badge = function ($n) { return $n ? '<sup class="tw-nav-badge" title="' . esc_attr($n . ' μη αναγνωσμένα') . '">' . (int) $n . '</sup>' : ''; };
 ?><!doctype html>
 <html lang="el">
 <head>
@@ -25,10 +31,29 @@ $user = wp_get_current_user();
         <span class="tw-brand-sub"><?php echo esc_html(TW_App::APP_NAME); ?></span>
     </div>
     <nav class="tw-nav" aria-label="Κύριο μενού">
-        <?php foreach ($screens as $key => $def) : ?>
+        <?php foreach (TW_Admin::nav() as $tw_n) :
+            if (isset($tw_n['key'])) :
+                $key = $tw_n['key']; $def = $screens[$key]; ?>
             <a href="<?php echo esc_url(TW_App::admin_url($key)); ?>" class="<?php echo $key === $screen ? 'is-active' : ''; ?>"<?php echo $key === $screen ? ' aria-current="page"' : ''; ?>>
-                <?php echo TW_Admin::icon($def[1]); // phpcs:ignore ?><span><?php echo esc_html($def[0]); ?></span>
+                <?php echo TW_Admin::icon($def[1]); // phpcs:ignore ?><span><?php echo esc_html($def[0]); ?></span><?php echo $tw_badge($tw_badges[$key] ?? 0); // phpcs:ignore ?>
             </a>
+            <?php else :
+                $tw_open = in_array($screen, $tw_n['items'], true);
+                $tw_sum = 0; foreach ($tw_n['items'] as $k) $tw_sum += $tw_badges[$k] ?? 0; ?>
+            <div class="tw-nav-group<?php echo $tw_open ? ' is-open has-active' : ''; ?>">
+                <button type="button" class="tw-nav-head" aria-expanded="<?php echo $tw_open ? 'true' : 'false'; ?>" aria-controls="tw-nav-<?php echo esc_attr($tw_n['group']); ?>">
+                    <?php echo TW_Admin::icon($tw_n['icon']); // phpcs:ignore ?><span><?php echo esc_html($tw_n['label']); ?></span><?php echo $tw_badge($tw_sum); // phpcs:ignore ?>
+                    <?php echo TW_Admin::icon('chevron'); // phpcs:ignore ?>
+                </button>
+                <div class="tw-nav-sub" id="tw-nav-<?php echo esc_attr($tw_n['group']); ?>"<?php echo $tw_open ? '' : ' hidden'; ?>>
+                    <?php foreach ($tw_n['items'] as $key) : $def = $screens[$key]; ?>
+                        <a href="<?php echo esc_url(TW_App::admin_url($key)); ?>" class="<?php echo $key === $screen ? 'is-active' : ''; ?>"<?php echo $key === $screen ? ' aria-current="page"' : ''; ?>>
+                            <?php echo TW_Admin::icon($def[1]); // phpcs:ignore ?><span><?php echo esc_html($def[0]); ?></span><?php echo $tw_badge($tw_badges[$key] ?? 0); // phpcs:ignore ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
         <?php endforeach; ?>
     </nav>
     <div class="tw-sidebar-foot">
@@ -64,10 +89,7 @@ $user = wp_get_current_user();
 <main class="tw-main">
     <?php
     // Each screen's title gets the same icon as its menu item.
-    ob_start();
-    call_user_func(['TW_Admin', $screens[$screen][2]]);
-    $page = ob_get_clean();
-    echo preg_replace('/<h1([^>]*)>/', '<h1$1><span class="tw-title-ico">' . TW_Admin::icon($screens[$screen][1]) . '</span>', $page, 1); // phpcs:ignore
+    echo preg_replace('/<h1([^>]*)>/', '<h1$1><span class="tw-title-ico">' . TW_Admin::icon($screens[$screen][1]) . '</span>', $tw_page, 1); // phpcs:ignore
     ?>
 </main>
 <script>
@@ -88,6 +110,14 @@ $user = wp_get_current_user();
         t.addEventListener('click', function () { open(panel.hidden, true); });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { open(false, true); t.focus(); } });
     })();
+    // Menu groups open on click (the group of the current screen starts open).
+    document.querySelectorAll('.tw-nav-head').forEach(function (h) {
+        h.addEventListener('click', function () {
+            var g = h.parentNode, sub = g.querySelector('.tw-nav-sub'), open = sub.hidden;
+            sub.hidden = !open; g.classList.toggle('is-open', open); h.setAttribute('aria-expanded', open ? 'true' : 'false');
+            fade();
+        });
+    });
     // Menu: a soft fade at the top/bottom edge when there are more items to scroll to.
     function fade() {
         var n = document.querySelector('.tw-nav'); if (!n) return;

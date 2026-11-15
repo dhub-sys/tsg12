@@ -21,6 +21,8 @@ final class TW_Activity {
             'team' => ['Ομάδα', ['team_*']],
             'settings' => ['Ρυθμίσεις', ['settings_saved', 'terms_*', 'logo_uploaded', 'remote_*', 'backup_settings']],
             'backups' => ['Αντίγραφα ασφαλείας', ['backup_created', 'backup_downloaded', 'backup_deleted', 'backup_restored', 'backup_failed', 'backup_sent', 'backup_send_failed']],
+            'claims' => ['Αιτήματα εγγύησης', ['claim_*']],
+            'partners' => ['Συνεργάτες', ['partner_added', 'partner_updated', 'partner_deleted', 'partners_imported']],
             'exports' => ['Εξαγωγές', ['*_exported']],
         ];
     }
@@ -39,7 +41,7 @@ final class TW_Activity {
             'backup_settings' => 'Ρυθμίσεις αντιγράφων ασφαλείας', 'backup_created' => 'Δημιουργία αντιγράφου ασφαλείας', 'backup_downloaded' => 'Λήψη αντιγράφου ασφαλείας',
             'backup_deleted' => 'Διαγραφή αντιγράφου ασφαλείας', 'backup_restored' => 'Επαναφορά από αντίγραφο ασφαλείας', 'backup_failed' => 'Αποτυχία αντιγράφου ασφαλείας',
             'backup_sent' => 'Αποστολή αντιγράφου εκτός server', 'backup_send_failed' => 'Αποτυχία αποστολής αντιγράφου',
-            'serials_imported' => 'Εισαγωγή σειριακών', 'serial_void' => 'Ακύρωση σειριακού', 'serial_available' => 'Επαναφορά σειριακού', 'serials_batch' => 'Αλλαγή παρτίδας σειριακών', 'terms_assigned' => 'Ανάθεση όρων σε σειριακούς', 'terms_unassigned' => 'Αφαίρεση ανάθεσης όρων', 'terms_deleted' => 'Διαγραφή σετ όρων', 'claim_submitted' => 'Νέο αίτημα εγγύησης', 'claim_updated' => 'Ενημέρωση αιτήματος εγγύησης', 'claim_file_downloaded' => 'Προβολή συνημμένου αιτήματος', 'terms_pdf_uploaded' => 'Μεταφόρτωση PDF όρων', 'terms_pdf_removed' => 'Αφαίρεση PDF όρων', 'partner_added' => 'Προσθήκη συνεργάτη', 'partner_updated' => 'Αλλαγή συνεργάτη', 'partner_deleted' => 'Αφαίρεση συνεργάτη', 'partners_imported' => 'Εισαγωγή συνεργατών', 'partners_exported' => 'Εξαγωγή συνεργατών',
+            'serials_imported' => 'Εισαγωγή σειριακών', 'serial_void' => 'Ακύρωση σειριακού', 'serial_available' => 'Επαναφορά σειριακού', 'serials_batch' => 'Αλλαγή παρτίδας σειριακών', 'terms_assigned' => 'Ανάθεση όρων σε σειριακούς', 'terms_unassigned' => 'Αφαίρεση ανάθεσης όρων', 'terms_deleted' => 'Διαγραφή σετ όρων', 'claim_submitted' => 'Νέο αίτημα εγγύησης', 'claim_updated' => 'Ενημέρωση αιτήματος εγγύησης', 'claim_file_downloaded' => 'Προβολή συνημμένου αιτήματος', 'terms_pdf_uploaded' => 'Μεταφόρτωση PDF όρων', 'terms_pdf_removed' => 'Αφαίρεση PDF όρων', 'terms_dates_changed' => 'Αλλαγή διαστήματος ισχύος όρων', 'partner_added' => 'Προσθήκη συνεργάτη', 'partner_updated' => 'Αλλαγή συνεργάτη', 'partner_deleted' => 'Αφαίρεση συνεργάτη', 'partners_imported' => 'Εισαγωγή συνεργατών', 'partners_exported' => 'Εξαγωγή συνεργατών',
             'log_verified' => 'Έλεγχος ακεραιότητας ημερολογίου', 'log_archived' => 'Αρχειοθέτηση καταγραφών', 'warranty_viewed' => 'Προβολή καρτέλας από την ομάδα',
             'serials_exported' => 'Εξαγωγή σειριακών', 'warranties_exported' => 'Εξαγωγή εγγυήσεων', 'log_exported' => 'Εξαγωγή ημερολογίου',
         ];
@@ -248,22 +250,71 @@ final class TW_Activity {
                 <span class="description"><?php echo esc_html(sprintf('%s – %s · %d καταγραφές', TW_Util::date_label($f['from']), TW_Util::date_label($f['to']), $total)); ?></span>
             </p>
             <table class="widefat striped tw-log-table">
-                <thead><tr><th>Ημ/νία &amp; ώρα</th><th>Ποιος</th><th>Ενέργεια</th><th>Εγγύηση / σειριακός</th><th>Λεπτομέρειες</th><th>IP</th></tr></thead>
+                <thead><tr><th>Ημ/νία &amp; ώρα</th><th>Ποιος</th><th>Ενέργεια</th><th>Εγγύηση / σειριακός</th><th class="tw-log-info-col"><span class="screen-reader-text">Λεπτομέρειες</span></th></tr></thead>
                 <tbody>
-                <?php if (!$rows) : ?><tr><td colspan="6">Δεν βρέθηκαν καταγραφές με αυτά τα φίλτρα.</td></tr><?php endif; ?>
-                <?php foreach ($rows as $r) : ?>
-                    <tr>
-                        <td class="tw-nowrap"><?php echo esc_html(TW_Util::datetime_label($r->created_at)); ?><br><small class="description">#<?php echo (int) $r->id; ?></small>
-                            <?php if (self::row_state($r) === 'changed') : ?><br><span class="tw-log-bad" title="Η καταγραφή δεν ταιριάζει με την υπογραφή της: άλλαξε απευθείας στη βάση δεδομένων.">⚠ αλλοιωμένη</span><?php endif; ?></td>
-                        <td><span class="tw-who tw-who--<?php echo esc_attr(['Πελάτης' => 'customer', 'Ομάδα' => 'team', 'Επισκέπτης' => 'visitor'][self::who_type($r->actor)] ?? 'system'); ?>"><?php echo esc_html(self::who_type($r->actor)); ?></span><br><?php echo esc_html(self::who($r->actor)); ?></td>
-                        <td><?php echo esc_html(self::label($r->action)); ?><br><small class="description"><?php echo esc_html(self::category_of($r->action)); ?></small></td>
-                        <td><?php if ($r->warranty_id && $r->warranty_code) : ?><a href="<?php echo esc_url(TW_App::admin_url('warranties', ['view' => $r->warranty_id])); ?>"><?php echo esc_html($r->warranty_code); ?></a><br><?php endif; ?><?php if ($r->serial) : ?><code><?php echo esc_html($r->serial); ?></code><?php endif; ?></td>
-                        <td class="tw-log-details"><?php echo esc_html(self::details($r)); ?></td>
-                        <td class="tw-nowrap"><?php echo esc_html($r->ip ?: '—'); ?></td>
+                <?php if (!$rows) : ?><tr><td colspan="5">Δεν βρέθηκαν καταγραφές με αυτά τα φίλτρα.</td></tr><?php endif; ?>
+                <?php foreach ($rows as $r) :
+                    $state = self::row_state($r);
+                    $wtype = self::who_type($r->actor);
+                    $details = self::details($r);
+                    $info = [
+                        'id' => (int) $r->id, 'date' => TW_Util::datetime_label($r->created_at), 'action' => self::label($r->action), 'cat' => self::category_of($r->action),
+                        'whoType' => $wtype, 'who' => self::who($r->actor), 'ip' => (string) $r->ip, 'code' => (string) ($r->warranty_code ?? ''),
+                        'link' => $r->warranty_id && $r->warranty_code ? TW_App::admin_url('warranties', ['view' => $r->warranty_id]) : '',
+                        'serial' => (string) ($r->serial ?? ''), 'details' => $details !== '' ? explode(' · ', $details) : [],
+                        'state' => $state === 'changed' ? '⚠ Η καταγραφή δεν ταιριάζει με την υπογραφή της: άλλαξε απευθείας στη βάση δεδομένων.' : ($state === 'ok' ? '✔ Υπογεγραμμένη, χωρίς αλλοίωση' : 'Χωρίς υπογραφή (πριν την έκδοση 1.21)'),
+                        'bad' => $state === 'changed', 'tech' => (string) $r->action,
+                    ];
+                    ?>
+                    <tr<?php echo $state === 'changed' ? ' class="tw-log-row-bad"' : ''; ?>>
+                        <td class="tw-nowrap"><?php echo esc_html(TW_Util::datetime_label($r->created_at)); ?></td>
+                        <td class="tw-nowrap"><span class="tw-who tw-who--<?php echo esc_attr(['Πελάτης' => 'customer', 'Ομάδα' => 'team', 'Επισκέπτης' => 'visitor'][$wtype] ?? 'system'); ?>"><?php echo esc_html($wtype); ?></span> <span class="tw-log-who"><?php echo esc_html(self::who($r->actor)); ?></span></td>
+                        <td class="tw-log-what"><span><?php if ($state === 'changed') : ?><span class="tw-log-bad" title="Αλλοιωμένη καταγραφή">⚠</span> <?php endif; ?><strong><?php echo esc_html(self::label($r->action)); ?></strong><?php if ($details !== '') : ?><span class="tw-log-sum"> · <?php echo esc_html($details); ?></span><?php endif; ?></span></td>
+                        <td class="tw-nowrap"><?php if ($r->warranty_id && $r->warranty_code) : ?><a href="<?php echo esc_url($info['link']); ?>" title="<?php echo esc_attr($r->serial ? 'S/N ' . $r->serial : ''); ?>"><?php echo esc_html($r->warranty_code); ?></a><?php elseif ($r->serial) : ?><code><?php echo esc_html($r->serial); ?></code><?php else : ?><span class="description">—</span><?php endif; ?></td>
+                        <td class="tw-log-info-col"><button type="button" class="tw-log-info" data-tw-log="<?php echo esc_attr(wp_json_encode($info, JSON_UNESCAPED_UNICODE)); ?>" title="Λεπτομέρειες" aria-label="Λεπτομέρειες ενέργειας"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg></button></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            <dialog class="tw-dialog tw-log-dlg" id="tw-log-dlg" aria-label="Λεπτομέρειες ενέργειας">
+                <div class="tw-log-dlg-head"><div><strong data-k="action"></strong><span data-k="date"></span></div><button type="button" class="tw-log-dlg-x" aria-label="Κλείσιμο">×</button></div>
+                <dl class="tw-log-dlg-body"></dl>
+            </dialog>
+            <script>
+            (function () {
+                var dlg = document.getElementById('tw-log-dlg'), body = dlg.querySelector('dl');
+                function row(label, value, cls, href) {
+                    if (value === undefined || value === null || value === '') return;
+                    var dt = document.createElement('dt'), dd = document.createElement('dd');
+                    dt.textContent = label;
+                    if (href) { var a = document.createElement('a'); a.href = href; a.textContent = value; dd.appendChild(a); } else dd.textContent = value;
+                    if (cls) dd.className = cls;
+                    body.appendChild(dt); body.appendChild(dd);
+                }
+                document.addEventListener('click', function (ev) {
+                    var b = ev.target.closest('[data-tw-log]');
+                    if (!b) return;
+                    var d = JSON.parse(b.getAttribute('data-tw-log'));
+                    dlg.querySelector('[data-k="action"]').textContent = d.action;
+                    dlg.querySelector('[data-k="date"]').textContent = d.date + ' · #' + d.id;
+                    body.textContent = '';
+                    row('Κατηγορία', d.cat);
+                    row('Ποιος', d.whoType + (d.who && d.who !== d.whoType ? ' – ' + d.who : ''));
+                    row('IP', d.ip);
+                    row('Εγγύηση', d.code, '', d.link);
+                    row('Σειριακός', d.serial, 'tw-mono');
+                    (d.details || []).forEach(function (x) {
+                        var i = x.indexOf(': ');
+                        if (i > 0 && i < 40) row(x.slice(0, i), x.slice(i + 2)); else row('Λεπτομέρειες', x);
+                    });
+                    row('Ακεραιότητα', d.state, d.bad ? 'tw-log-bad' : '');
+                    row('Τεχνικό όνομα', d.tech, 'tw-mono');
+                    dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', '');
+                });
+                dlg.querySelector('.tw-log-dlg-x').addEventListener('click', function () { dlg.close(); });
+                dlg.addEventListener('click', function (ev) { if (ev.target === dlg) dlg.close(); });
+            })();
+            </script>
             <?php if ($pages > 1) : ?>
                 <p class="tw-pagination">
                     <?php if ($paged > 1) printf('<a class="button" href="%s">← Νεότερες</a> ', esc_url(TW_App::admin_url('log', array_filter(array_merge($f, ['paged' => $paged - 1]))))); ?>
@@ -279,10 +330,10 @@ final class TW_Activity {
         $raw = json_decode((string) $r->details, true);
         if (is_array($raw) && isset($raw['ip'])) { unset($raw['ip']); $r = clone $r; $r->details = wp_json_encode($raw, JSON_UNESCAPED_UNICODE); } // the IP has its own column
         $d = TW_Admin::event_details($r->details);
-        $map = ['section' => 'Ενότητα', 'message' => 'Μήνυμα', 'channel' => 'Μέσο', 'filters' => 'Φίλτρα', 'columns' => 'Στήλες', 'ips' => 'IP', 'period' => 'Περίοδος', 'checked' => 'Ελέγχθηκαν', 'altered' => 'Αλλοιωμένες', 'gaps' => 'Πιθανές διαγραφές', 'count' => 'Πλήθος', 'before' => 'Πριν από'];
+        $map = ['section' => 'Ενότητα', 'message' => 'Μήνυμα', 'channel' => 'Μέσο', 'filters' => 'Φίλτρα', 'columns' => 'Στήλες', 'ips' => 'IP', 'period' => 'Περίοδος', 'checked' => 'Ελέγχθηκαν', 'altered' => 'Αλλοιωμένες', 'gaps' => 'Πιθανές διαγραφές', 'count' => 'Πλήθος', 'before' => 'Πριν από', 'set' => 'Σετ όρων', 'range_before' => 'Προηγούμενο διάστημα', 'range_after' => 'Νέο διάστημα', 'file' => 'Αρχείο', 'claim' => 'Αίτημα', 'type' => 'Τύπος', 'files' => 'Συνημμένα', 'status' => 'Κατάσταση'];
         $sections = ['general' => 'Γενικά', 'sender' => 'Αποστολέας', 'app' => 'Εφαρμογή & εμφάνιση', 'schedule' => 'Εγγύηση & ειδοποιήσεις', 'terms' => 'Όροι & συγκαταθέσεις',
             'messages' => 'Κείμενα μηνυμάτων', 'brevo' => 'Brevo', 'sms' => 'Άλλος πάροχος SMS', 'security' => 'Ασφάλεια', 'privacy' => 'GDPR', 'log' => 'Ημερολόγιο'];
-        $d = preg_replace_callback('/\b(section|message|channel|filters|columns|ips|period|checked|altered|gaps|count|before): /', function ($m) use ($map) { return $map[$m[1]] . ': '; }, $d);
+        $d = preg_replace_callback('/\b(section|message|channel|filters|columns|ips|period|checked|altered|gaps|count|before|set|range_before|range_after|file|claim|type|files|status): /', function ($m) use ($map) { return $map[$m[1]] . ': '; }, $d);
         return preg_replace_callback('/Ενότητα: ([a-z]+)/', function ($m) use ($sections) { return 'Ενότητα: ' . ($sections[$m[1]] ?? $m[1]); }, $d);
     }
 
