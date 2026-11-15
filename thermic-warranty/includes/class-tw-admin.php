@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'serial_batch', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export', 'terms_save', 'terms_assign', 'terms_delete', 'claim_update', 'claim_file'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export', 'terms_save', 'terms_assign', 'terms_delete', 'terms_pdf_draft', 'claim_update', 'claim_file'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -2017,6 +2017,7 @@ final class TW_Admin {
     public static function handle_terms_save() { TW_Terms::handle_save(); }
     public static function handle_terms_assign() { TW_Terms::handle_assign(); }
     public static function handle_terms_delete() { TW_Terms::handle_delete(); }
+    public static function handle_terms_pdf_draft() { TW_Terms::handle_pdf_draft(); }
     public static function page_partners() { TW_Partners::page(); }
     public static function handle_partner_save() { TW_Partners::handle_save(); }
     public static function handle_partner_delete() { TW_Partners::handle_delete(); }

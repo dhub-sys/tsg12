@@ -356,10 +356,26 @@ final class TW_Terms {
     public static function period_label($set) {
         $p = self::period($set);
         if (!$p) return tw__('Για τα προϊόντα με συγκεκριμένους σειριακούς αριθμούς.');
+        return self::label_from_to($p['from'], $p['to']);
+    }
+
+    /** The same label for dates not saved yet (from the edit form): the end comes from the next set if empty. */
+    public static function period_label_for($id, $from, $to) {
+        $id = (int) $id;
+        if ($id !== self::BASE && $from === '' && $to === '') return tw__('Για τα προϊόντα με συγκεκριμένους σειριακούς αριθμούς.');
+        if ($to === '') {
+            foreach (self::ranges() as $r) {
+                if ($r['id'] !== $id && $r['from'] !== '' && $r['from'] > $from) { $to = TW_Schedule::add_days($r['from'], -1); break; }
+            }
+        }
+        return self::label_from_to($from, $to);
+    }
+
+    private static function label_from_to($from, $to) {
         $d = function ($ymd) { return TW_Util::date_label($ymd); };
-        if ($p['from'] !== '' && $p['to'] !== '') return sprintf(tw__('Για αγορές από %1$s έως %2$s.'), $d($p['from']), $d($p['to']));
-        if ($p['from'] !== '') return sprintf(tw__('Για αγορές από %s και μετά.'), $d($p['from']));
-        if ($p['to'] !== '') return sprintf(tw__('Για αγορές έως %s.'), $d($p['to']));
+        if ($from !== '' && $to !== '') return sprintf(tw__('Για αγορές από %1$s έως %2$s.'), $d($from), $d($to));
+        if ($from !== '') return sprintf(tw__('Για αγορές από %s και μετά.'), $d($from));
+        if ($to !== '') return sprintf(tw__('Για αγορές έως %s.'), $d($to));
         return tw__('Για όλες τις αγορές.');
     }
 
@@ -462,8 +478,35 @@ final class TW_Terms {
                         <p><label>Κείμενο όρων (Ελληνικά) <textarea name="text_el" rows="16" class="large-text" data-tw-rich><?php echo esc_textarea($el['text']); ?></textarea></label></p>
                         <p><label>Terms (English) <span class="description">(προαιρετικό – χωρίς αγγλικό κείμενο, οι πελάτες στα αγγλικά βλέπουν τους ελληνικούς όρους του σετ)</span><textarea name="text_en" rows="10" class="large-text" lang="en" data-tw-rich><?php echo esc_textarea($enx); ?></textarea></label></p>
                         <script src="<?php echo esc_url(TW_URL . 'assets/js/terms-editor.js?ver=' . TW_VERSION); ?>"></script>
+                        <script>
+                        (function () {
+                            // Sends the text and dates as they are in the form (saved or not) to the print page, in a new tab.
+                            document.addEventListener('click', function (e) {
+                                var b = e.target.closest('[data-tw-mkpdf] button[data-lang]');
+                                if (!b) return;
+                                var box = b.closest('[data-tw-mkpdf]'), cfg = JSON.parse(box.getAttribute('data-tw-mkpdf')), form = box.closest('form');
+                                var lang = b.getAttribute('data-lang');
+                                form.querySelectorAll('.tw-rte-area').forEach(function (a) { a.dispatchEvent(new Event('blur')); });
+                                var ta = form.querySelector('[name="text_' + lang + '"]'), src = ta.parentNode.parentNode.querySelector('.tw-rte-src');
+                                var text = src ? src.value : ta.value;
+                                if (!text.replace(/<[^>]*>|&nbsp;|\s/g, '')) { alert(lang === 'en' ? 'Δεν υπάρχει αγγλικό κείμενο.' : 'Δεν υπάρχει κείμενο.'); return; }
+                                var f = document.createElement('form');
+                                f.method = 'post'; f.action = cfg.url; f.target = '_blank'; f.style.display = 'none';
+                                var fields = { action: 'tw_terms_pdf_draft', _wpnonce: cfg.nonce, id: cfg.id, lang: lang, text: text,
+                                    from: (form.querySelector('[name=from]') || {}).value || '', to: (form.querySelector('[name=to]') || {}).value || '' };
+                                Object.keys(fields).forEach(function (k) { var i = document.createElement('textarea'); i.name = k; i.value = fields[k]; f.appendChild(i); });
+                                document.body.appendChild(f); f.submit(); f.remove();
+                            });
+                        })();
+                        </script>
                         <h3>PDF για λήψη από το site <span class="description">(προαιρετικό)</span></h3>
                         <p class="description">Το «Λήψη PDF» της σελίδας όρων δίνει αυτό το αρχείο. Χωρίς PDF, ο επισκέπτης παίρνει αυτόματη σελίδα εκτύπωσης από το κείμενο, με το διάστημα ισχύος. Αν διορθώσετε το κείμενο, ανεβάστε και το ενημερωμένο PDF.</p>
+                        <div class="tw-terms-mkpdf" data-tw-mkpdf="<?php echo esc_attr(wp_json_encode(['url' => $post, 'nonce' => wp_create_nonce('tw_terms_pdf_draft'), 'id' => $id])); ?>">
+                            <p><strong>Δημιουργία PDF από το κείμενο:</strong>
+                                <button type="button" class="button" data-lang="el"><?php echo TW_Admin::icon('printer'); // phpcs:ignore ?> Ελληνικά</button>
+                                <button type="button" class="button" data-lang="en"><?php echo TW_Admin::icon('printer'); // phpcs:ignore ?> English</button></p>
+                            <p class="description">Ανοίγει σε νέα καρτέλα η σελίδα των όρων όπως τους γράψατε, και πριν την αποθήκευση, με λογότυπο, διάστημα ισχύος και ημερομηνία. Επιλέξτε «Αποθήκευση ως PDF» στο παράθυρο εκτύπωσης και ανεβάστε το αρχείο στο αντίστοιχο πεδίο παρακάτω.</p>
+                        </div>
                         <?php foreach (['el' => 'PDF (Ελληνικά)', 'en' => 'PDF (English)'] as $pl => $plabel) : $pm = $id ? self::pdf($id, $pl) : null; $pv = $id && self::versions($id, $pl) ? (int) end(self::versions($id, $pl))['version'] : 0; ?>
                             <p><label><?php echo esc_html($plabel); ?> <input type="file" name="pdf_<?php echo esc_attr($pl); ?>" accept="application/pdf,.pdf"></label>
                             <?php if ($pm) : ?>
@@ -569,6 +612,31 @@ final class TW_Terms {
         }
         TW_Admin::flash($msg, $type);
         TW_Admin::back('tw-terms', ['edit' => $id]);
+    }
+
+    /** Print page (save as PDF) of the text as it is in the edit form, before or after saving. */
+    public static function handle_pdf_draft() {
+        TW_Admin::guard('tw_terms_pdf_draft');
+        $id = (int) TW_Admin::post('id');
+        if ($id && !self::get($id)) $id = 0;
+        $lang = TW_Admin::post('lang') === 'en' ? 'en' : 'el';
+        $text = trim(str_replace("\r\n", "\n", self::clean_html(wp_unslash($_POST['text'] ?? ''))));
+        if (trim(wp_strip_all_tags($text)) === '') wp_die('Το κείμενο των όρων είναι κενό.');
+        $date = function ($k) { $v = TW_Admin::post($k); return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : ''; };
+        $from = $date('from');
+        $to = $date('to');
+        $versions = $id ? self::versions($id, $lang) : [];
+        $saved = $versions ? end($versions) : null;
+        $hash = hash('sha256', $text);
+        $same = $saved && $saved['hash'] === $hash;
+        $set = $id ? self::get($id) : null;
+        $dates_saved = $set && $set['from'] === $from && $set['to'] === $to;
+        $t = $same ? $saved + ['lang' => $lang] : ['text' => $text, 'hash' => $hash, 'published_at' => TW_DB::now(), 'lang' => $lang];
+        $note = ($same && $dates_saved) ? '' : 'Προεπισκόπηση με αλλαγές που δεν έχουν αποθηκευτεί ακόμη. Πατήστε «Αποθήκευση» στη φόρμα, ώστε το PDF να συμφωνεί με τους όρους που βλέπουν οι πελάτες.';
+        TW_I18n::with($lang, function () use ($id, $from, $to, $t, $note) {
+            TW_Terms_Public::render_print($t, self::period_label_for($id, $from, $to), $note);
+        });
+        exit;
     }
 
     public static function handle_assign() {
@@ -748,6 +816,12 @@ final class TW_Terms_Public {
         $tl = TW_I18n::norm(sanitize_key(wp_unslash($_GET['tl'] ?? ''))) ?: 'el';
         $t = TW_Terms::get($set) ? TW_Terms::version($set, (int) ($_GET['v'] ?? 0), $tl) : null;
         if (!$t) wp_die(esc_html(tw__('Δεν βρέθηκε.')), '', 404);
+        self::render_print($t, TW_Terms::period_label($set));
+        exit;
+    }
+
+    /** The printable page of a terms text (the browser saves it as PDF). $note: shown on screen only. */
+    public static function render_print($t, $period, $note = '') {
         $s = TW_Settings::all();
         $lang = TW_I18n::lang();
         nocache_headers();
@@ -770,17 +844,17 @@ h1 { font-size: 20pt; margin: 0 0 4px; }
 .text table { border-collapse: collapse; margin: .6em 0 1em; } .text th, .text td { border: 1px solid #9aa1ab; padding: 5px 8px; vertical-align: top; text-align: left; } .text th { background: #eef0f3; }
 h2, h3, tr { page-break-inside: avoid; break-inside: avoid; }
 footer { margin-top: 24px; border-top: 1px solid #d6d9de; padding-top: 8px; color: #5f6b7a; font-size: 8.5pt; }
-.bar { text-align: center; margin: 0 0 16px; } .bar button { font: inherit; padding: 8px 18px; border-radius: 6px; border: 1px solid #1d2330; background: #1d2330; color: #fff; cursor: pointer; }
+.bar { text-align: center; margin: 0 0 16px; } .note { background: #fff7e6; border: 1px solid #f2d39b; border-radius: 6px; padding: 8px 12px; font-size: 10pt; margin: 0 0 10px; } .bar button { font: inherit; padding: 8px 18px; border-radius: 6px; border: 1px solid #1d2330; background: #1d2330; color: #fff; cursor: pointer; }
 @media print { .bar { display: none; } body { margin: 0; max-width: none; padding: 0; } }
 </style></head><body>
+<?php if ($note !== '') : ?><div class="bar note"><?php echo esc_html($note); ?></div><?php endif; ?>
 <div class="bar"><button type="button" onclick="window.print()"><?php echo esc_html(tw__('Αποθήκευση ως PDF / Εκτύπωση')); ?></button></div>
 <header><div><h1><?php tw_e('Όροι εγγύησης'); ?></h1><div><?php echo esc_html($s['company_name']); ?></div></div><?php echo $s['logo_url'] ? TW_App::logo_html('logo') : ''; // phpcs:ignore ?></header>
-<p class="period"><?php echo esc_html(TW_Terms::period_label($set)); ?></p>
+<p class="period"><?php echo esc_html($period); ?></p>
 <p class="meta"><?php echo esc_html(TW_Terms::updated_label($t)); ?></p>
 <div class="text"<?php echo $t['lang'] !== $lang ? ' lang="' . esc_attr($t['lang']) . '"' : ''; ?>><?php echo TW_Terms::html($t['text']); // sanitized ?></div>
 <footer><?php echo esc_html(sprintf(tw__('Εκτυπώθηκε %s'), TW_Util::datetime_label(TW_DB::now()))); ?> · SHA-256 <?php echo esc_html(substr($t['hash'], 0, 16)); ?>…</footer>
 <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });</script>
 </body></html><?php
-        exit;
     }
 }
