@@ -42,7 +42,9 @@
             status.textContent = ps.length === 0 ? cfg.t.none : (ps.length === 1 ? cfg.t.found1 : cfg.t.foundN.replace('%d', ps.length));
             ps.forEach(function (p) {
                 var card = el('article', 'tw-card tw-partner');
-                card.appendChild(el('h4', '', p.n));
+                var head = el('div', 'tw-partner-head');
+                head.appendChild(el('h4', '', p.n));
+                card.appendChild(head);
                 var where = [p.ad, [p.pc, p.a].filter(Boolean).join(' ')].filter(Boolean).join(', ');
                 if (where) card.appendChild(el('p', 'tw-partner-addr', where));
                 var ul = el('ul', 'tw-partner-contact');
@@ -52,8 +54,13 @@
                 if (p.em) { var li = el('li'); li.appendChild(link('mailto:' + p.em, p.em)); ul.appendChild(li); }
                 if (p.w) { var lw = el('li'); lw.appendChild(link(p.w, p.w.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''), true)); ul.appendChild(lw); }
                 if (where) {
-                    var q = p.q || p.n;
-                    var lm = el('li'); lm.appendChild(link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q), cfg.t.map, true)); ul.appendChild(lm);
+                    // Pin (UIkit «location» icon) opening the place in Google Maps.
+                    var pin = link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.q || p.n), '', true);
+                    pin.className = 'tw-partner-pin';
+                    pin.title = cfg.t.map;
+                    pin.setAttribute('aria-label', cfg.t.map + ': ' + p.n);
+                    pin.innerHTML = '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.01" d="M10,0.5 C6.41,0.5 3.5,3.39 3.5,6.98 C3.5,11.83 10,19 10,19 C10,19 16.5,11.83 16.5,6.98 C16.5,3.39 13.59,0.5 10,0.5 L10,0.5 Z"></path><circle fill="none" stroke="currentColor" cx="10" cy="6.8" r="2.3"></circle></svg>';
+                    head.appendChild(pin);
                 }
                 card.appendChild(ul);
                 if (p.no) card.appendChild(el('p', 'tw-hint', p.no));
