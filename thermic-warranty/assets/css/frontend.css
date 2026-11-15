@@ -202,13 +202,14 @@
 .tw-partners select:focus { outline: 2px solid var(--tw-accent); outline-offset: 1px; }
 .tw-partners-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .tw-partner { margin: 0; }
-.tw-partner-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.tw-partner h4 { margin: 0 0 6px; font-size: 17px; }
-.tw-partner-pin { flex: none; display: inline-flex; color: var(--tw-accent); line-height: 0; padding: 2px; border-radius: 6px; }
+.tw-partner h4 { margin: 0 0 8px; font-size: 17px; }
+.tw-partner-linewrap { overflow: hidden; }
+.tw-partner-line { list-style: none; margin: 0 0 0 -9px; padding: 0; display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; font-size: 15px; }
+.tw-partner-line li { margin: 0; padding: 0 8px; border-left: 1px solid var(--tw-border); white-space: nowrap; line-height: 1.4; }
+.tw-partner-line li::marker { content: none; }
+.tw-partner-line li.tw-partner-addr { white-space: normal; color: var(--tw-muted); }
+.tw-partner-line a { color: var(--tw-accent); text-decoration: none; }
+.tw-partner-line a:hover { text-decoration: underline; }
+.tw-partner-pin { display: inline-flex; vertical-align: middle; color: var(--tw-accent); line-height: 0; padding: 2px; border-radius: 6px; }
 .tw-partner-pin:hover, .tw-partner-pin:focus-visible { background: var(--tw-bg-soft); }
-.tw-partner-addr { margin: 0 0 8px; color: var(--tw-muted); font-size: 14px; }
-.tw-partner-contact { list-style: none; margin: 0; padding: 0; font-size: 15px; }
-.tw-partner-contact li { margin: 2px 0; overflow-wrap: anywhere; }
-.tw-partner-contact a { color: var(--tw-accent); text-decoration: none; }
-.tw-partner-contact a:hover { text-decoration: underline; }
 .tw-partner .tw-hint { margin: 8px 0 0; }

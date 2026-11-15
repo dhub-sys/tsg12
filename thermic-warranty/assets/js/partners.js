@@ -42,27 +42,30 @@
             status.textContent = ps.length === 0 ? cfg.t.none : (ps.length === 1 ? cfg.t.found1 : cfg.t.foundN.replace('%d', ps.length));
             ps.forEach(function (p) {
                 var card = el('article', 'tw-card tw-partner');
-                var head = el('div', 'tw-partner-head');
-                head.appendChild(el('h4', '', p.n));
-                card.appendChild(head);
+                card.appendChild(el('h4', '', p.n));
+                // One line: address | phone | phone | email | website | map pin. Each item stays whole and moves
+                // to the next line when it does not fit; the separator at the start of a line is clipped away.
+                var ul = el('ul', 'tw-partner-line');
+                var item = function (cls, child) { var li = el('li', cls); li.appendChild(child); ul.appendChild(li); };
                 var where = [p.ad, [p.pc, p.a].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-                if (where) card.appendChild(el('p', 'tw-partner-addr', where));
-                var ul = el('ul', 'tw-partner-contact');
+                if (where) item('tw-partner-addr', document.createTextNode(where));
                 (p.ph || '').split(/\s*[,;\/]\s*/).filter(Boolean).forEach(function (t) {
-                    var li = el('li'); li.appendChild(link('tel:' + t.replace(/[^\d+]/g, ''), t)); ul.appendChild(li);
+                    item('', link('tel:' + t.replace(/[^\d+]/g, ''), t));
                 });
-                if (p.em) { var li = el('li'); li.appendChild(link('mailto:' + p.em, p.em)); ul.appendChild(li); }
-                if (p.w) { var lw = el('li'); lw.appendChild(link(p.w, p.w.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''), true)); ul.appendChild(lw); }
+                if (p.em) item('', link('mailto:' + p.em, p.em));
+                if (p.w) item('', link(p.w, p.w.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''), true));
                 if (where) {
                     // Pin (UIkit «location» icon) opening the place in Google Maps.
                     var pin = link('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.q || p.n), '', true);
                     pin.className = 'tw-partner-pin';
                     pin.title = cfg.t.map;
                     pin.setAttribute('aria-label', cfg.t.map + ': ' + p.n);
-                    pin.innerHTML = '<svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.01" d="M10,0.5 C6.41,0.5 3.5,3.39 3.5,6.98 C3.5,11.83 10,19 10,19 C10,19 16.5,11.83 16.5,6.98 C16.5,3.39 13.59,0.5 10,0.5 L10,0.5 Z"></path><circle fill="none" stroke="currentColor" cx="10" cy="6.8" r="2.3"></circle></svg>';
-                    head.appendChild(pin);
+                    pin.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.01" d="M10,0.5 C6.41,0.5 3.5,3.39 3.5,6.98 C3.5,11.83 10,19 10,19 C10,19 16.5,11.83 16.5,6.98 C16.5,3.39 13.59,0.5 10,0.5 L10,0.5 Z"></path><circle fill="none" stroke="currentColor" cx="10" cy="6.8" r="2.3"></circle></svg>';
+                    item('tw-partner-map', pin);
                 }
-                card.appendChild(ul);
+                var wrap = el('div', 'tw-partner-linewrap');
+                wrap.appendChild(ul);
+                card.appendChild(wrap);
                 if (p.no) card.appendChild(el('p', 'tw-hint', p.no));
                 list.appendChild(card);
             });
