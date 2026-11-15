@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
  * events         – audit trail per warranty / serial
  */
 final class TW_DB {
-    const DB_VERSION = '1.11.0';
+    const DB_VERSION = '1.12.0';
     const DB_VERSION_OPTION = 'tw_db_version';
 
     public static function table($name) {
@@ -208,6 +208,28 @@ final class TW_DB {
   KEY created_at (created_at),
   KEY action (action),
   KEY actor (actor)
+) $c;");
+
+        // Partners / authorized Service network (public finder: country → region → area).
+        dbDelta("CREATE TABLE {$t('partners')} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  name varchar(190) NOT NULL,
+  country char(2) NOT NULL DEFAULT 'GR',
+  region varchar(100) NOT NULL DEFAULT '',
+  area varchar(100) NOT NULL DEFAULT '',
+  address varchar(255) NOT NULL DEFAULT '',
+  postcode varchar(20) NOT NULL DEFAULT '',
+  phone varchar(100) NOT NULL DEFAULT '',
+  email varchar(190) NOT NULL DEFAULT '',
+  website varchar(255) NOT NULL DEFAULT '',
+  notes varchar(255) NOT NULL DEFAULT '',
+  is_service tinyint(1) NOT NULL DEFAULT 1,
+  active tinyint(1) NOT NULL DEFAULT 1,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  KEY loc (country, region, area),
+  KEY name (name)
 ) $c;");
 
         // Rate limits (serial lookups, failed sign-ins): one row per bucket and IP, updated atomically.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Warranty Manager
  * Description: Warranty Manager – αυτόνομη πλατφόρμα (standalone app) ηλεκτρονικής ενεργοποίησης και διαχείριση εγγυήσεων με σειριακούς αριθμούς: εγγραφή με επαλήθευση email, πύλη πελάτη, ειδοποιήσεις Service/λήξης μέσω email και SMS, διαχειριστικό με μαζική εισαγωγή από Excel/CSV και καταγραφή συγκαταθέσεων (GDPR).
- * Version: 1.25.2
+ * Version: 1.26.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Plugin URI: https://www.dazzlink.gr
@@ -12,7 +12,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('TW_VERSION', '1.25.2');
+define('TW_VERSION', '1.26.0');
 define('TW_FILE', __FILE__);
 define('TW_DIR', plugin_dir_path(__FILE__));
 define('TW_URL', plugin_dir_url(__FILE__));
@@ -31,6 +31,7 @@ require_once TW_DIR . 'includes/class-tw-warranty.php';
 require_once TW_DIR . 'includes/class-tw-frontend.php';
 require_once TW_DIR . 'includes/class-tw-cron.php';
 require_once TW_DIR . 'includes/class-tw-importer.php';
+require_once TW_DIR . 'includes/class-tw-partners.php';
 require_once TW_DIR . 'includes/class-tw-xlsx.php';
 require_once TW_DIR . 'includes/class-tw-privacy.php';
 require_once TW_DIR . 'includes/class-tw-backup.php';
@@ -49,6 +50,7 @@ register_deactivation_hook(__FILE__, function () {
 add_action('plugins_loaded', function () {
     TW_DB::maybe_upgrade();
     TW_Frontend::init();
+    TW_Partners::init();
     TW_Cron::init();
     TW_Privacy::init();
     TW_App::init();

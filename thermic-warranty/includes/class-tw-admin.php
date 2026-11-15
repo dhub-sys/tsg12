@@ -19,7 +19,7 @@ final class TW_Admin {
     public static function actions() {
         return ['import', 'add_serial', 'serial_status', 'serial_batch', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
-            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings'];
+            'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export'];
     }
 
     /** Screens of the admin app: key => [label, dashicon-like glyph, callback]. */
@@ -29,6 +29,7 @@ final class TW_Admin {
             'warranties' => ['Εγγυήσεις & πελάτες', 'shield', 'page_warranties'],
             'serials' => ['Σειριακοί αριθμοί', 'barcode', 'page_serials'],
             'notifications' => ['Ειδοποιήσεις', 'bell', 'page_notifications'],
+            'partners' => ['Συνεργάτες', 'pin', 'page_partners'],
         ];
         if (self::can_admin()) {
             $screens['team'] = ['Ομάδα', 'users', 'page_team'];
@@ -64,6 +65,7 @@ final class TW_Admin {
             'upload' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
             'scroll' => '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
             'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+            'pin' => '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
             'book' => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
         ];
         if (!isset($paths[$name])) return '';
@@ -103,44 +105,44 @@ final class TW_Admin {
 
     // ------------------------------------------------------------------ helpers
 
-    private static function guard($action) {
+    public static function guard($action) {
         if (!current_user_can(self::cap())) wp_die('Δεν έχετε δικαίωμα πρόσβασης.', 403);
         check_admin_referer($action);
     }
 
-    private static function back($page, array $args = []) {
+    public static function back($page, array $args = []) {
         wp_safe_redirect(self::url(preg_replace('/^tw-/', '', $page), array_filter($args, function ($v) { return $v !== null; })));
         exit;
     }
 
     /** Hidden inputs so GET filter forms stay inside the app. */
-    private static function get_form_fields($screen) {
+    public static function get_form_fields($screen) {
         foreach (TW_App::admin_base_query() as $k => $v) {
             echo '<input type="hidden" name="' . esc_attr($k) . '" value="' . esc_attr($v) . '">';
         }
         echo '<input type="hidden" name="screen" value="' . esc_attr($screen) . '">';
     }
 
-    private static function post($k) {
+    public static function post($k) {
         return isset($_POST[$k]) ? trim(wp_unslash((string) $_POST[$k])) : '';
     }
 
-    private static function q($k) {
+    public static function q($k) {
         return isset($_GET[$k]) ? sanitize_text_field(wp_unslash((string) $_GET[$k])) : '';
     }
 
-    private static function notice() {
+    public static function notice() {
         $msg = get_transient('tw_notice_' . get_current_user_id());
         if (!$msg) return;
         delete_transient('tw_notice_' . get_current_user_id());
         printf('<div class="notice notice-%s is-dismissible"><p>%s</p></div>', esc_attr($msg['type']), wp_kses_post($msg['text']));
     }
 
-    private static function flash($text, $type = 'success') {
+    public static function flash($text, $type = 'success') {
         set_transient('tw_notice_' . get_current_user_id(), ['text' => $text, 'type' => $type], 120);
     }
 
-    private static function pagination($total, $paged) {
+    public static function pagination($total, $paged) {
         $pages = (int) ceil($total / self::PER_PAGE);
         if ($pages <= 1) return;
         echo '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">' . (int) $total . ' εγγραφές</span> ';
@@ -1952,6 +1954,12 @@ final class TW_Admin {
         self::flash('Η παρτίδα άλλαξε σε «' . $new . '» για ' . $n . ' σειριακούς (' . $what . ').');
         self::back('tw-serials', ['batch' => $new]);
     }
+
+    public static function page_partners() { TW_Partners::page(); }
+    public static function handle_partner_save() { TW_Partners::handle_save(); }
+    public static function handle_partner_delete() { TW_Partners::handle_delete(); }
+    public static function handle_partner_import() { TW_Partners::handle_import(); }
+    public static function handle_partner_export() { TW_Partners::handle_export(); }
 
     public static function handle_serial_status() {
         global $wpdb;
