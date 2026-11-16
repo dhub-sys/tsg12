@@ -19,6 +19,7 @@ $tw_sess = TW_Frontend::session();
     </ol>
 
     <div class="tw-alert" role="alert" hidden></div>
+    <?php if ($tw_sess) { $tw_pill = ['left' => TW_OTP::token_seconds_left($tw_sess), 'csrf' => TW_Frontend::csrf($tw_sess)]; include TW_DIR . 'templates/session-pill.php'; } ?>
 
     <!-- Step 1: serial only -->
     <form class="tw-step" data-step="1" novalidate>

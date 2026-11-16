@@ -355,7 +355,7 @@ final class TW_Frontend {
     }
 
     /** CSRF token bound to the session. */
-    private static function csrf($session) {
+    public static function csrf($session) {
         return substr(hash_hmac('sha256', 'csrf' . $session->id . $session->token_hash, wp_salt('nonce')), 0, 32);
     }
 

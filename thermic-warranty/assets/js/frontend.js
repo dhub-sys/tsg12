@@ -147,6 +147,39 @@
         if (img && !img.complete) { img.addEventListener('load', go, { once: true }); img.addEventListener('error', go, { once: true }); } else go();
     }
 
+    // ------------------------------------------------------------ sign-in timer (portal + activation page)
+    /**
+     * The fixed «⏱ Σύνδεση: 9:42 ↻» pill: counts down, ↻ renews the sign-in on the server, red in the last
+     * minute; onExpire runs at zero, onFail when renewing is refused.
+     */
+    function sessionPill(root, getCsrf, onExpire, onFail) {
+        var pill = root.querySelector('[data-portal-timer]'), tick = null, ends = 0;
+        function fmt(sec) { var m = Math.floor(sec / 60), x = sec % 60; return (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+        function start(left) {
+            if (tick) { clearInterval(tick); tick = null; }
+            if (!pill) return;
+            pill.hidden = !left;
+            if (!left) return;
+            ends = Date.now() + left * 1000;
+            function step() {
+                var sec = Math.max(0, Math.round((ends - Date.now()) / 1000));
+                pill.querySelector('[data-left]').textContent = fmt(sec);
+                pill.classList.toggle('is-low', sec <= 60);
+                if (sec <= 0) { clearInterval(tick); tick = null; pill.hidden = true; onExpire(); }
+            }
+            step();
+            tick = setInterval(step, 1000);
+        }
+        if (pill) pill.querySelector('[data-action="session-refresh"]').addEventListener('click', function () {
+            var b = this; b.disabled = true; b.classList.add('is-spinning');
+            post('portal_refresh', { csrf: getCsrf() }).then(function (r) {
+                setTimeout(function () { b.disabled = false; b.classList.remove('is-spinning'); }, 400);
+                if (r.success) start(r.data.left); else { start(0); onFail(); }
+            });
+        });
+        return { start: start };
+    }
+
     // ------------------------------------------------------------ registration
     function Register(root) {
         enhanceFiles(root);
@@ -160,6 +193,16 @@
         var f3 = root.querySelector('[data-step="3"]');
         var f4 = root.querySelector('[data-step="4"]');
         var ASK = T('Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.');
+        // Signed in to «Οι εγγυήσεις μου»: the same sign-in timer; when it ends, a new product needs the emailed code again.
+        var regPill = root.querySelector('[data-portal-timer][data-left-init]');
+        if (regPill) {
+            var signedOut = function () {
+                root.removeAttribute('data-portal-email');
+                var h = root.querySelector('.tw-signed-hint'); if (h) h.hidden = true;
+                alertBox(root, T('Η σύνδεση στις «Οι εγγυήσεις μου» έληξε. Συνεχίστε με το email σας.'), 'info');
+            };
+            sessionPill(root, function () { return regPill.getAttribute('data-csrf'); }, signedOut, signedOut).start(parseInt(regPill.getAttribute('data-left-init'), 10) || 0);
+        }
 
         var partDetails = f4.querySelector('[data-part="details"]'), partTerms = f4.querySelector('[data-part="terms"]');
         function show(n) {
@@ -443,35 +486,11 @@
         var csrf = '';
         root.querySelectorAll('.tw-ts').forEach(tsRender);
 
-        // Sign-in timer (fixed at the corner): time left, ↻ renews it, red in the last minute, sign-out at zero.
-        var pill = root.querySelector('[data-portal-timer]'), tick = null, ends = 0;
-        function fmt(sec) { var m = Math.floor(sec / 60), x = sec % 60; return (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
-        function timer(left) {
-            if (tick) { clearInterval(tick); tick = null; }
-            if (!pill) return;
-            pill.hidden = !left;
-            if (!left) return;
-            ends = Date.now() + left * 1000;
-            function step() {
-                var sec = Math.max(0, Math.round((ends - Date.now()) / 1000));
-                pill.querySelector('[data-left]').textContent = fmt(sec);
-                pill.classList.toggle('is-low', sec <= 60);
-                if (sec <= 0) {
-                    clearInterval(tick); tick = null;
-                    load(function () {}); // the server has ended the sign-in: back to the sign-in form
-                    alertBox(root, T('Η σύνδεση έληξε για την ασφάλειά σας. Συνδεθείτε ξανά με το email σας.'), 'info');
-                }
-            }
-            step();
-            tick = setInterval(step, 1000);
-        }
-        if (pill) pill.querySelector('[data-action="session-refresh"]').addEventListener('click', function () {
-            var b = this; b.disabled = true; b.classList.add('is-spinning');
-            post('portal_refresh', { csrf: csrf }).then(function (r) {
-                setTimeout(function () { b.disabled = false; b.classList.remove('is-spinning'); }, 400);
-                if (r.success) timer(r.data.left); else load();
-            });
-        });
+        var pillCtl = sessionPill(root, function () { return csrf; }, function () {
+            load(function () {}); // the server has ended the sign-in: back to the sign-in form
+            alertBox(root, T('Η σύνδεση έληξε για την ασφάλειά σας. Συνδεθείτε ξανά με το email σας.'), 'info');
+        }, function () { load(); });
+        function timer(left) { pillCtl.start(left); }
 
         function load(after) {
             post('portal', {}).then(function (r) {
