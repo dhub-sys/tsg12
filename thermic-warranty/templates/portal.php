@@ -6,6 +6,12 @@ $register_url = TW_Settings::page_url('register');
     <noscript><p class="tw-alert tw-alert--error"><?php tw_e('Για την πύλη εγγυήσεων απαιτείται JavaScript.'); ?></p></noscript>
     <div class="tw-alert" role="alert" hidden></div>
     <p class="tw-loading" data-portal="loading"><?php tw_e('Φόρτωση…'); ?></p>
+    <?php // Sign-in timer: fixed at the corner of the screen, always visible while signed in. ?>
+    <div class="tw-session-pill" data-portal-timer hidden role="status" aria-live="off">
+        <span class="tw-session-ico" aria-hidden="true">⏱</span>
+        <span><?php tw_e('Σύνδεση:'); ?> <strong data-left>–</strong></span>
+        <button type="button" data-action="session-refresh" title="<?php echo esc_attr(tw__('Ανανέωση σύνδεσης')); ?>" aria-label="<?php echo esc_attr(tw__('Ανανέωση σύνδεσης')); ?>">↻</button>
+    </div>
 
     <div data-portal="login" hidden>
         <form class="tw-step" data-step="login-1" novalidate>

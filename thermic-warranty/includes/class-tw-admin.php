@@ -1164,6 +1164,12 @@ final class TW_Admin {
                         </select>
                         <p class="description">Πόσο ισχύει ο κωδικός που στέλνεται με email στους πελάτες (ενεργοποίηση, «Οι εγγυήσεις μου») και στην ομάδα (σύνδεση, ορισμός κωδικού πρόσβασης). Στην οθόνη του κωδικού φαίνεται ο χρόνος που απομένει.</p>
                     </td></tr>
+                    <tr><th><label for="tw-portal-session">Διάρκεια σύνδεσης πελατών</label></th><td>
+                        <select id="tw-portal-session" name="s[portal_session_minutes]">
+                            <?php foreach (TW_OTP::SESSION_CHOICES as $m) printf('<option value="%d"%s>%s</option>', $m, selected(TW_OTP::session_minutes(), $m, false), $m >= 60 ? ($m / 60) . ($m === 60 ? ' ώρα' : ' ώρες') : $m . ' λεπτά'); ?>
+                        </select>
+                        <p class="description">Πόσο μένει συνδεδεμένος ο πελάτης στις «Οι εγγυήσεις μου». Κάτω δεξιά στη σελίδα βλέπει συνεχώς τον χρόνο που απομένει, με κουμπί ανανέωσης (↻) που τον ξεκινά από την αρχή· στο τελευταίο λεπτό η ένδειξη γίνεται κόκκινη. Όταν λήξει, αποσυνδέεται και χρειάζεται νέο κωδικό.</p>
+                    </td></tr>
                     <tr><td colspan="2"><h2 style="margin:8px 0 0">Πρόσβαση με IP</h2>
                         <p><?php if (TW_Access::active()) : ?><strong style="color:#15803d">Ενεργός.</strong> Το <?php echo esc_html(TW_App::APP_NAME); ?> ανοίγει μόνο από: <code><?php echo esc_html(implode(', ', TW_Access::allowed_list())); ?></code>.
                         <?php else : ?><strong>Ανενεργός.</strong> Το <?php echo esc_html(TW_App::APP_NAME); ?> ανοίγει από οποιαδήποτε σύνδεση.<?php endif; ?>
@@ -1808,6 +1814,7 @@ final class TW_Admin {
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
             elseif ($k === 'tax_countries') $values[$k] = array_values(array_intersect(array_keys(TW_Util::countries()), array_map('strtoupper', array_map('sanitize_key', (array) $v))));
             elseif ($k === 'otp_minutes') $values[$k] = in_array((int) $v, TW_OTP::MINUTE_CHOICES, true) ? (int) $v : 2;
+            elseif ($k === 'portal_session_minutes') $values[$k] = in_array((int) $v, TW_OTP::SESSION_CHOICES, true) ? (int) $v : 60;
             elseif ($k === 'staff_session_minutes') $values[$k] = in_array((int) $v, TW_Staff_Auth::SESSION_CHOICES, true) ? (int) $v : 120;
             elseif ($k === 'pdf_watermark') $values[$k] = in_array($v, ['text', 'logo', 'none'], true) ? $v : 'text';
             elseif ($k === 'pdf_watermark_opacity') $values[$k] = max(0, min(100, (int) $v));

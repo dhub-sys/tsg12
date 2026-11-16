@@ -230,9 +230,41 @@
                 state.product = r.data.product;
                 state.pass = r.data.pass;
                 productLine(f2.querySelector('.tw-product'), '✔ ' + T('Βρέθηκε:') + ' ');
+                // Signed in to «Οι εγγυήσεις μου»: the email is verified already – straight to the details.
+                if (root.getAttribute('data-portal-email')) {
+                    busy(f1, true);
+                    post('reg_portal_start', { serial: state.serial, pass: state.pass }).then(function (p) {
+                        busy(f1, false);
+                        if (p.success) { verified(p.data); return; }
+                        if (p.data.field === 'session') { // the sign-in expired meanwhile: the usual way, with a code
+                            root.removeAttribute('data-portal-email');
+                            var h = f1.querySelector('.tw-signed-hint'); if (h) h.hidden = true;
+                            alertBox(root, p.data.message, 'info');
+                            show(2);
+                            return;
+                        }
+                        alertBox(root, p.data.message);
+                        if (p.data.field === 'restart') setTimeout(restart, 3000);
+                    });
+                    return;
+                }
                 show(2);
             });
         });
+
+        // Email verified (by code, or by the «Οι εγγυήσεις μου» sign-in) → details step.
+        function verified(d) {
+            alertBox(root, '');
+            state.token = d.token;
+            state.product = d.product;
+            state.verifiedEmail = d.email;
+            state.serial = d.serial;
+            state.terms = d.terms || [];
+            state.prefill = d.prefill || null;
+            try { sessionStorage.setItem('tw_reg', JSON.stringify(state)); } catch (e2) {}
+            fillDetails();
+            show(4);
+        }
 
         function sendCode(form) {
             alertBox(root, '');
@@ -269,21 +301,21 @@
             post('reg_verify', extend({ serial: state.serial, email: state.email, code: code }, guard(f3, root) || {})).then(function (r) {
                 busy(f3, false);
                 if (!r.success) { alertBox(root, r.data.message); if (window.TWOtp) TWOtp.clear(f3.code); markField(f3, 'code'); return; }
-                alertBox(root, '');
-                state.token = r.data.token;
-                state.product = r.data.product;
-                state.verifiedEmail = r.data.email;
-                state.serial = r.data.serial;
-                state.terms = r.data.terms || [];
-                try { sessionStorage.setItem('tw_reg', JSON.stringify(state)); } catch (e2) {}
-                fillDetails();
-                show(4);
+                verified(r.data);
             });
         });
 
         function fillDetails() {
             productLine(f4.querySelector('.tw-product'), T('Προϊόν') + ': ');
             bind(f4, { email: state.verifiedEmail });
+            // An existing customer: their owner details are filled in (they can still change them).
+            var pf = state.prefill, filled = false;
+            if (pf) Object.keys(pf).forEach(function (k) {
+                var el = f4.querySelector('[name="' + k + '"]');
+                if (el && !el.value && pf[k]) { el.value = pf[k]; filled = true; }
+            });
+            var note = f4.querySelector('.tw-prefill-note');
+            if (note) note.hidden = !filled;
             showTerms();
         }
 
@@ -411,17 +443,49 @@
         var csrf = '';
         root.querySelectorAll('.tw-ts').forEach(tsRender);
 
+        // Sign-in timer (fixed at the corner): time left, ↻ renews it, red in the last minute, sign-out at zero.
+        var pill = root.querySelector('[data-portal-timer]'), tick = null, ends = 0;
+        function fmt(sec) { var m = Math.floor(sec / 60), x = sec % 60; return (m >= 60 ? Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+        function timer(left) {
+            if (tick) { clearInterval(tick); tick = null; }
+            if (!pill) return;
+            pill.hidden = !left;
+            if (!left) return;
+            ends = Date.now() + left * 1000;
+            function step() {
+                var sec = Math.max(0, Math.round((ends - Date.now()) / 1000));
+                pill.querySelector('[data-left]').textContent = fmt(sec);
+                pill.classList.toggle('is-low', sec <= 60);
+                if (sec <= 0) {
+                    clearInterval(tick); tick = null;
+                    load(function () {}); // the server has ended the sign-in: back to the sign-in form
+                    alertBox(root, T('Η σύνδεση έληξε για την ασφάλειά σας. Συνδεθείτε ξανά με το email σας.'), 'info');
+                }
+            }
+            step();
+            tick = setInterval(step, 1000);
+        }
+        if (pill) pill.querySelector('[data-action="session-refresh"]').addEventListener('click', function () {
+            var b = this; b.disabled = true; b.classList.add('is-spinning');
+            post('portal_refresh', { csrf: csrf }).then(function (r) {
+                setTimeout(function () { b.disabled = false; b.classList.remove('is-spinning'); }, 400);
+                if (r.success) timer(r.data.left); else load();
+            });
+        });
+
         function load(after) {
             post('portal', {}).then(function (r) {
                 loading.hidden = true;
                 if (r.success && r.data.signed_in) {
                     csrf = r.data.csrf;
+                    timer(r.data.left);
                     content.innerHTML = r.data.html;
                     content.hidden = false;
                     login.hidden = true;
                     wire();
                     if (typeof after === 'function') after();
                 } else {
+                    timer(0);
                     content.hidden = true;
                     login.hidden = false;
                     l1.hidden = false; l2.hidden = true;

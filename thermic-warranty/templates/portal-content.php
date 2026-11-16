@@ -13,6 +13,8 @@ $mlabels = TW_Settings::consent_labels($lang);
     <p><?php tw_e('Συνδεδεμένος/η ως'); ?> <strong><?php echo esc_html($email); ?></strong>
         <button type="button" class="tw-link" data-action="logout"><?php tw_e('Αποσύνδεση'); ?></button></p>
 </div>
+<p class="tw-portal-new"><a class="tw-btn tw-btn--sm" href="<?php echo esc_url(TW_Settings::page_url('register')); ?>">+ <?php tw_e('Καταχώρηση νέου προϊόντος'); ?></a>
+    <span class="tw-hint"><?php tw_e('Με τα στοιχεία σας συμπληρωμένα και χωρίς νέο κωδικό.'); ?></span></p>
 
 <?php if (!$warranties) : ?>
     <p><?php tw_e('Δεν βρέθηκαν εγγυήσεις.'); ?></p>

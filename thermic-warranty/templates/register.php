@@ -3,8 +3,10 @@
 if (!defined('ABSPATH')) exit;
 $lang = TW_I18n::lang();
 $labels = TW_Settings::consent_labels($lang);
+// Signed in to «Οι εγγυήσεις μου»: the email is already verified, so another product needs no new code.
+$tw_sess = TW_Frontend::session();
 ?>
-<div class="tw-app tw-register" data-tw="register" lang="<?php echo esc_attr($lang); ?>">
+<div class="tw-app tw-register" data-tw="register" lang="<?php echo esc_attr($lang); ?>"<?php echo $tw_sess ? ' data-portal-email="' . esc_attr($tw_sess->email) . '"' : ''; ?>>
     <noscript><p class="tw-alert tw-alert--error"><?php tw_e('Για την ενεργοποίηση της εγγύησης απαιτείται JavaScript.'); ?></p></noscript>
 
     <ol class="tw-steps" aria-label="<?php echo esc_attr(tw__('Βήματα ενεργοποίησης')); ?>">
@@ -23,6 +25,7 @@ $labels = TW_Settings::consent_labels($lang);
         <?php echo TW_Guard::fields(); // phpcs:ignore ?>
         <h3><?php tw_e('Ενεργοποίηση εγγύησης'); ?></h3>
         <p><?php tw_e('Πληκτρολογήστε τον σειριακό αριθμό, όπως αναγράφεται στην ετικέτα του προϊόντος.'); ?></p>
+        <?php if ($tw_sess) : ?><p class="tw-alert tw-alert--success tw-signed-hint"><?php echo esc_html(sprintf(tw__('Είστε συνδεδεμένος/η ως %s: μετά τον σειριακό αριθμό συνεχίζετε κατευθείαν στα στοιχεία σας, χωρίς νέο κωδικό.'), $tw_sess->email)); ?></p><?php endif; ?>
         <div class="tw-field">
             <label for="tw-serial"><?php tw_e('Σειριακός αριθμός (S/N)'); ?> <span class="tw-req">*</span></label>
             <input id="tw-serial" name="serial" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required maxlength="64">
@@ -65,6 +68,7 @@ $labels = TW_Settings::consent_labels($lang);
         <div data-part="details">
         <h3><?php tw_e('Στοιχεία κατόχου'); ?></h3>
         <p class="tw-product"></p>
+        <p class="tw-alert tw-alert--info tw-prefill-note" hidden><?php tw_e('Συμπληρώσαμε τα στοιχεία σας από την προηγούμενη καταχώρησή σας. Ελέγξτε τα και αλλάξτε ό,τι χρειάζεται (π.χ. αν το προϊόν είναι σε άλλη διεύθυνση). Τα στοιχεία αγοράς συμπληρώνονται για κάθε προϊόν.'); ?></p>
 
         <fieldset>
             <legend><?php tw_e('Στοιχεία επικοινωνίας'); ?></legend>

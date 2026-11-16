@@ -11,12 +11,56 @@ final class TW_OTP {
     const MINUTE_CHOICES = [2, 3, 5, 10, 15];
     const MAX_ATTEMPTS = 5;
     const TOKEN_TTL_MINUTES = 60;
+    /** «Οι εγγυήσεις μου» sign-in duration choices (Ρυθμίσεις → Ασφάλεια); the customer can renew it. */
+    const SESSION_CHOICES = [10, 15, 30, 60, 120];
     const MAX_SENDS_PER_HOUR_EMAIL = 8; // short-lived codes mean a few more "send a new code"
 
     /** How long an emailed code is valid (Settings → Ασφάλεια, default 2 minutes). */
     public static function ttl_minutes() {
         $m = (int) TW_Settings::get('otp_minutes');
         return in_array($m, self::MINUTE_CHOICES, true) ? $m : 2;
+    }
+
+    /** How long a «Οι εγγυήσεις μου» sign-in lasts, in minutes (default 60). */
+    public static function session_minutes() {
+        $m = (int) TW_Settings::get('portal_session_minutes');
+        return in_array($m, self::SESSION_CHOICES, true) ? $m : 60;
+    }
+
+    /** Seconds left on a verified token row. */
+    public static function token_seconds_left($row) {
+        return $row ? max(0, strtotime($row->expires_at) - current_time('timestamp')) : 0;
+    }
+
+    /** Renews a sign-in for another full session; returns the seconds left. */
+    public static function extend($row) {
+        global $wpdb;
+        $exp = date('Y-m-d H:i:s', current_time('timestamp') + self::session_minutes() * MINUTE_IN_SECONDS);
+        $wpdb->update(TW_DB::table('otps'), ['expires_at' => $exp], ['id' => (int) $row->id]);
+        return self::session_minutes() * MINUTE_IN_SECONDS;
+    }
+
+    /**
+     * A verified continuation token without an emailed code – only for a customer who is already signed in to
+     * «Οι εγγυήσεις μου» with the same email (their email was verified at sign-in). @return string token
+     */
+    public static function issue_token($purpose, $email, $serial_id = 0) {
+        global $wpdb;
+        $t = TW_DB::table('otps');
+        $now = TW_DB::now();
+        $token = bin2hex(random_bytes(32));
+        $wpdb->insert($t, [
+            'purpose' => $purpose,
+            'email' => $email,
+            'serial_id' => (int) $serial_id,
+            'code_hash' => self::hash(bin2hex(random_bytes(16))),
+            'verified_at' => $now,
+            'token_hash' => self::hash($token),
+            'expires_at' => date('Y-m-d H:i:s', current_time('timestamp') + self::TOKEN_TTL_MINUTES * MINUTE_IN_SECONDS),
+            'ip' => TW_Util::client_ip(),
+            'created_at' => $now,
+        ]);
+        return $token;
     }
 
     /** Seconds left on the newest open code (for the countdown on the code screen). */
@@ -105,7 +149,7 @@ final class TW_OTP {
         $wpdb->update($t, [
             'verified_at' => $now,
             'token_hash' => self::hash($token),
-            'expires_at' => date('Y-m-d H:i:s', current_time('timestamp') + self::TOKEN_TTL_MINUTES * MINUTE_IN_SECONDS),
+            'expires_at' => date('Y-m-d H:i:s', current_time('timestamp') + ($purpose === 'login' ? self::session_minutes() : self::TOKEN_TTL_MINUTES) * MINUTE_IN_SECONDS),
         ], ['id' => $row->id]);
         $row->verified_at = $now;
         return ['token' => $token, 'row' => $row];

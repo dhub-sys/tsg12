@@ -65,6 +65,8 @@ final class TW_Settings {
             'ip_proxy' => '',
             // Lifetime of the emailed one-time codes, in minutes.
             'otp_minutes' => 2,
+            // How long a customer stays signed in to «Οι εγγυήσεις μου» (minutes; renewable from the page).
+            'portal_session_minutes' => 60,
             // Countries offered next to the partner / technician tax number (Greece is always offered).
             'tax_countries' => ['GR', 'CY', 'AE', 'QA', 'XX'],
             // Activity log entries older than this many years move to the archive automatically (0 = never).

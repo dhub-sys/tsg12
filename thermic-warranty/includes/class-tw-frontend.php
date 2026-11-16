@@ -18,7 +18,7 @@ final class TW_Frontend {
         add_action('template_redirect', [__CLASS__, 'no_cache_on_our_pages']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
 
-        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_claim', 'portal_export', 'portal_erase', 'portal_erase_start', 'portal_erase_confirm', 'logout'];
+        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_claim', 'portal_export', 'portal_erase', 'portal_erase_start', 'portal_erase_confirm', 'portal_refresh', 'reg_portal_start', 'logout'];
         foreach ($public as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
@@ -170,14 +170,7 @@ final class TW_Frontend {
         $serial = self::usable_serial(self::input('serial'));
         $res = TW_OTP::verify('register', $email, self::input('code'), $serial->id);
         if (is_wp_error($res)) self::fail($res->get_error_message(), 'code');
-        wp_send_json_success([
-            'token' => $res['token'],
-            'product' => trim($serial->product_name . ($serial->product_code ? ' (' . $serial->product_code . ')' : '')),
-            'serial' => $serial->serial,
-            'email' => $email,
-            // Terms that apply to this product; the form shows the right one once the purchase date is entered.
-            'terms' => TW_Terms::candidates($serial, TW_I18n::lang()),
-        ]);
+        wp_send_json_success(self::verified_payload($res['token'], $serial, $email));
     }
 
     public static function ajax_reg_submit() {
@@ -336,7 +329,7 @@ final class TW_Frontend {
         $email = self::email_input();
         $res = TW_OTP::verify('login', $email, self::input('code'), 0);
         if (is_wp_error($res)) self::fail($res->get_error_message(), 'code');
-        self::set_cookie($res['token'], time() + TW_OTP::TOKEN_TTL_MINUTES * MINUTE_IN_SECONDS);
+        self::set_cookie($res['token'], time() + TW_OTP::session_minutes() * MINUTE_IN_SECONDS);
         foreach (TW_Warranty::by_email($email) as $w) {
             TW_DB::log_event('portal_login', '', $w->id, $w->serial_id, 'customer:' . $email);
         }
@@ -373,6 +366,53 @@ final class TW_Frontend {
         return $s;
     }
 
+    /** ↻ on the sign-in timer: another full session. */
+    public static function ajax_portal_refresh() {
+        $s = self::require_session();
+        $left = TW_OTP::extend($s);
+        self::set_cookie((string) $_COOKIE[self::COOKIE], time() + $left);
+        wp_send_json_success(['left' => $left]);
+    }
+
+    /** Owner details from the customer's newest warranty, to fill in the form for another product. */
+    public static function prefill($email) {
+        $w = TW_Warranty::by_email($email);
+        if (!$w) return null;
+        $w = $w[0];
+        return ['customer_name' => $w->customer_name, 'phone_mobile' => $w->phone_mobile, 'phone_landline' => $w->phone_landline,
+            'address' => $w->address, 'postcode' => $w->postcode, 'city' => $w->city];
+    }
+
+    /**
+     * Another product from «Οι εγγυήσεις μου»: a customer signed in there (email already verified) goes from the
+     * serial straight to the details, without a new code. Needs the step-1 pass (bot checks done) and the session.
+     */
+    public static function ajax_reg_portal_start() {
+        $s = self::session();
+        if (!$s) self::fail('Η σύνδεση στις «Οι εγγυήσεις μου» έληξε. Συνεχίστε με το email σας.', 'session', 401);
+        if (!TW_Guard::pass_ok(self::input('pass'), 'serial|' . TW_Util::normalize_serial(self::input('serial')))) {
+            self::fail('Η σελίδα έμεινε ανοιχτή πολύ ώρα. Ξεκινήστε ξανά από τον σειριακό αριθμό.', 'restart', 403);
+        }
+        $serial = self::usable_serial(self::input('serial'));
+        $token = TW_OTP::issue_token('register', $s->email, $serial->id);
+        TW_DB::log_event('registration_from_portal', ['serial' => $serial->serial], 0, $serial->id, 'customer:' . $s->email);
+        wp_send_json_success(self::verified_payload($token, $serial, $s->email));
+    }
+
+    /** What the details step needs once the email is verified (by code or by the portal sign-in). */
+    private static function verified_payload($token, $serial, $email) {
+        return [
+            'token' => $token,
+            'product' => trim($serial->product_name . ($serial->product_code ? ' (' . $serial->product_code . ')' : '')),
+            'serial' => $serial->serial,
+            'email' => $email,
+            // Terms that apply to this product; the form shows the right one once the purchase date is entered.
+            'terms' => TW_Terms::candidates($serial, TW_I18n::lang()),
+            // Owner details of an existing customer (only after verification, so nobody sees someone else's).
+            'prefill' => self::prefill($email),
+        ];
+    }
+
     public static function ajax_logout() {
         $s = self::session();
         if ($s) TW_OTP::mark_used($s->id);
@@ -386,9 +426,10 @@ final class TW_Frontend {
         $warranties = TW_Warranty::by_email($s->email);
         $csrf = self::csrf($s);
         $email = $s->email;
+        $left = TW_OTP::token_seconds_left($s); // before the template, which uses $s for the settings
         ob_start();
         include TW_DIR . 'templates/portal-content.php';
-        wp_send_json_success(['signed_in' => true, 'html' => ob_get_clean(), 'csrf' => $csrf]);
+        wp_send_json_success(['signed_in' => true, 'html' => ob_get_clean(), 'csrf' => $csrf, 'left' => $left]);
     }
 
     private static function owned_warranty($session) {
