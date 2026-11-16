@@ -11,8 +11,9 @@ $labels = TW_Settings::consent_labels($lang);
         <li class="is-current" data-step-label="1"><?php tw_e('Σειριακός αριθμός'); ?></li>
         <li data-step-label="2"><?php tw_e('Email'); ?></li>
         <li data-step-label="3"><?php tw_e('Επαλήθευση'); ?></li>
-        <li data-step-label="4"><?php tw_e('Στοιχεία & όροι'); ?></li>
-        <li data-step-label="5"><?php tw_e('Ολοκλήρωση'); ?></li>
+        <li data-step-label="4"><?php tw_e('Στοιχεία'); ?></li>
+        <li data-step-label="5"><?php tw_e('Όροι & αποδοχές'); ?></li>
+        <li data-step-label="6"><?php tw_e('Ολοκλήρωση'); ?></li>
     </ol>
 
     <div class="tw-alert" role="alert" hidden></div>
@@ -58,9 +59,10 @@ $labels = TW_Settings::consent_labels($lang);
         <button type="button" class="tw-link" data-action="change-email"><?php tw_e('Αλλαγή email'); ?></button>
     </form>
 
-    <!-- Step 4: details, terms, consents -->
+    <!-- Steps 4 and 5: one form in two parts – details, then terms & consents (submitted together) -->
     <form class="tw-step" data-step="4" novalidate hidden enctype="multipart/form-data">
         <?php echo TW_Guard::fields(); // phpcs:ignore ?>
+        <div data-part="details">
         <h3><?php tw_e('Στοιχεία κατόχου'); ?></h3>
         <p class="tw-product"></p>
 
@@ -132,7 +134,12 @@ $labels = TW_Settings::consent_labels($lang);
                 ? sprintf(tw__('Η εγγύηση διαρκεί %1$d χρόνια από την ημερομηνία αγοράς, με προβλεπόμενο Service ανά %2$d χρόνια.'), (int) $s['warranty_years'], (int) $s['service_interval_years'])
                 : sprintf(tw__('Η εγγύηση διαρκεί %d χρόνια από την ημερομηνία αγοράς.'), (int) $s['warranty_years'])); ?></p>
         </fieldset>
+        <button type="submit" class="tw-btn"><?php tw_e('Συνέχεια'); ?></button>
+        </div>
 
+        <div data-part="terms" hidden>
+        <h3><?php tw_e('Όροι εγγύησης & αποδοχές'); ?></h3>
+        <p class="tw-hint"><?php tw_e('Διαβάστε τους όρους εγγύησης που ισχύουν για την αγορά σας και επιβεβαιώστε τις αποδοχές για να ολοκληρωθεί η ενεργοποίηση.'); ?></p>
         <fieldset>
             <legend><?php tw_e('Όροι εγγύησης'); ?></legend>
             <?php // Filled from the verification step: the terms that apply to this product and purchase date. ?>
@@ -151,11 +158,13 @@ $labels = TW_Settings::consent_labels($lang);
         </fieldset>
 
         <?php echo TW_Guard::widget('public', 'register_submit'); // phpcs:ignore ?>
-        <button type="submit" class="tw-btn"><?php tw_e('Ενεργοποίηση εγγύησης'); ?></button>
+        <p class="tw-step-actions"><button type="submit" class="tw-btn"><?php tw_e('Ενεργοποίηση εγγύησης'); ?></button>
+            <button type="button" class="tw-link" data-action="back-details">← <?php tw_e('Πίσω στα στοιχεία'); ?></button></p>
+        </div>
     </form>
 
-    <!-- Step 5 -->
-    <div class="tw-step tw-done" data-step="5" hidden>
+    <!-- Step 6 -->
+    <div class="tw-step tw-done" data-step="6" hidden>
         <div class="tw-card-logo" hidden><?php echo TW_App::logo_html('tw-card-logo-img'); // phpcs:ignore -- shown only on the printed card ?></div>
         <h3><?php tw_e('Η εγγύηση ενεργοποιήθηκε'); ?></h3>
         <p><?php tw_e('Ο κωδικός εγγύησής σας:'); ?></p>

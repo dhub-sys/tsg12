@@ -277,7 +277,7 @@ final class TW_Backup {
                 $settings = $options['tw_settings'];
                 foreach (self::SECRET_SETTINGS as $k) $settings[$k] = $current[$k] ?? '';
                 // Keep this site's addresses: a backup may come from staging.
-                foreach (['admin_slug', 'public_slug', 'portal_url', 'register_url'] as $k) $settings[$k] = $current[$k] ?? '';
+                foreach (['admin_slug', 'public_slug', 'portal_url', 'register_url', 'portal_url_en', 'register_url_en'] as $k) $settings[$k] = $current[$k] ?? '';
                 // …and this site's backup configuration (schedule, encryption, off-site destination).
                 foreach ($current as $k => $v) if (strpos($k, 'backup_') === 0) $settings[$k] = $v;
                 update_option(TW_Settings::OPTION, $settings, false);

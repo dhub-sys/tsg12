@@ -33,7 +33,7 @@ final class TW_Messenger {
         $vars = [
             'company_name' => $s['company_name'],
             'company_contact' => TW_Settings::company_contact(TW_I18n::lang()),
-            'portal_url' => TW_I18n::url($s['portal_url'] ?: TW_App::public_url('my')),
+            'portal_url' => TW_Settings::page_url('portal'),
             'customer_name' => $w->customer_name,
             'email' => $w->email,
             'serial' => $w->serial,
@@ -122,7 +122,7 @@ final class TW_Messenger {
         return TW_I18n::with($lang, function () use ($to, $key, $vars, $lang) {
             $vars = self::localize_vars($vars, $lang);
             $t = TW_Settings::template($key, $lang);
-            $footer = in_array($key, ['registration_otp', 'login_otp'], true) ? 'login' : 'service';
+            $footer = in_array($key, ['registration_otp', 'login_otp', 'erasure_otp', 'erasure_done'], true) ? 'login' : 'service';
             return self::send_email($to, self::render($t['subject'], $vars), self::render($t['body'], $vars), $footer);
         });
     }

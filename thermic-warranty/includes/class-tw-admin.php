@@ -809,7 +809,7 @@ final class TW_Admin {
                     <form method="post" action="<?php echo esc_url($post); ?>" enctype="multipart/form-data">
                         <?php wp_nonce_field('tw_import'); ?><input type="hidden" name="action" value="tw_import">
                         <p><input type="file" name="file" accept=".xlsx,.csv,.txt" required></p>
-                        <p class="description">Πρώτο φύλλο του .xlsx ή αρχείο .csv. Στήλες: <code>serial</code> (υποχρεωτική), <code>product_code</code>, <code>product_name</code>, <code>notes</code> – δεκτές και ελληνικές επικεφαλίδες (Σειριακός αριθμός, Κωδικός προϊόντος, Όνομα προϊόντος, Σημειώσεις). Χωρίς γραμμή επικεφαλίδων, οι στήλες διαβάζονται με αυτή τη σειρά. Υπάρχοντες σειριακοί δεν αλλάζουν.</p>
+                        <p class="description">Πρώτο φύλλο του .xlsx ή αρχείο .csv. Στήλες: <code>Σειριακός αριθμός</code> (υποχρεωτική), <code>Κωδικός προϊόντος</code>, <code>Όνομα προϊόντος</code>, <code>Παρτίδα</code>, <code>Σημειώσεις</code> (δεκτές και οι αγγλικές: serial, product_code, product_name, batch, notes). Η στήλη «Παρτίδα» του αρχείου υπερισχύει της παρτίδας της φόρμας· όπου είναι κενή, ισχύει η παρτίδα της φόρμας. Χωρίς γραμμή επικεφαλίδων, οι στήλες διαβάζονται ως σειριακός, κωδικός, όνομα, σημειώσεις. Υπάρχοντες σειριακοί δεν αλλάζουν.</p>
                         <p><label>Προεπιλεγμένος κωδικός προϊόντος (για κενά κελιά) <input type="text" name="default_code"></label></p>
                         <p><label>Προεπιλεγμένο όνομα προϊόντος (για κενά κελιά) <input type="text" name="default_name" class="regular-text"></label></p>
 <p><label>Παρτίδα <span class="description">(προαιρετικό)</span> <input type="text" name="batch" maxlength="64" list="tw-batches" placeholder="π.χ. Παραγγελία 2026-118 – κενό: αυτόματα"></label><span class="description">Ομαδοποιεί τους σειριακούς (π.χ. ανά παραγγελία, αποστολή ή προμηθευτή) για φίλτρο και εξαγωγή. Γράψτε όνομα υπάρχουσας παρτίδας για να προστεθούν σε αυτή.</span></p>
@@ -947,7 +947,9 @@ final class TW_Admin {
                     $field('company_contact', 'Στοιχεία επικοινωνίας για Service', 'text', 'Εμφανίζεται στα μηνύματα: «…ή απευθείας στη Thermic: <em>αυτό το κείμενο</em>».');
                     $field('company_contact_en', 'Στοιχεία επικοινωνίας (English)', 'text', 'Για τους πελάτες στα αγγλικά, π.χ. <code>Thermic – tel. +30 210 0000000 – service@example.com</code>. Κενό = το ελληνικό κείμενο.');
                     $field('register_url', 'Σελίδα ενεργοποίησης (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url()) . '</code>. Συμπληρώστε μόνο αν βάλατε το shortcode <code>[thermic_warranty_register]</code> σε δική σας σελίδα του site.');
+                    $field('register_url_en', 'Σελίδα ενεργοποίησης – English (προαιρετικό)', 'url', 'Η αγγλική σελίδα με το shortcode <code>[thermic_warranty_register]</code>. Κενό = η παραπάνω σελίδα στα αγγλικά (μετάφραση Polylang ή <code>?lang=en</code>).');
                     $field('portal_url', 'Σελίδα «Οι εγγυήσεις μου» (προαιρετικό)', 'url', 'Αφήστε κενό για την αυτόνομη σελίδα <code>' . esc_html(TW_App::public_url('my')) . '</code>. Συμπληρώστε μόνο αν χρησιμοποιείτε το shortcode <code>[thermic_warranty_portal]</code>. Μπαίνει στα email.');
+                    $field('portal_url_en', 'Σελίδα «My warranties» – English (προαιρετικό)', 'url', 'Η αγγλική σελίδα με το shortcode <code>[thermic_warranty_portal]</code>. Μπαίνει στα email των πελατών που επικοινωνούν στα αγγλικά. Κενό = η παραπάνω σελίδα στα αγγλικά.');
                     $field('admin_emails', 'Email εταιρείας για ειδοποιήσεις', 'text', 'Ένα ή περισσότερα, χωρισμένα με κόμμα.');
                     $field('admin_digest', 'Ημερήσια αναφορά', 'checkbox', 'Κάθε πρωί (περίπου 09:00) email στα «Email εταιρείας για ειδοποιήσεις» με όσα έγιναν τις τελευταίες 24 ώρες: υπενθυμίσεις, αποτυχίες, μηνύματα που δεν παραδόθηκαν, λήξεις και κλειδώματα, νέες ενεργοποιήσεις, υποβολές Service. Στέλνεται μόνο αν υπάρχει κάτι.');
                     self::select_row('invoice_mode', 'Αρχείο παραστατικού αγοράς (ενεργοποίηση)', TW_Settings::invoice_mode(), [
@@ -1109,7 +1111,7 @@ final class TW_Admin {
                         <tr><th><?php echo esc_html($def['label']); ?><br><code><?php echo esc_html($key); ?></code></th><td>
                             <p><input type="text" class="large-text" name="tpl[<?php echo esc_attr($key); ?>][subject]" value="<?php echo esc_attr($saved['subject'] ?? ''); ?>" placeholder="<?php echo esc_attr($def['subject']); ?>"></p>
                             <p><textarea class="large-text" rows="6" name="tpl[<?php echo esc_attr($key); ?>][body]" placeholder="<?php echo esc_attr($def['body']); ?>"><?php echo esc_textarea($saved['body'] ?? ''); ?></textarea></p>
-                            <?php if (!in_array($key, ['registration_otp', 'login_otp'], true)) : ?>
+                            <?php if (!in_array($key, ['registration_otp', 'login_otp', 'erasure_otp', 'erasure_done'], true)) : ?>
                             <p><label>SMS<br><textarea class="large-text" rows="2" name="tpl[<?php echo esc_attr($key); ?>][sms]" placeholder="<?php echo esc_attr($def['sms']); ?>"><?php echo esc_textarea($saved['sms'] ?? ''); ?></textarea></label></p>
                             <?php endif; ?>
                         </td></tr>
@@ -1209,11 +1211,19 @@ final class TW_Admin {
                     <?php
                 elseif ($tab === 'privacy') :
                     $field('privacy_url', 'Σελίδα Πολιτικής Απορρήτου', 'url', 'Η σελίδα του site με την πολιτική απορρήτου, όπου βάλατε το shortcode <code>[' . TW_Privacy_Text::SHORTCODE . ']</code>. Μπαίνει ως σύνδεσμος στη φόρμα ενεργοποίησης και στις σελίδες της εφαρμογής. Κενό = η Πολιτική Απορρήτου της ιστοσελίδας (WordPress).');
+                    $field('privacy_url_en', 'Σελίδα Πολιτικής Απορρήτου – English', 'url', 'Η αγγλική σελίδα με το shortcode (π.χ. <code>[' . TW_Privacy_Text::SHORTCODE . ' lang=&quot;en&quot;]</code>). Κενό = η ελληνική σελίδα στα αγγλικά.');
                     echo '<tr><th>Κείμενα πολιτικής απορρήτου</th><td><p class="description" style="margin-top:0">Γράψτε εδώ την πολιτική απορρήτου στα ελληνικά και στα αγγλικά, με την ίδια μπάρα μορφοποίησης όπως στους όρους εγγύησης. Στη σελίδα του site βάλτε το shortcode <code>[' . esc_html(TW_Privacy_Text::SHORTCODE) . ']</code>: δείχνει το κείμενο στη γλώσσα του επισκέπτη, με την ημερομηνία τελευταίας ενημέρωσης. Για συγκεκριμένη γλώσσα: <code>[' . esc_html(TW_Privacy_Text::SHORTCODE) . ' lang="en"]</code>.</p></td></tr>';
                     TW_Privacy_Text::admin_rows();
                     $field('retention_months_after_end', 'Αυτόματη ανωνυμοποίηση (μήνες)', 'number', 'Μήνες μετά τη λήξη ή το κλείδωμα για αυτόματη ανωνυμοποίηση των προσωπικών στοιχείων. Το ιστορικό του προϊόντος μένει. 0 = απενεργοποιημένο. Ορίστε το σε συνεννόηση με τον νομικό σύμβουλο / DPO.', 'min="0"');
                     ?>
-                    <tr><th>Αιτήματα διαγραφής</th><td><p class="description">Τα αιτήματα από την πύλη πελατών εμφανίζονται παρακάτω αφού ο πελάτης τα επιβεβαιώσει από το email του. Ενεργές εγγυήσεις διατηρούνται (ανάκληση εμπορικής συγκατάθεσης)· όσες έχουν λήξει ή κλειδωθεί ανωνυμοποιούνται.</p></td></tr>
+                    <tr><th>Διαγραφή από τον πελάτη</th><td><p class="description" style="margin-top:0">Στις «Οι εγγυήσεις μου» → «Διαγραφή των στοιχείων μου» ο πελάτης βλέπει το παρακάτω κείμενο, επιλέγει «Επιθυμώ τη διαγραφή των στοιχείων μου» και επιβεβαιώνει με κωδικό που λαμβάνει στο email (μήνυμα «Κωδικός επιβεβαίωσης διαγραφής στοιχείων» στα Κείμενα μηνυμάτων). Με τον σωστό κωδικό τα στοιχεία όλων των εγγυήσεών του ανωνυμοποιούνται αμέσως, και λαμβάνει email επιβεβαίωσης. Η ενέργεια καταγράφεται στο Ημερολόγιο.</p></td></tr>
+                    <?php foreach (['erase_text' => 'Κείμενο πριν τη διαγραφή (Ελληνικά)', 'erase_text_en' => 'Κείμενο πριν τη διαγραφή (English)'] as $ek => $el) : ?>
+                        <tr><th><label for="tw-<?php echo esc_attr($ek); ?>"><?php echo esc_html($el); ?></label></th><td>
+                            <textarea id="tw-<?php echo esc_attr($ek); ?>" name="s[<?php echo esc_attr($ek); ?>]" rows="12" class="large-text"<?php echo $ek === 'erase_text_en' ? ' lang="en"' : ''; ?> placeholder="<?php echo esc_attr(TW_Settings::erase_text_default($ek === 'erase_text_en' ? 'en' : 'el')); ?>"><?php echo esc_textarea($s[$ek]); ?></textarea>
+                            <p class="description">Κενό = το προτεινόμενο κείμενο (φαίνεται αχνά μέσα στο πεδίο). Κενή γραμμή = νέα παράγραφος· γραμμές που αρχίζουν με «•» εμφανίζονται ως λίστα.</p>
+                        </td></tr>
+                    <?php endforeach; ?>
+                    <tr><th>Παλαιότερα αιτήματα</th><td><p class="description">Αιτήματα διαγραφής που υποβλήθηκαν με τον παλιό τρόπο (επιβεβαίωση από email και εκτέλεση από την ομάδα) εμφανίζονται παρακάτω.</p></td></tr>
                 <?php endif; ?>
                 </table>
                 <p class="submit"><button type="submit" class="button button-primary" id="submit">Αποθήκευση</button></p>
@@ -1785,8 +1795,8 @@ final class TW_Admin {
             'sender' => [],
         ];
         $numbers = ['service_submit_window_days', 'service_resubmit_days', 'warranty_years', 'service_interval_years', 'lock_offset', 'catchup_days', 'max_registration_delay_days', 'invoice_max_mb', 'retention_months_after_end'];
-        $multiline = ['sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label', 'email_footer_login', 'email_footer_service', 'terms_label_en', 'accuracy_label_en', 'marketing_label_en', 'email_footer_login_en', 'email_footer_service_en'];
-        $urls = ['portal_url', 'register_url', 'privacy_url', 'sms_url', 'logo_url'];
+        $multiline = ['erase_text', 'erase_text_en', 'sms_headers', 'sms_body', 'terms_label', 'accuracy_label', 'marketing_label', 'email_footer_login', 'email_footer_service', 'terms_label_en', 'accuracy_label_en', 'marketing_label_en', 'email_footer_login_en', 'email_footer_service_en'];
+        $urls = ['portal_url', 'register_url', 'privacy_url', 'portal_url_en', 'register_url_en', 'privacy_url_en', 'sms_url', 'logo_url'];
         $values = [];
         foreach ($in as $k => $v) {
             if (!array_key_exists($k, $defaults) || $k === 'templates' || $k === 'templates_en' || strpos($k, 'ip_') === 0) continue; // IP lock: wp-admin only
@@ -1960,7 +1970,7 @@ final class TW_Admin {
             'product_name' => sanitize_text_field(self::post('default_name')),
         ], self::post('batch'));
         set_transient('tw_import_result_' . get_current_user_id(), $res, 600);
-        self::back('tw-serials', ['batch' => $res['inserted'] ? $res['batch'] : null]);
+        self::back('tw-serials', ['batch' => $res['inserted'] && strpos($res['batch'], ', ') === false ? $res['batch'] : null]);
     }
 
     public static function handle_template() {
@@ -1991,7 +2001,7 @@ final class TW_Admin {
         }
         $res = TW_Importer::import($records, [], self::post('batch'));
         set_transient('tw_import_result_' . get_current_user_id(), $res, 600);
-        self::back('tw-serials', ['batch' => $res['inserted'] ? $res['batch'] : null]);
+        self::back('tw-serials', ['batch' => $res['inserted'] && strpos($res['batch'], ', ') === false ? $res['batch'] : null]);
     }
 
     /** Renames a whole batch, or moves the ticked serials to another (new or existing) batch. */

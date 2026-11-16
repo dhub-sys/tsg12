@@ -271,3 +271,14 @@
 .tw-portal-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tw-portal-actions a.tw-btn { text-decoration: none; }
 .tw-portal-terms-hint { margin-top: -6px; font-size: 13px; }
+
+/* «Διαγραφή των στοιχείων μου» */
+.tw-btn--danger { background: #b42318; border-color: #b42318; color: #fff; }
+.tw-btn--danger:hover:not(:disabled) { background: #912018; border-color: #912018; }
+.tw-btn:disabled { opacity: .5; cursor: not-allowed; }
+.tw-erase-card { padding: 22px 24px; }
+.tw-erase-card h3 { margin-top: 0; }
+.tw-erase-text ul { margin: 0 0 1em; padding-left: 1.3em; }
+.tw-erase-text li { margin: .35em 0; }
+.tw-erase-text p { margin: 0 0 1em; }
+.tw-erase-check { margin: 18px 0 14px; padding: 12px 14px; border: 1px solid #f2c4bf; background: #fef3f2; border-radius: 10px; font-weight: 600; }

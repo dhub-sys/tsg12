@@ -7,6 +7,7 @@ $lang = TW_I18n::lang();
 $s['company_contact'] = TW_Settings::company_contact($lang);
 $mlabels = TW_Settings::consent_labels($lang);
 ?>
+<div data-portal-main>
 <div class="tw-portal-head">
     <h3><?php tw_e('Οι εγγυήσεις μου'); ?></h3>
     <p><?php tw_e('Συνδεδεμένος/η ως'); ?> <strong><?php echo esc_html($email); ?></strong>
@@ -214,6 +215,33 @@ $cust_lang = TW_Warranty::customer_lang($email);
 
     <p><?php tw_e('Δείτε, εκτυπώστε ή αποθηκεύστε ως PDF όλα τα στοιχεία που έχουμε για εσάς και τις εγγυήσεις σας. Χρησιμεύει και ως βεβαίωση της εγγύησης.'); ?></p>
     <a class="tw-btn" href="<?php echo esc_url(add_query_arg(['copy' => '1', 'lang' => $lang], TW_App::public_url('my'))); ?>" target="_blank" rel="noopener">📄 <?php tw_e('Αντίγραφο των στοιχείων μου'); ?></a>
-    <button type="button" class="tw-btn tw-btn--ghost" data-action="erase"><?php tw_e('Αίτημα διαγραφής'); ?></button>
+    <button type="button" class="tw-btn tw-btn--ghost" data-action="erase-view"><?php tw_e('Διαγραφή των στοιχείων μου'); ?></button>
     <p class="tw-hint"><button type="button" class="tw-link" data-action="export"><?php tw_e('Αντίγραφο σε μορφή για μεταφορά σε άλλο σύστημα (JSON)'); ?></button></p>
 </section>
+</div>
+
+<?php // «Διαγραφή των στοιχείων μου»: its own page inside «Οι εγγυήσεις μου» (explanation → tick → emailed code → deletion). ?>
+<div class="tw-erase" data-portal-erase hidden>
+    <p><button type="button" class="tw-link" data-action="erase-back">← <?php tw_e('Πίσω στις εγγυήσεις μου'); ?></button></p>
+    <section class="tw-card tw-erase-card">
+        <h3><?php tw_e('Διαγραφή των στοιχείων μου'); ?></h3>
+        <div class="tw-erase-text"><?php echo TW_Frontend::erase_html($lang); // escaped inside ?></div>
+        <?php if ($warranties) : ?>
+            <p class="tw-hint"><?php echo esc_html(sprintf(tw__('Θα διαγραφούν τα στοιχεία για: %s'), implode(', ', array_map(function ($w) { return trim(($w->product_name ?: tw__('Προϊόν')) . ' (S/N ' . $w->serial . ')'); }, $warranties)))); ?></p>
+        <?php endif; ?>
+        <form class="tw-step" data-step="erase-1" novalidate>
+            <label class="tw-check tw-erase-check"><input type="checkbox" name="confirm" value="1"> <span><?php tw_e('Επιθυμώ τη διαγραφή των στοιχείων μου'); ?></span></label>
+            <button type="submit" class="tw-btn tw-btn--danger" disabled><?php tw_e('Υποβολή'); ?></button>
+        </form>
+        <form class="tw-step" data-step="erase-2" novalidate hidden>
+            <p class="tw-step-info"></p>
+            <div class="tw-field">
+                <label for="tw-erase-code"><?php tw_e('Κωδικός επιβεβαίωσης'); ?></label>
+                <input id="tw-erase-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="\d{6}" maxlength="6" required class="tw-code-input">
+            </div>
+            <button type="submit" class="tw-btn tw-btn--danger"><?php tw_e('Οριστική διαγραφή'); ?></button>
+            <button type="button" class="tw-link" data-action="erase-resend"><?php tw_e('Αποστολή νέου κωδικού'); ?></button>
+        </form>
+        <div class="tw-erase-done" hidden><p class="tw-alert tw-alert--success" role="status"></p></div>
+    </section>
+</div>

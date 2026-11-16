@@ -3,7 +3,7 @@
 if (!defined('ABSPATH')) exit;
 $lang = TW_I18n::lang();
 $s['company_contact'] = TW_Settings::company_contact($lang);
-$privacy = $s['privacy_url'] ?: get_privacy_policy_url();
+$privacy = TW_Settings::page_url('privacy');
 $config = [
     'ajax' => admin_url('admin-ajax.php'),
     'maxMb' => (int) $s['invoice_max_mb'],
@@ -48,7 +48,7 @@ $here = TW_App::public_url($screen === 'my' ? 'my' : '');
     <div class="tw-pub-inner">
         <span>© <?php echo esc_html(current_time('Y') . ' ' . $s['company_name']); ?></span>
         <span><?php echo esc_html($s['company_contact']); ?></span>
-        <?php if ($privacy) : ?><a href="<?php echo esc_url(TW_I18n::url($privacy)); ?>" target="_blank" rel="noopener"><?php tw_e('Πολιτική απορρήτου'); ?></a><?php endif; ?>
+        <?php if ($privacy) : ?><a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener"><?php tw_e('Πολιτική απορρήτου'); ?></a><?php endif; ?>
     </div>
 </footer>
 <script>var TW = <?php echo wp_json_encode($config, JSON_UNESCAPED_UNICODE); ?>;</script>

@@ -579,3 +579,23 @@ dialog.tw-log-dlg { width: min(620px, 96vw); max-width: 96vw; padding: 0; border
 .tw-new-dot { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: #fee2e2; color: #b42318; font-size: 11px; font-weight: 700; vertical-align: middle; }
 .widefat tr.tw-unread td { background: #fffbeb !important; }
 .tw-panel + .widefat, .tw-panel + table { margin-top: 20px; }
+
+/* ---------------------------------------------------------------- filter tabs (Αιτήματα εγγύησης) */
+.tw-filter-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 18px 0 16px; padding: 6px; background: var(--tw-card, #fff); border: 1px solid var(--tw-line); border-radius: 12px; box-shadow: var(--tw-shadow); width: fit-content; max-width: 100%; }
+.tw-filter-tab { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 8px; color: var(--tw-ink-2, #344054); font-weight: 600; font-size: 13.5px; text-decoration: none; white-space: nowrap; transition: background .15s, color .15s; }
+.tw-filter-tab:hover { background: #f2f4f7; color: var(--tw-ink, #101828); }
+.tw-filter-tab.is-active { background: var(--tw-brand); color: var(--tw-brand-ink, #fff); }
+.tw-filter-tab.is-empty:not(.is-active) { color: #98a2b3; }
+.tw-filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #eef0f3; color: #475467; font-size: 12px; font-weight: 700; }
+.tw-filter-tab.is-active .tw-filter-count { background: rgba(255, 255, 255, .25); color: inherit; }
+.tw-filter-dot { width: 8px; height: 8px; border-radius: 50%; background: #98a2b3; flex: none; }
+.tw-filter-tab--open .tw-filter-dot { background: #2563eb; }
+.tw-filter-tab--new .tw-filter-dot { background: #ef4444; }
+.tw-filter-tab--in_progress .tw-filter-dot { background: #f59e0b; }
+.tw-filter-tab--approved .tw-filter-dot { background: #10b981; }
+.tw-filter-tab--rejected .tw-filter-dot { background: #6b7280; }
+.tw-filter-tab--completed .tw-filter-dot { background: #15803d; }
+.tw-filter-tab--all .tw-filter-dot { display: none; }
+.tw-filter-tab.is-active .tw-filter-dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .7); }
+.tw-filter-sep { width: 1px; height: 22px; background: var(--tw-line); margin: 0 2px; }
+@media (max-width: 760px) { .tw-filter-sep { display: none; } .tw-filter-tabs { width: auto; } }

@@ -18,7 +18,7 @@ final class TW_Frontend {
         add_action('template_redirect', [__CLASS__, 'no_cache_on_our_pages']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
 
-        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_claim', 'portal_export', 'portal_erase', 'logout'];
+        $public = ['reg_check', 'reg_start', 'reg_verify', 'reg_submit', 'login_start', 'login_verify', 'portal', 'portal_marketing', 'portal_lang', 'portal_service', 'portal_claim', 'portal_export', 'portal_erase', 'portal_erase_start', 'portal_erase_confirm', 'logout'];
         foreach ($public as $a) {
             add_action('wp_ajax_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
             add_action('wp_ajax_nopriv_tw_' . $a, [__CLASS__, 'ajax_' . $a]);
@@ -63,7 +63,7 @@ final class TW_Frontend {
     public static function shortcode_register() {
         self::enqueue();
         $s = TW_Settings::all();
-        $privacy = $s['privacy_url'] ?: get_privacy_policy_url();
+        $privacy = TW_Settings::page_url('privacy');
         ob_start();
         include TW_DIR . 'templates/register.php';
         return ob_get_clean();
@@ -303,7 +303,7 @@ final class TW_Frontend {
             'warranty_end' => TW_Util::date_label($w->warranty_end),
             'next_service' => $next ? TW_Util::date_label($next['due']) : '',
             'email' => TW_Util::mask_email($w->email),
-            'portal_url' => TW_I18n::url((string) TW_Settings::get('portal_url') ?: TW_App::public_url('my')),
+            'portal_url' => TW_Settings::page_url('portal'),
         ]);
     }
 
@@ -511,6 +511,66 @@ final class TW_Frontend {
         $data = TW_Privacy::customer_data($s->email);
         TW_DB::log_event('portal_data_export', '', 0, 0, 'customer:' . $s->email);
         wp_send_json_success(['filename' => 'thermic-warranty-data.json', 'data' => $data]);
+    }
+
+    /** The explanation before deletion as HTML: blank line = paragraph, lines starting with «•» = list. */
+    public static function erase_html($lang) {
+        $out = '';
+        foreach (preg_split('/\n\s*\n/', trim(str_replace("\r\n", "\n", TW_Settings::erase_text($lang)))) as $block) {
+            $lines = array_values(array_filter(array_map('trim', explode("\n", $block)), 'strlen'));
+            if ($lines && count(array_filter($lines, function ($l) { return preg_match('/^[•\-\*]\s*/u', $l); })) === count($lines)) {
+                $out .= '<ul>' . implode('', array_map(function ($l) { return '<li>' . esc_html(preg_replace('/^[•\-\*]\s*/u', '', $l)) . '</li>'; }, $lines)) . '</ul>';
+            } elseif ($lines) {
+                $out .= '<p>' . implode('<br>', array_map('esc_html', $lines)) . '</p>';
+            }
+        }
+        return $out;
+    }
+
+    /** Deletion, step 1: the customer ticked «I want my details deleted» → a code to their email. */
+    public static function ajax_portal_erase_start() {
+        $s = self::require_session();
+        if (self::input('confirm') !== '1') self::fail('Επιλέξτε ότι επιθυμείτε τη διαγραφή των στοιχείων σας.', 'confirm');
+        $rl = TW_OTP::rate_limit_ok($s->email);
+        if (is_wp_error($rl)) self::fail($rl->get_error_message(), '', 429);
+        [, $code] = TW_OTP::create('erase', $s->email, 0);
+        TW_Messenger::send_template_email($s->email, 'erasure_otp', [
+            'company_name' => TW_Settings::get('company_name'),
+            'company_contact' => TW_Settings::company_contact(TW_I18n::lang()),
+            'code' => $code,
+            'minutes' => TW_OTP::ttl_minutes(),
+        ]);
+        TW_DB::log_event('erasure_code_sent', '', 0, 0, 'customer:' . $s->email);
+        wp_send_json_success([
+            'message' => sprintf(tw__('Στείλαμε κωδικό επιβεβαίωσης στο %s. Πληκτρολογήστε τον για να ολοκληρωθεί η διαγραφή.'), TW_Util::mask_email($s->email)),
+            'ttl' => TW_OTP::ttl_minutes() * MINUTE_IN_SECONDS,
+        ]);
+    }
+
+    /** Deletion, step 2: the right code → every warranty of this email is anonymised at once; the session ends. */
+    public static function ajax_portal_erase_confirm() {
+        $s = self::require_session();
+        $res = TW_OTP::verify('erase', $s->email, self::input('code'), 0);
+        if (is_wp_error($res)) self::fail($res->get_error_message(), 'code');
+        $email = $s->email;
+        $lang = TW_Warranty::customer_lang($email);
+        $warranties = TW_Warranty::by_email($email);
+        // The confirmation goes out first: afterwards the address no longer exists in the system.
+        TW_Messenger::send_template_email($email, 'erasure_done', [
+            '_lang' => $lang,
+            'company_name' => TW_Settings::get('company_name'),
+            'company_contact' => TW_Settings::company_contact($lang),
+            'count' => count($warranties),
+        ]);
+        $codes = [];
+        foreach ($warranties as $w) {
+            $codes[] = $w->warranty_code;
+            TW_Warranty::anonymize($w, 'customer_request');
+        }
+        TW_DB::log_event('erasure_completed', ['warranties' => implode(', ', $codes), 'count' => count($codes)], 0, 0, 'customer:' . TW_Util::mask_email($email));
+        TW_OTP::mark_used($s->id);
+        self::set_cookie('', time() - 3600);
+        wp_send_json_success(['message' => tw__('Τα στοιχεία σας διαγράφηκαν. Σας στείλαμε σχετική επιβεβαίωση με email. Σας ευχαριστούμε που επιλέξατε τα προϊόντα μας.')]);
     }
 
     public static function ajax_portal_erase() {

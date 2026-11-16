@@ -9,6 +9,7 @@ if (!defined('ABSPATH')) exit;
  *   product_code (Κωδικός)  – optional
  *   product_name (Όνομα προϊόντος, Περιγραφή, Προϊόν, Μοντέλο) – optional
  *   notes (Σημειώσεις) – optional
+ *   batch (Παρτίδα) – optional; per row, overrides the batch given in the form
  * Without a header row the columns are taken as: serial, product_code, product_name, notes.
  */
 final class TW_Importer {
@@ -17,9 +18,11 @@ final class TW_Importer {
         'product_code' => ['product_code', 'code', 'sku', 'κωδικός', 'κωδικος', 'κωδικός προϊόντος', 'κωδικος προιοντος'],
         'product_name' => ['product_name', 'product', 'name', 'model', 'description', 'όνομα προϊόντος', 'ονομα προιοντος', 'περιγραφή', 'περιγραφη', 'προϊόν', 'προιον', 'μοντέλο', 'μοντελο', 'όνομα', 'ονομα'],
         'notes' => ['notes', 'note', 'σημειώσεις', 'σημειωσεις', 'παρατηρήσεις', 'παρατηρησεις'],
+        'batch' => ['batch', 'import_batch', 'lot', 'παρτίδα', 'παρτιδα', 'παρτίδα εισαγωγής', 'παρτιδα εισαγωγης'],
     ];
 
-    const TEMPLATE_HEADERS = ['serial', 'product_code', 'product_name', 'notes'];
+    /** Template columns (Greek headings; the importer also accepts the English ones). */
+    const TEMPLATE_HEADERS = ['Σειριακός αριθμός', 'Κωδικός προϊόντος', 'Όνομα προϊόντος', 'Παρτίδα', 'Σημειώσεις'];
 
     /**
      * Builds the import template: sheet 1 has only the header row (columns formatted as text so
@@ -38,16 +41,17 @@ final class TW_Importer {
             . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
             . '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
             . '<cols><col min="1" max="1" width="26" style="2" customWidth="1"/><col min="2" max="2" width="18" style="2" customWidth="1"/>'
-            . '<col min="3" max="3" width="40" style="2" customWidth="1"/><col min="4" max="4" width="40" style="2" customWidth="1"/></cols>'
+            . '<col min="3" max="3" width="40" style="2" customWidth="1"/><col min="4" max="4" width="22" style="2" customWidth="1"/><col min="5" max="5" width="40" style="2" customWidth="1"/></cols>'
             . '<sheetData><row r="1">' . $head . '</row></sheetData></worksheet>';
         $lines = [
             ['Οδηγίες εισαγωγής σειριακών αριθμών', 1],
             ['', 0],
             ['Συμπληρώστε το φύλλο «Σειριακοί», μία γραμμή ανά προϊόν. Μην αλλάξετε την πρώτη γραμμή (επικεφαλίδες).', 0],
-            ['serial: ο σειριακός αριθμός όπως στην ετικέτα (υποχρεωτικό). Γράμματα, αριθμοί και - / . _ , 3–64 χαρακτήρες.', 0],
-            ['product_code: ο κωδικός του προϊόντος (προαιρετικό).', 0],
-            ['product_name: το όνομα του προϊόντος που θα βλέπει ο πελάτης, π.χ. «Ηλιακός θερμοσίφωνας 200L» (προαιρετικό).', 0],
-            ['notes: εσωτερικές σημειώσεις, δεν εμφανίζονται στον πελάτη (προαιρετικό).', 0],
+            ['Σειριακός αριθμός: όπως στην ετικέτα (υποχρεωτικό). Γράμματα, αριθμοί και - / . _ , 3–64 χαρακτήρες.', 0],
+            ['Κωδικός προϊόντος: ο κωδικός του προϊόντος (προαιρετικό).', 0],
+            ['Όνομα προϊόντος: το όνομα που θα βλέπει ο πελάτης, π.χ. «Ηλιακός θερμοσίφωνας 200L» (προαιρετικό).', 0],
+            ['Παρτίδα: π.χ. αριθμός παραγγελίας ή παράδοσης (προαιρετικό). Κενό = η παρτίδα που γράψατε στη φόρμα εισαγωγής ή αυτόματη (IMP-ημερομηνία).', 0],
+            ['Σημειώσεις: εσωτερικές σημειώσεις, δεν εμφανίζονται στον πελάτη (προαιρετικό).', 0],
             ['Οι στήλες είναι μορφοποιημένες ως κείμενο, ώστε να μη χάνονται μηδενικά στην αρχή των σειριακών.', 0],
             ['Σειριακοί που υπάρχουν ήδη στο σύστημα παραλείπονται και δεν αλλάζουν.', 0],
             ['Το φύλλο «Οδηγίες» δεν εισάγεται· μπορείτε να το αφήσετε ή να το διαγράψετε.', 0],
@@ -236,7 +240,7 @@ final class TW_Importer {
             return is_array($r) && trim(implode('', array_map('strval', $r))) !== '';
         }));
         if (!$rows) return [];
-        $map = ['serial' => 0, 'product_code' => 1, 'product_name' => 2, 'notes' => 3];
+        $map = ['serial' => 0, 'product_code' => 1, 'product_name' => 2, 'notes' => 3, 'batch' => null];
         $header = array_map(function ($h) { return mb_strtolower(trim((string) $h)); }, $rows[0]);
         $found = [];
         foreach ($header as $i => $h) {
@@ -258,6 +262,7 @@ final class TW_Importer {
                 'product_code' => mb_substr($get('product_code'), 0, 100),
                 'product_name' => mb_substr($get('product_name'), 0, 255),
                 'notes' => $get('notes'),
+                'batch' => isset($map['batch']) && $map['batch'] !== null ? mb_substr(sanitize_text_field($get('batch')), 0, 64) : '',
                 'line' => $n + $first_line,
             ];
         }
@@ -296,6 +301,7 @@ final class TW_Importer {
             $valid[] = $r;
         }
         $now = TW_DB::now();
+        $used = [];
         foreach (array_chunk($valid, 500) as $chunk) {
             $serials = wp_list_pluck($chunk, 'serial');
             $in = implode(',', array_fill(0, count($serials), '%s'));
@@ -306,7 +312,9 @@ final class TW_Importer {
             foreach ($chunk as $r) {
                 if (isset($existing[$r['serial']])) { $result['duplicates'][] = $r['serial']; continue; }
                 $values[] = '(%s,%s,%s,%s,%s,%s,%s)';
-                array_push($params, $r['serial'], $r['product_code'], $r['product_name'], 'available', $batch, $r['notes'], $now);
+                $rb = ($r['batch'] ?? '') !== '' ? $r['batch'] : $batch; // a batch column in the file wins over the form
+                $used[$rb] = true;
+                array_push($params, $r['serial'], $r['product_code'], $r['product_name'], 'available', $rb, $r['notes'], $now);
             }
             if ($values) {
                 $sql = "INSERT INTO $t (serial_no, product_code, product_name, status, import_batch, notes, created_at) VALUES " . implode(',', $values);
@@ -314,7 +322,8 @@ final class TW_Importer {
                 $result['inserted'] += (int) $n;
             }
         }
-        TW_DB::log_event('serials_imported', ['batch' => $batch, 'inserted' => $result['inserted'], 'duplicates' => count($result['duplicates']), 'invalid' => count($result['invalid'])]);
+        if ($used) $result['batch'] = implode(', ', array_keys($used));
+        TW_DB::log_event('serials_imported', ['batch' => $result['batch'], 'inserted' => $result['inserted'], 'duplicates' => count($result['duplicates']), 'invalid' => count($result['invalid'])]);
         return $result;
     }
 }

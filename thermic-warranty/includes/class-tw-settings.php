@@ -71,6 +71,13 @@ final class TW_Settings {
             'log_archive_years' => 0,
             'portal_url' => '',
             'register_url' => '',
+            // English pages (optional): used for English customers instead of the Greek page + ?lang=en.
+            'portal_url_en' => '',
+            'register_url_en' => '',
+            'privacy_url_en' => '',
+            // «Οι εγγυήσεις μου» → delete my details: the explanation shown before the customer confirms (empty = default).
+            'erase_text' => '',
+            'erase_text_en' => '',
             'privacy_url' => '',
             'retention_months_after_end' => 0,
             'brevo_api_key' => '',
@@ -159,6 +166,18 @@ final class TW_Settings {
                 'body' => "Γεια σας,\n\nο κωδικός επαλήθευσης για την ενεργοποίηση της εγγύησης του προϊόντος με σειριακό αριθμό {serial} είναι:\n\n{code}\n\nΟ κωδικός ισχύει για {minutes} λεπτά. Αν δεν ζητήσατε εσείς την ενεργοποίηση, αγνοήστε αυτό το μήνυμα.",
                 'sms' => '',
             ],
+            'erasure_otp' => [
+                'label' => 'Κωδικός επιβεβαίωσης διαγραφής στοιχείων',
+                'subject' => 'Επιβεβαίωση διαγραφής των στοιχείων σας – Εγγυήσεις {company_name}',
+                'body' => "Γεια σας,\n\nλάβαμε από τη σελίδα «Οι εγγυήσεις μου» αίτημα για οριστική διαγραφή των προσωπικών σας στοιχείων και των εγγυήσεων που έχετε καταχωρήσει με αυτό το email.\n\nΓια να επιβεβαιώσετε ότι το αίτημα έγινε από εσάς, πληκτρολογήστε τον παρακάτω κωδικό στη σελίδα:\n\n{code}\n\nΟ κωδικός ισχύει για {minutes} λεπτά. Μετά τη διαγραφή δεν θα λαμβάνετε υπενθυμίσεις για το Service των προϊόντων σας και δεν θα έχετε πρόσβαση στις «Οι εγγυήσεις μου».\n\nΑν δεν ζητήσατε εσείς τη διαγραφή, αγνοήστε αυτό το μήνυμα: τα στοιχεία σας δεν θα διαγραφούν. Για οποιαδήποτε απορία: {company_contact}",
+                'sms' => '',
+            ],
+            'erasure_done' => [
+                'label' => 'Επιβεβαίωση ολοκλήρωσης διαγραφής',
+                'subject' => 'Τα στοιχεία σας διαγράφηκαν – Εγγυήσεις {company_name}',
+                'body' => "Γεια σας,\n\nόπως ζητήσατε, διαγράψαμε τα προσωπικά σας στοιχεία και τα αρχεία που είχατε ανεβάσει για τις εγγυήσεις των προϊόντων σας (προϊόντα: {count}).\n\nΑπό εδώ και πέρα δεν θα λαμβάνετε μηνύματα από την πλατφόρμα εγγυήσεων. Αν στο μέλλον χρειαστείτε βοήθεια με ένα προϊόν μας, θα χαρούμε να σας εξυπηρετήσουμε: {company_contact}\n\nΣας ευχαριστούμε που επιλέξατε τα προϊόντα μας.",
+                'sms' => '',
+            ],
             'login_otp' => [
                 'label' => 'Κωδικός σύνδεσης στην πύλη',
                 'subject' => 'Κωδικός σύνδεσης – Εγγυήσεις {company_name}',
@@ -243,6 +262,10 @@ final class TW_Settings {
         return [
             'registration_otp' => ['label' => 'Registration verification code', 'subject' => 'Verification code for serial number {serial}',
                 'body' => "Hello,\n\nyour verification code to activate the warranty of the product with serial number {serial} is:\n\n{code}\n\nThe code is valid for {minutes} minutes. If you did not request this activation, please ignore this message.", 'sms' => ''],
+            'erasure_otp' => ['label' => 'Confirmation code for deleting your details', 'subject' => 'Confirm the deletion of your details – {company_name} warranties',
+                'body' => "Hello,\n\nwe received a request from the «My warranties» page to permanently delete your personal details and the warranties registered with this email.\n\nTo confirm that the request was made by you, enter the following code on the page:\n\n{code}\n\nThe code is valid for {minutes} minutes. After the deletion you will no longer receive reminders about the Service of your products and you will no longer have access to «My warranties».\n\nIf you did not request the deletion, please ignore this message: your details will not be deleted. For any questions: {company_contact}", 'sms' => ''],
+            'erasure_done' => ['label' => 'Deletion completed', 'subject' => 'Your details have been deleted – {company_name} warranties',
+                'body' => "Hello,\n\nas you requested, we have deleted your personal details and the files you had uploaded for the warranties of your products (products: {count}).\n\nFrom now on you will not receive messages from the warranty platform. If you need help with one of our products in the future, we will be glad to assist you: {company_contact}\n\nThank you for choosing our products.", 'sms' => ''],
             'login_otp' => ['label' => 'Sign-in code', 'subject' => 'Sign-in code – {company_name} warranties',
                 'body' => "Hello,\n\nyour sign-in code for the warranty platform is:\n\n{code}\n\nThe code is valid for {minutes} minutes. If you did not request to sign in, please ignore this message.", 'sms' => ''],
             'activation' => ['label' => 'Warranty activation confirmation', 'subject' => 'Your warranty is active – {warranty_code}',
@@ -295,9 +318,32 @@ final class TW_Settings {
         return array_merge(self::defaults(), is_array($saved) ? $saved : []);
     }
 
+    /** The explanation shown before deletion, in a language (the saved text, or the default). */
+    public static function erase_text($lang) {
+        $v = trim((string) self::get($lang === 'en' ? 'erase_text_en' : 'erase_text'));
+        return $v !== '' ? $v : self::erase_text_default($lang);
+    }
+
+    public static function erase_text_default($lang) {
+        return $lang === 'en' ? "We are sorry to see you go. Before you continue, we would like you to know what deleting your details means:\n\n• Your personal details (name, email, phone numbers, address) and the files you have uploaded (purchase documents, Service receipts, request attachments) will be permanently deleted, for all the products you have registered with this email.\n• You will no longer receive reminders about the scheduled maintenance (Service) of your products.\n• You will no longer have access to «My warranties», where you record the maintenance receipts that keep the warranty of your products valid and extend it until the next Service.\n• Without these details we will not be able to confirm the warranty of your products in case of a fault.\n\nDeletion is permanent and cannot be undone. If you only wish to stop receiving news and offers, you can change this in «My permissions» without affecting your warranty.\n\nIf you still wish to have your details deleted, tick the box below and press «Submit». We will send a confirmation code to your email." : "Λυπούμαστε που αποφασίσατε να φύγετε. Πριν προχωρήσετε, θα θέλαμε να γνωρίζετε τι σημαίνει η διαγραφή των στοιχείων σας:\n\n• Θα διαγραφούν οριστικά τα προσωπικά σας στοιχεία (ονοματεπώνυμο, email, τηλέφωνα, διεύθυνση) και τα αρχεία που έχετε ανεβάσει (παραστατικά αγοράς, αποδεικτικά Service, συνημμένα αιτημάτων), για όλα τα προϊόντα που έχετε καταχωρήσει με αυτό το email.\n• Δεν θα λαμβάνετε πλέον υπενθυμίσεις για τις προγραμματισμένες συντηρήσεις (Service) των προϊόντων σας.\n• Δεν θα έχετε πλέον πρόσβαση στις «Οι εγγυήσεις μου», όπου καταχωρείτε τα αποδεικτικά συντήρησης με τα οποία η εγγύηση των προϊόντων σας παραμένει σε ισχύ και παρατείνεται μέχρι το επόμενο Service.\n• Χωρίς αυτά τα στοιχεία δεν θα μπορούμε να επιβεβαιώσουμε την εγγύηση των προϊόντων σας σε περίπτωση βλάβης.\n\nΗ διαγραφή είναι οριστική και δεν μπορεί να αναιρεθεί. Αν θέλετε μόνο να μη λαμβάνετε νέα και προσφορές, μπορείτε να το αλλάξετε από την ενότητα «Οι άδειές μου», χωρίς να επηρεαστεί η εγγύησή σας.\n\nΑν, παρ' όλα αυτά, επιθυμείτε τη διαγραφή, επιλέξτε το παρακάτω πεδίο και πατήστε «Υποβολή». Θα σας στείλουμε έναν κωδικό επιβεβαίωσης στο email σας.";
+    }
+
     public static function get($key) {
         $all = self::all();
         return $all[$key] ?? null;
+    }
+
+    /**
+     * Public page in a language: 'register', 'portal' or 'privacy'. English uses its own page if set,
+     * otherwise the Greek one in English (Polylang translation or ?lang=en). Empty = the plugin's own page.
+     */
+    public static function page_url($page, $lang = null) {
+        $lang = $lang ?: TW_I18n::lang();
+        $s = self::all();
+        if ($lang === 'en' && !empty($s[$page . '_url_en'])) return $s[$page . '_url_en'];
+        $base = (string) ($s[$page . '_url'] ?? '');
+        if ($base === '') $base = $page === 'portal' ? TW_App::public_url('my') : ($page === 'register' ? TW_App::public_url() : (string) get_privacy_policy_url());
+        return $base === '' ? '' : TW_I18n::url($base, $lang);
     }
 
     /** Purchase invoice file at activation: required | optional | off (keeps the pre-1.4 checkbox working). */

@@ -10,7 +10,7 @@ global $wpdb;
 $labels = TW_Util::status_labels();
 $lang = TW_I18n::lang();
 $s['company_contact'] = TW_Settings::company_contact($lang);
-$privacy = $s['privacy_url'] ?: get_privacy_policy_url();
+$privacy = TW_Settings::page_url('privacy');
 $consent_labels = array_map('tw__', ['terms' => 'Αποδοχή όρων εγγύησης', 'data_accuracy' => 'Επιβεβαίωση ορθότητας στοιχείων', 'marketing' => 'Ενημερώσεις και προσφορές (email/SMS)']);
 $source_labels = array_map('tw__', ['registration' => 'κατά την ενεργοποίηση', 'portal' => 'από «Οι εγγυήσεις μου»', 'erasure_request' => 'με αίτημα διαγραφής', 'inherited' => 'κατά την ενεργοποίηση, από την ήδη ισχύουσα συγκατάθεσή σας']);
 $channel_labels = array_map('tw__', ['email' => 'Email', 'sms' => 'SMS', 'partner' => 'Email συνεργάτη']);
@@ -147,7 +147,7 @@ $review_labels = array_map('tw__', ['pending' => 'Καταχωρήθηκε', 'ap
             <li><strong><?php tw_e('Αποδέκτες:'); ?></strong> <?php echo esc_html(sprintf(tw__('η %s και οι πάροχοι που στέλνουν τα email/SMS για λογαριασμό της.'), $s['company_name'])); ?></li>
             <li><strong><?php tw_e('Διόρθωση στοιχείων:'); ?></strong> <?php echo esc_html(sprintf(tw__('επικοινωνήστε μαζί μας: %s.'), $s['company_contact'])); ?></li>
             <li><strong><?php tw_e('Διαγραφή:'); ?></strong> <?php tw_e('από «Οι εγγυήσεις μου» → «Αίτημα διαγραφής». Τα στοιχεία ενεργών εγγυήσεων διατηρούνται όσο διαρκεί η εγγύηση, ώστε να μπορεί να εξυπηρετηθεί.'); ?></li>
-            <?php if ($privacy) : ?><li><strong><?php tw_e('Πολιτική απορρήτου:'); ?></strong> <?php echo esc_html(TW_I18n::url($privacy)); ?></li><?php endif; ?>
+            <?php if ($privacy) : ?><li><strong><?php tw_e('Πολιτική απορρήτου:'); ?></strong> <?php echo esc_html($privacy); ?></li><?php endif; ?>
         </ul>
     </section>
     <footer class="tw-copy-foot"><?php echo esc_html($s['company_name'] . ' – ' . $s['company_contact']); ?></footer>

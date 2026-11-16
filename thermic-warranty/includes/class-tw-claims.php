@@ -121,7 +121,7 @@ final class TW_Claims {
             $types = self::types();
             $subject = sprintf(tw__('Λάβαμε το αίτημά σας #%1$d – S/N %2$s'), $c->id, $w->serial);
             $body = sprintf(tw__("Αγαπητέ/ή %1\$s,\n\nλάβαμε το αίτημά σας για %2\$s του προϊόντος σας (S/N %3\$s, κωδικός εγγύησης %4\$s).\n\nΑριθμός αιτήματος: #%5\$d\n\nΘα το εξετάσουμε και θα σας ενημερώσουμε με email. Μπορείτε να δείτε την εξέλιξή του στη σελίδα «Οι εγγυήσεις μου»: %6\$s\n\n%7\$s"),
-                $w->customer_name, mb_strtolower($types[$c->type] ?? $c->type), $w->serial, $w->warranty_code, $c->id, TW_I18n::url(TW_Settings::get('portal_url') ?: TW_App::public_url('my')), $s['company_name']);
+                $w->customer_name, mb_strtolower($types[$c->type] ?? $c->type), $w->serial, $w->warranty_code, $c->id, TW_Settings::page_url('portal'), $s['company_name']);
             TW_Messenger::send_email($w->email, $subject, $body, 'service');
         });
         // To the team.
@@ -218,13 +218,21 @@ final class TW_Claims {
             <h1 class="wp-heading-inline">Αιτήματα εγγύησης</h1>
             <?php TW_Admin::notice(); ?>
             <p class="description">Αιτήματα επισκευής ή αντικατάστασης που υπέβαλαν πελάτες από τη σελίδα «Οι εγγυήσεις μου», για προϊόντα με εγγύηση σε ισχύ. Ανοίξτε την καρτέλα της εγγύησης για να δείτε τα συνημμένα και να απαντήσετε.</p>
-            <ul class="subsubsub">
-                <li><a href="<?php echo esc_url(TW_Admin::url('claims')); ?>"<?php echo $status === '' && !TW_Admin::q('all') ? ' class="current"' : ''; ?>>Ανοιχτά</a> |</li>
-                <?php foreach (self::admin_labels() as $k => $l) : ?>
-                    <li><a href="<?php echo esc_url(TW_Admin::url('claims', ['status' => $k])); ?>"<?php echo $status === $k ? ' class="current"' : ''; ?>><?php echo esc_html($l); ?> <span class="count">(<?php echo (int) ($counts[$k]->n ?? 0); ?>)</span></a> |</li>
+            <?php
+            $total_all = 0; foreach ($counts as $cn) $total_all += (int) $cn->n;
+            $open_n = 0; foreach (self::open_statuses() as $os) $open_n += (int) ($counts[$os]->n ?? 0);
+            $tabs = [['Ανοιχτά', $open_n, TW_Admin::url('claims'), $status === '' && !TW_Admin::q('all'), 'open']];
+            foreach (self::admin_labels() as $k => $l) $tabs[] = [$l, (int) ($counts[$k]->n ?? 0), TW_Admin::url('claims', ['status' => $k]), $status === $k, $k];
+            $tabs[] = ['Όλα', $total_all, TW_Admin::url('claims', ['all' => 1]), (bool) TW_Admin::q('all'), 'all'];
+            ?>
+            <nav class="tw-filter-tabs" aria-label="Φίλτρο κατάστασης">
+                <?php foreach ($tabs as $i => $tb) : ?>
+                    <?php if ($i === 1 || $i === count($tabs) - 1) echo '<span class="tw-filter-sep" aria-hidden="true"></span>'; ?>
+                    <a href="<?php echo esc_url($tb[2]); ?>" class="tw-filter-tab tw-filter-tab--<?php echo esc_attr($tb[4]); ?><?php echo $tb[3] ? ' is-active' : ''; ?><?php echo $tb[1] ? '' : ' is-empty'; ?>"<?php echo $tb[3] ? ' aria-current="page"' : ''; ?>>
+                        <span class="tw-filter-dot" aria-hidden="true"></span><?php echo esc_html($tb[0]); ?><span class="tw-filter-count"><?php echo (int) $tb[1]; ?></span>
+                    </a>
                 <?php endforeach; ?>
-                <li><a href="<?php echo esc_url(TW_Admin::url('claims', ['all' => 1])); ?>"<?php echo TW_Admin::q('all') ? ' class="current"' : ''; ?>>Όλα</a></li>
-            </ul>
+            </nav>
             <?php TW_Admin::pagination($total, $paged); ?>
             <table class="widefat striped"><thead><tr><th>#</th><th>Ημ/νία</th><th>Αίτημα</th><th>Κατάσταση</th><th>Πελάτης</th><th>Προϊόν / S/N</th><th>Περιγραφή</th><th></th></tr></thead><tbody>
             <?php if (!$rows) echo '<tr><td colspan="8">Δεν υπάρχουν αιτήματα.</td></tr>'; ?>
@@ -300,7 +308,7 @@ final class TW_Claims {
                 $subject = sprintf(tw__('Ενημέρωση για το αίτημά σας #%1$d – S/N %2$s'), $c->id, $w->serial);
                 $body = sprintf(tw__("Αγαπητέ/ή %1\$s,\n\nτο αίτημά σας #%2\$d για το προϊόν με S/N %3\$s: %4\$s."), $w->customer_name, $c->id, $w->serial, self::statuses()[$c->status]);
                 if ($reply !== '') $body .= "\n\n" . $reply;
-                $body .= "\n\n" . sprintf(tw__('Οι εγγυήσεις μου: %s'), TW_I18n::url(TW_Settings::get('portal_url') ?: TW_App::public_url('my'))) . "\n\n" . $s['company_name'];
+                $body .= "\n\n" . sprintf(tw__('Οι εγγυήσεις μου: %s'), TW_Settings::page_url('portal')) . "\n\n" . $s['company_name'];
                 return TW_Messenger::send_email($w->email, $subject, $body, 'service');
             });
             $msg .= $res === true ? ' Ο πελάτης ενημερώθηκε με email.' : ' Το email προς τον πελάτη δεν στάλθηκε: ' . esc_html($res);

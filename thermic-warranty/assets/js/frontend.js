@@ -151,7 +151,7 @@
     function Register(root) {
         enhanceFiles(root);
         root.querySelectorAll('.tw-ts').forEach(tsRender);
-        // Steps: 1 serial · 2 email · 3 code · 4 details & terms · 5 done
+        // Steps: 1 serial · 2 email · 3 code · 4 details · 5 terms & consents (same form as 4) · 6 done
         var state = { serial: '', email: '', token: '', pass: '', product: '' };
         var steps = root.querySelectorAll('.tw-step');
         var labels = root.querySelectorAll('.tw-steps li');
@@ -161,14 +161,39 @@
         var f4 = root.querySelector('[data-step="4"]');
         var ASK = T('Ολοκληρώστε τον έλεγχο ασφαλείας πάνω από το κουμπί και δοκιμάστε ξανά.');
 
+        var partDetails = f4.querySelector('[data-part="details"]'), partTerms = f4.querySelector('[data-part="terms"]');
         function show(n) {
-            steps.forEach(function (s) { s.hidden = s.getAttribute('data-step') !== String(n); });
+            var dom = n === 5 ? 4 : n; // step 5 is the second part of the step-4 form
+            steps.forEach(function (s) { s.hidden = s.getAttribute('data-step') !== String(dom); });
+            if (dom === 4) { partDetails.hidden = n !== 4; partTerms.hidden = n !== 5; }
             labels.forEach(function (l, i) {
                 l.classList.toggle('is-current', i + 1 === n);
                 l.classList.toggle('is-done', i + 1 < n);
             });
-            var first = root.querySelector('.tw-step[data-step="' + n + '"] input:not([readonly]):not([type=hidden]):not([name=tw_website])');
+            var scope = n === 5 ? partTerms : (n === 4 ? partDetails : root.querySelector('.tw-step[data-step="' + dom + '"]'));
+            var first = scope && n !== 5 ? scope.querySelector('input:not([readonly]):not([type=hidden]):not([name=tw_website])') : null;
             if (first) first.focus();
+            if (n === 5) { var bx = partTerms.querySelector('[data-terms-box]'); if (bx) bx.focus({ preventScroll: true }); root.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        }
+        // A field reported by the server may be in the other part of the form: show that part first.
+        function markF4(name) {
+            var f = name ? f4.querySelector('[name="' + name + '"]') : null;
+            if (f) show(partTerms.contains(f) ? 5 : 4);
+            markField(f4, name);
+        }
+        // Required fields of one part; returns false (and marks the field) if one is missing.
+        function checkPart(part) {
+            var req = part.querySelectorAll('[required]');
+            for (var i = 0; i < req.length; i++) {
+                var el = req[i];
+                var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
+                if (empty || (el.checkValidity && !el.checkValidity())) {
+                    alertBox(root, el.type === 'checkbox' ? T('Πρέπει να επιλέξετε το υποχρεωτικό πεδίο.') : T('Συμπληρώστε σωστά όλα τα υποχρεωτικά πεδία.'));
+                    markField(f4, el.name);
+                    return false;
+                }
+            }
+            return true;
         }
 
         function restart() {
@@ -314,30 +339,30 @@
 
         root.querySelectorAll('[data-action="print-card"]').forEach(function (b) {
             b.addEventListener('click', function () {
-                printCard(root.querySelector('[data-step="5"]'), state.done ? state.done.warranty_code + (state.done.customer_name ? ' - ' + state.done.customer_name : '') : '');
+                printCard(root.querySelector('[data-step="6"]'), state.done ? state.done.warranty_code + (state.done.customer_name ? ' - ' + state.done.customer_name : '') : '');
             });
         });
 
         // Step 4: details, terms, consents → warranty code
+        f4.querySelectorAll('[data-action="back-details"]').forEach(function (b) {
+            b.addEventListener('click', function () { alertBox(root, ''); show(4); });
+        });
         f4.addEventListener('submit', function (e) {
             e.preventDefault();
             alertBox(root, '');
             // Browser-side checks for the obvious; the server validates everything again.
-            var req = f4.querySelectorAll('[required]');
-            for (var i = 0; i < req.length; i++) {
-                var el = req[i];
-                var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !el.files.length : !el.value.trim());
-                if (empty || (el.checkValidity && !el.checkValidity())) {
-                    var lbl = el.type === 'checkbox' ? T('Πρέπει να επιλέξετε το υποχρεωτικό πεδίο.') : T('Συμπληρώστε σωστά όλα τα υποχρεωτικά πεδία.');
-                    alertBox(root, lbl);
-                    markField(f4, el.name);
-                    return;
+            if (!partDetails.hidden) {
+                // First part: details → on to the terms.
+                if (!checkPart(partDetails)) return;
+                var file = f4.invoice_file && f4.invoice_file.files[0];
+                if (file && file.size > TW.maxMb * 1024 * 1024) {
+                    alertBox(root, T('Το αρχείο ξεπερνά το όριο των %d MB.').replace('%d', TW.maxMb)); markField(f4, 'invoice_file'); return;
                 }
+                showTerms();
+                show(5);
+                return;
             }
-            var file = f4.invoice_file && f4.invoice_file.files[0];
-            if (file && file.size > TW.maxMb * 1024 * 1024) {
-                alertBox(root, T('Το αρχείο ξεπερνά το όριο των %d MB.').replace('%d', TW.maxMb)); markField(f4, 'invoice_file'); return;
-            }
+            if (!checkPart(partTerms)) return;
             if (tsToken(f4) === '') { alertBox(root, ASK); return; }
             var fd = new FormData(f4); // includes the honeypot, timestamp and Turnstile token
             ['consent_terms', 'consent_accuracy', 'consent_marketing'].forEach(function (k) {
@@ -350,7 +375,7 @@
                 tsReset(f4);
                 if (!r.success) {
                     alertBox(root, r.data.message);
-                    markField(f4, r.data.field);
+                    markF4(r.data.field);
                     if (r.data.field === 'token' || r.data.field === 'serial') {
                         setTimeout(restart, 4000);
                     }
@@ -358,8 +383,8 @@
                 }
                 try { sessionStorage.removeItem('tw_reg'); } catch (e3) {}
                 state.done = r.data;
-                bind(root.querySelector('[data-step="5"]'), r.data);
-                show(5);
+                bind(root.querySelector('[data-step="6"]'), r.data);
+                show(6);
                 root.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         });
@@ -564,13 +589,51 @@
                 });
             });
 
-            var er = content.querySelector('[data-action="erase"]');
-            if (er) er.addEventListener('click', function () {
-                if (!window.confirm(T('Θέλετε να υποβάλετε αίτημα διαγραφής των προσωπικών σας δεδομένων;'))) return;
-                post('portal_erase', { csrf: csrf }).then(function (r) {
-                    alertBox(root, r.data.message, r.success ? 'success' : 'error');
+            // «Διαγραφή των στοιχείων μου»: a page of its own (#erase), with explanation, tick box and emailed code.
+            var main = content.querySelector('[data-portal-main]'), ev = content.querySelector('[data-portal-erase]');
+            if (main && ev) {
+                var e1 = ev.querySelector('[data-step="erase-1"]'), e2 = ev.querySelector('[data-step="erase-2"]');
+                function eraseView(on) {
+                    alertBox(root, '');
+                    main.hidden = on; ev.hidden = !on;
+                    if (on && location.hash !== '#erase') history.pushState(null, '', '#erase');
+                    if (!on && location.hash === '#erase') history.pushState(null, '', location.pathname + location.search);
+                    root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                content.querySelectorAll('[data-action="erase-view"]').forEach(function (b) { b.addEventListener('click', function () { eraseView(true); }); });
+                ev.querySelectorAll('[data-action="erase-back"]').forEach(function (b) { b.addEventListener('click', function () { eraseView(false); }); });
+                if (!window.twErasePop) { window.twErasePop = true; window.addEventListener('popstate', function () { var v = document.querySelector('[data-portal-erase]'); if (v) v.dispatchEvent(new Event('tw-hash')); }); }
+                ev.addEventListener('tw-hash', function () { eraseView(location.hash === '#erase'); });
+                if (location.hash === '#erase') eraseView(true);
+                e1.confirm.addEventListener('change', function () { e1.querySelector('button').disabled = !e1.confirm.checked; });
+                function sendCode() {
+                    busy(e1, true);
+                    return post('portal_erase_start', { csrf: csrf, confirm: e1.confirm.checked ? '1' : '0' }).then(function (r) {
+                        busy(e1, false); e1.querySelector('button').disabled = !e1.confirm.checked;
+                        if (!r.success) { alertBox(root, r.data.message); return false; }
+                        e2.querySelector('.tw-step-info').textContent = r.data.message;
+                        e1.hidden = true; e2.hidden = false;
+                        if (window.TWOtp) { TWOtp.clear(e2.code); TWOtp.timer(e2.code, r.data.ttl); }
+                        return true;
+                    });
+                }
+                e1.addEventListener('submit', function (e) { e.preventDefault(); alertBox(root, ''); if (e1.confirm.checked) sendCode(); });
+                ev.querySelector('[data-action="erase-resend"]').addEventListener('click', function () { alertBox(root, ''); sendCode(); });
+                e2.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    alertBox(root, '');
+                    if (!/^\d{6}$/.test(e2.code.value.trim())) { alertBox(root, T('Πληκτρολογήστε τον 6ψήφιο κωδικό.')); markField(e2, 'code'); return; }
+                    busy(e2, true);
+                    post('portal_erase_confirm', { csrf: csrf, code: e2.code.value.trim() }).then(function (r) {
+                        busy(e2, false);
+                        if (!r.success) { alertBox(root, r.data.message); if (window.TWOtp) TWOtp.clear(e2.code); markField(e2, 'code'); return; }
+                        e2.hidden = true;
+                        ev.querySelectorAll('.tw-erase-text, .tw-hint, [data-action="erase-back"]').forEach(function (x) { x.hidden = true; });
+                        var done = ev.querySelector('.tw-erase-done'); done.hidden = false; done.querySelector('p').textContent = r.data.message;
+                        history.replaceState(null, '', location.pathname + location.search);
+                    });
                 });
-            });
+            }
         }
 
         load();
