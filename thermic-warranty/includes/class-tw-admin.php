@@ -1170,6 +1170,23 @@ final class TW_Admin {
                         </select>
                         <p class="description">Πόσο μένει συνδεδεμένος ο πελάτης στις «Οι εγγυήσεις μου». Κάτω δεξιά στη σελίδα βλέπει συνεχώς τον χρόνο που απομένει, με κουμπί ανανέωσης (↻) που τον ξεκινά από την αρχή· στο τελευταίο λεπτό η ένδειξη γίνεται κόκκινη. Όταν λήξει, αποσυνδέεται και χρειάζεται νέο κωδικό.</p>
                     </td></tr>
+                    <tr><td colspan="2"><h2 style="margin:8px 0 0">Όρια κατά της κατάχρησης</h2>
+                        <p class="description">Προστατεύουν από μαζικές αποστολές email, δοκιμές κωδικών και «σάρωση» σειριακών. Οι προεπιλογές ταιριάζουν στις περισσότερες περιπτώσεις· αυξήστε ένα όριο μόνο αν πελάτες ή η ομάδα το συναντούν σε κανονική χρήση (π.χ. πολλοί υπάλληλοι πίσω από την ίδια IP γραφείου).</p></td></tr>
+                    <?php
+                    $tw_lim = [
+                        'otp_attempts' => ['Λάθος προσπάθειες ανά κωδικό', 'φορές', 'Μετά από τόσες λάθος καταχωρίσεις ο κωδικός ακυρώνεται και χρειάζεται νέος. Ισχύει για πελάτες και ομάδα.'],
+                        'otp_per_email_hour' => ['Κωδικοί ανά email', 'την ώρα', 'Πόσοι κωδικοί μπορούν να σταλούν στο ίδιο email μέσα σε μία ώρα (ενεργοποίηση, «Οι εγγυήσεις μου», διαγραφή, σύνδεση ομάδας). Προστατεύει τα γραμματοκιβώτια από βομβαρδισμό μηνυμάτων.'],
+                        'otp_per_ip_hour' => ['Κωδικοί ανά διεύθυνση IP', 'την ώρα', 'Πόσοι κωδικοί μπορούν να ζητηθούν από την ίδια σύνδεση μέσα σε μία ώρα, για οποιαδήποτε email.'],
+                        'serial_checks_per_hour' => ['Αναζητήσεις σειριακών ανά IP', 'την ώρα', 'Πόσες φορές μπορεί κάποιος να ελέγξει σειριακό αριθμό στην ενεργοποίηση μέσα σε μία ώρα (προστασία από δοκιμές σειριακών).'],
+                        'staff_max_fails' => ['Αποτυχημένες συνδέσεις ομάδας ανά IP', 'φορές', 'Μετά από τόσες αποτυχημένες προσπάθειες σύνδεσης στο διαχειριστικό (λάθος κωδικός πρόσβασης ή κωδικός μίας χρήσης), η IP μπλοκάρεται για το διάστημα παρακάτω.'],
+                        'staff_fail_minutes' => ['Διάρκεια μπλοκαρίσματος', 'λεπτά', 'Για πόσο μένει μπλοκαρισμένη η IP μετά τις αποτυχημένες συνδέσεις.'],
+                    ];
+                    foreach ($tw_lim as $lk => $ld) : $lr = TW_Settings::LIMITS[$lk]; ?>
+                        <tr><th><label for="tw-<?php echo esc_attr($lk); ?>"><?php echo esc_html($ld[0]); ?></label></th><td>
+                            <input type="number" id="tw-<?php echo esc_attr($lk); ?>" name="s[<?php echo esc_attr($lk); ?>]" value="<?php echo (int) TW_Settings::limit($lk); ?>" min="<?php echo (int) $lr[1]; ?>" max="<?php echo (int) $lr[2]; ?>" class="small-text"> <?php echo esc_html($ld[1]); ?>
+                            <p class="description"><?php echo esc_html($ld[2]); ?> Προεπιλογή: <?php echo (int) $lr[0]; ?> · επιτρέπεται <?php echo (int) $lr[1]; ?>–<?php echo (int) $lr[2]; ?>.</p>
+                        </td></tr>
+                    <?php endforeach; ?>
                     <tr><td colspan="2"><h2 style="margin:8px 0 0">Πρόσβαση με IP</h2>
                         <p><?php if (TW_Access::active()) : ?><strong style="color:#15803d">Ενεργός.</strong> Το <?php echo esc_html(TW_App::APP_NAME); ?> ανοίγει μόνο από: <code><?php echo esc_html(implode(', ', TW_Access::allowed_list())); ?></code>.
                         <?php else : ?><strong>Ανενεργός.</strong> Το <?php echo esc_html(TW_App::APP_NAME); ?> ανοίγει από οποιαδήποτε σύνδεση.<?php endif; ?>
@@ -1814,6 +1831,7 @@ final class TW_Admin {
             elseif ($k === 'service_proof_mode') $values[$k] = in_array($v, ['upload', 'fields', 'both'], true) ? $v : 'upload';
             elseif ($k === 'tax_countries') $values[$k] = array_values(array_intersect(array_keys(TW_Util::countries()), array_map('strtoupper', array_map('sanitize_key', (array) $v))));
             elseif ($k === 'otp_minutes') $values[$k] = in_array((int) $v, TW_OTP::MINUTE_CHOICES, true) ? (int) $v : 2;
+            elseif (isset(TW_Settings::LIMITS[$k])) $values[$k] = max(TW_Settings::LIMITS[$k][1], min(TW_Settings::LIMITS[$k][2], (int) $v));
             elseif ($k === 'portal_session_minutes') $values[$k] = in_array((int) $v, TW_OTP::SESSION_CHOICES, true) ? (int) $v : 60;
             elseif ($k === 'staff_session_minutes') $values[$k] = in_array((int) $v, TW_Staff_Auth::SESSION_CHOICES, true) ? (int) $v : 120;
             elseif ($k === 'pdf_watermark') $values[$k] = in_array($v, ['text', 'logo', 'none'], true) ? $v : 'text';

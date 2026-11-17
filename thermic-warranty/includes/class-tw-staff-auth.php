@@ -64,11 +64,11 @@ final class TW_Staff_Auth {
     }
 
     private static function blocked() {
-        return TW_Guard::hits('staff_fail') >= self::MAX_FAILS;
+        return TW_Guard::hits('staff_fail') >= TW_Settings::limit('staff_max_fails');
     }
 
     private static function fail() {
-        TW_Guard::hit('staff_fail', self::MAX_FAILS, self::FAIL_WINDOW); // atomic: parallel guesses are counted too
+        TW_Guard::hit('staff_fail', TW_Settings::limit('staff_max_fails'), TW_Settings::limit('staff_fail_minutes') * MINUTE_IN_SECONDS); // atomic: parallel guesses are counted too
     }
 
     private static function team_user($email) {

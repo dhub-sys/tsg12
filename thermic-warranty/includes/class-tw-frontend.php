@@ -121,7 +121,7 @@ final class TW_Frontend {
      */
     public static function ajax_reg_check() {
         self::guard(true);
-        if (!TW_Guard::throttle('serial_check', 30, HOUR_IN_SECONDS)) {
+        if (!TW_Guard::throttle('serial_check', TW_Settings::limit('serial_checks_per_hour'), HOUR_IN_SECONDS)) {
             self::fail('Πάρα πολλές αναζητήσεις σειριακών αριθμών. Δοκιμάστε ξανά σε λίγο.', '', 429);
         }
         $serial = self::usable_serial(self::input('serial'));

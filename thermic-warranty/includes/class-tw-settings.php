@@ -65,6 +65,13 @@ final class TW_Settings {
             'ip_proxy' => '',
             // Lifetime of the emailed one-time codes, in minutes.
             'otp_minutes' => 2,
+            // Abuse limits (Ρυθμίσεις → Ασφάλεια); see self::LIMITS for the allowed range of each.
+            'otp_attempts' => 5,
+            'otp_per_email_hour' => 8,
+            'otp_per_ip_hour' => 20,
+            'serial_checks_per_hour' => 30,
+            'staff_max_fails' => 10,
+            'staff_fail_minutes' => 15,
             // How long a customer stays signed in to «Οι εγγυήσεις μου» (minutes; renewable from the page).
             'portal_session_minutes' => 60,
             // Countries offered next to the partner / technician tax number (Greece is always offered).
@@ -318,6 +325,23 @@ final class TW_Settings {
     public static function all() {
         $saved = get_option(self::OPTION, []);
         return array_merge(self::defaults(), is_array($saved) ? $saved : []);
+    }
+
+    /** Abuse limits: key => [default, min, max]. */
+    const LIMITS = [
+        'otp_attempts' => [5, 3, 10],
+        'otp_per_email_hour' => [8, 3, 30],
+        'otp_per_ip_hour' => [20, 5, 200],
+        'serial_checks_per_hour' => [30, 10, 300],
+        'staff_max_fails' => [10, 3, 50],
+        'staff_fail_minutes' => [15, 5, 120],
+    ];
+
+    /** A limit from the settings, kept within its allowed range. */
+    public static function limit($key) {
+        $d = self::LIMITS[$key];
+        $v = (int) self::get($key);
+        return $v ? max($d[1], min($d[2], $v)) : $d[0];
     }
 
     /** The explanation shown before deletion, in a language (the saved text, or the default). */
