@@ -154,6 +154,10 @@ final class TW_Importer {
             }
         }
 
+        // Cell styles: a serial is often a number shown through a custom format (e.g. 89327 with
+        // 000000"/26" appears as 089327/26). Keep each style's format code to rebuild what Excel shows.
+        $style_fmt = self::style_formats((string) $zip->getFromName('xl/styles.xml'));
+
         // First worksheet, resolved through the workbook relationships.
         $sheet_path = 'xl/worksheets/sheet1.xml';
         $wb = @simplexml_load_string((string) $zip->getFromName('xl/workbook.xml'));
@@ -186,6 +190,7 @@ final class TW_Importer {
                         $ref = (string) $reader->getAttribute('r');
                         $col = $ref !== '' ? self::col_index($ref) : ($row ? max(array_keys($row)) + 1 : 0);
                         $type = (string) $reader->getAttribute('t');
+                        $style = (int) $reader->getAttribute('s');
                         $val = null;
                         break;
                     case 'v': $in_v = true; $val = ''; break;
@@ -200,7 +205,7 @@ final class TW_Importer {
                     case 'c':
                         if ($row !== null && $val !== null) {
                             if ($type === 's') $val = $shared[(int) $val] ?? '';
-                            elseif ($type === '' || $type === 'n') $val = self::number_text($val);
+                            elseif ($type === '' || $type === 'n') $val = self::formatted($val, $style_fmt[$style] ?? '');
                             $row[$col] = $val;
                         }
                         break;
@@ -225,6 +230,54 @@ final class TW_Importer {
         $n = 0;
         for ($i = 0; $i < strlen($letters); $i++) $n = $n * 26 + (ord($letters[$i]) - 64);
         return $n - 1;
+    }
+
+    /** Style index (cellXfs) => custom number format code ('' = general / built-in). */
+    private static function style_formats($xml) {
+        $out = [];
+        $x = $xml !== '' ? @simplexml_load_string($xml) : false;
+        if (!$x) return $out;
+        $codes = [];
+        if (isset($x->numFmts->numFmt)) foreach ($x->numFmts->numFmt as $f) $codes[(int) $f['numFmtId']] = (string) $f['formatCode'];
+        $i = 0;
+        if (isset($x->cellXfs->xf)) foreach ($x->cellXfs->xf as $xf) { $out[$i++] = $codes[(int) $xf['numFmtId']] ?? ''; }
+        return $out;
+    }
+
+    /**
+     * A numeric cell as Excel shows it, for the formats used for codes: zero padding (000000) and literal text
+     * ("/26", \-, or plain - / . _ characters), e.g. 89327 with 000000"/26" → 089327/26. Dates, decimals,
+     * thousands separators and anything else keep the plain number.
+     */
+    private static function formatted($v, $code) {
+        $num = self::number_text($v);
+        if ($code === '' || !preg_match('/^\d+$/', $num)) return $num;
+        $code = explode(';', $code)[0];
+        $code = preg_replace('/\[[^\]]*\]/', '', $code); // colours, locales, conditions
+        // Split into literals and digit placeholders.
+        $parts = []; $digits = 0;
+        for ($i = 0, $n = strlen($code); $i < $n; $i++) {
+            $c = $code[$i];
+            if ($c === '"') { $j = strpos($code, '"', $i + 1); if ($j === false) return $num; $parts[] = ['t', substr($code, $i + 1, $j - $i - 1)]; $i = $j; }
+            elseif ($c === '\\') { $parts[] = ['t', $code[$i + 1] ?? '']; $i++; }
+            elseif ($c === '0' || $c === '#') { $parts[] = ['d', $c]; $digits++; }
+            elseif (strpos('-/._ ()123456789', $c) !== false) { $parts[] = ['t', $c]; } // digits other than 0 are shown as they are
+            else return $num; // dates, decimals, %, @, E… → leave the number alone
+        }
+        if (!$digits) return $num;
+        // Placeholders form one number (text between them is kept in place): pad with the 0s, extra digits go first.
+        $zeros = 0; foreach ($parts as $p) if ($p[0] === 'd' && $p[1] === '0') $zeros++;
+        $str = str_pad($num, $zeros, '0', STR_PAD_LEFT);
+        if (strlen($str) < $digits) $str = str_repeat(' ', $digits - strlen($str)) . $str; // '#' positions stay empty
+        $extra = substr($str, 0, strlen($str) - $digits);
+        $str = substr($str, strlen($str) - $digits);
+        $out = ''; $k = 0; $first = true;
+        foreach ($parts as $p) {
+            if ($p[0] === 't') { $out .= $p[1]; continue; }
+            if ($first) { $out .= $extra; $first = false; }
+            $out .= $str[$k++];
+        }
+        return trim(str_replace(' ', '', $out)) === '' ? $num : str_replace(' ', '', $out);
     }
 
     /** Excel stores long numeric serials as numbers (sometimes in E-notation). */
