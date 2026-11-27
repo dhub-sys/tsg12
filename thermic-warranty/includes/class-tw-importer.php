@@ -204,7 +204,8 @@ final class TW_Importer {
                     case 'is': $in_is = false; break;
                     case 'c':
                         if ($row !== null && $val !== null) {
-                            if ($type === 's') $val = $shared[(int) $val] ?? '';
+                            if ($type === 's') $val = self::formatted_text($shared[(int) $val] ?? '', $style_fmt[$style] ?? '');
+                            elseif ($type === 'inlineStr' || $type === 'str') $val = self::formatted_text($val, $style_fmt[$style] ?? '');
                             elseif ($type === '' || $type === 'n') $val = self::formatted($val, $style_fmt[$style] ?? '');
                             $row[$col] = $val;
                         }
@@ -278,6 +279,29 @@ final class TW_Importer {
             $out .= $str[$k++];
         }
         return trim(str_replace(' ', '', $out)) === '' ? $num : str_replace(' ', '', $out);
+    }
+
+    /**
+     * A text cell as Excel shows it when its format adds text around it (the «@» part), e.g. 081130 with
+     * @"/26" → 081130/26. Formats without «@» show the text unchanged.
+     */
+    private static function formatted_text($v, $code) {
+        $v = (string) $v;
+        if ($code === '' || strpos($code, '@') === false) return $v;
+        $sections = explode(';', $code);
+        $code = count($sections) >= 4 ? $sections[3] : $sections[0]; // the 4th section is for text, if present
+        if (strpos($code, '@') === false) return $v;
+        $code = preg_replace('/\[[^\]]*\]/', '', $code);
+        $out = '';
+        for ($i = 0, $n = strlen($code); $i < $n; $i++) {
+            $c = $code[$i];
+            if ($c === '"') { $j = strpos($code, '"', $i + 1); if ($j === false) return $v; $out .= substr($code, $i + 1, $j - $i - 1); $i = $j; }
+            elseif ($c === '\\') { $out .= $code[$i + 1] ?? ''; $i++; }
+            elseif ($c === '@') { $out .= $v; }
+            elseif ($c === '_' || $c === '*') { $i++; } // spacing / fill instructions, not shown text
+            else { $out .= $c; }
+        }
+        return $out;
     }
 
     /** Excel stores long numeric serials as numbers (sometimes in E-notation). */
