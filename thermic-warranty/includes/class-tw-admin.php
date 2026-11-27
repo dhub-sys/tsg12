@@ -17,7 +17,7 @@ final class TW_Admin {
 
     /** Actions accepted by the app router (POST, or GET for downloads). */
     public static function actions() {
-        return ['import', 'add_serial', 'serial_status', 'serial_batch', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
+        return ['import', 'add_serial', 'serial_status', 'serial_batch', 'serial_delete', 'record_service', 'delete_service', 'set_status', 'invoice', 'export',
             'save_settings', 'run_now', 'resend_activation', 'anonymize', 'test_message', 'terms_view', 'team_add', 'team_remove', 'process_erasure', 'template', 'review_service', 'receipt', 'brevo_tool', 'backup_create', 'backup_download', 'backup_delete', 'backup_restore', 'backup_settings',
             'backup_send', 'remote_settings', 'remote_connect', 'remote_disconnect', 'remote_test', 'edit_customer', 'log_export', 'log_verify', 'log_archive', 'log_archive_settings', 'partner_save', 'partner_delete', 'partner_import', 'partner_export', 'terms_save', 'terms_assign', 'terms_delete', 'terms_pdf_draft', 'claim_update', 'claim_file'];
     }
@@ -114,6 +114,7 @@ final class TW_Admin {
             'scroll' => '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
             'history' => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
             'wrench' => '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+            'trash' => '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
             'layers' => '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
             'lock' => '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
             'chevron' => '<path d="m6 9 6 6 6-6"/>',
@@ -852,12 +853,42 @@ final class TW_Admin {
                 <?php endif; ?>
                 → νέα παρτίδα <input type="text" name="new_batch" maxlength="64" list="tw-batches" required placeholder="όνομα (νέο ή υπάρχον)">
                 <button class="button">Αλλαγή παρτίδας</button>
+                <?php if (self::can_admin()) : ?>
+                    <span class="tw-batch-sep" aria-hidden="true"></span>
+                    <button type="button" class="button tw-button-danger" data-tw-serial-delete="<?php echo esc_attr(wp_json_encode(['url' => $post, 'nonce' => wp_create_nonce('tw_serial_delete'), 'back' => array_filter(['s' => $s, 'status' => $status, 'batch' => $batch, 'paged' => $paged > 1 ? $paged : null])])); ?>"><?php echo self::icon('trash'); // phpcs:ignore ?> Διαγραφή επιλεγμένων</button>
+                <?php endif; ?>
             </form>
+            <?php if (self::can_admin()) : ?>
+            <script>
+            (function () {
+                // Bulk delete: the ticked serials, after a confirmation; serials with a warranty are skipped by the server.
+                var b = document.querySelector('[data-tw-serial-delete]'); if (!b) return;
+                b.addEventListener('click', function () {
+                    var cfg = JSON.parse(b.getAttribute('data-tw-serial-delete'));
+                    var boxes = [].filter.call(document.querySelectorAll('.tw-batch-cb'), function (c) { return c.checked; });
+                    if (!boxes.length) { alert('Τικάρετε πρώτα στη λίστα τους σειριακούς που θέλετε να διαγράψετε.'); return; }
+                    var reg = boxes.filter(function (c) { return c.getAttribute('data-registered') === '1'; }).length;
+                    var del = boxes.length - reg;
+                    if (!del) { alert('Οι επιλεγμένοι σειριακοί έχουν ενεργοποιημένη εγγύηση και δεν διαγράφονται.'); return; }
+                    var msg = 'Θα διαγραφούν οριστικά ' + del + (del === 1 ? ' σειριακός.' : ' σειριακοί.')
+                        + (reg ? '\n' + (reg === 1 ? '1 επιλεγμένος έχει ενεργοποιημένη εγγύηση και θα παραλειφθεί.' : reg + ' επιλεγμένοι έχουν ενεργοποιημένη εγγύηση και θα παραλειφθούν.') : '')
+                        + '\n\nΗ διαγραφή δεν αναιρείται. Συνέχεια;';
+                    if (!confirm(msg)) return;
+                    var f = document.createElement('form'); f.method = 'post'; f.action = cfg.url; f.hidden = true;
+                    var add = function (n, v) { var i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); };
+                    add('action', 'tw_serial_delete'); add('_wpnonce', cfg.nonce);
+                    Object.keys(cfg.back || {}).forEach(function (k) { add('back[' + k + ']', cfg.back[k]); });
+                    boxes.forEach(function (c) { add('ids[]', c.value); });
+                    document.body.appendChild(f); f.submit();
+                });
+            })();
+            </script>
+            <?php endif; ?>
             <?php self::pagination($total, $paged); ?>
             <table class="widefat striped"><thead><tr><th class="check-column"><input type="checkbox" onclick="document.querySelectorAll('.tw-batch-cb').forEach(function(c){c.checked=this.checked}.bind(this))" aria-label="Επιλογή όλων"></th><th>Σειριακός</th><th>Κωδικός προϊόντος</th><th>Όνομα προϊόντος</th><th>Κατάσταση</th><th>Εγγύηση</th><th>Παρτίδα</th><th>Όροι</th><th>Καταχώρηση</th><th></th></tr></thead><tbody>
             <?php if (!$rows) echo '<tr><td colspan="10">Δεν βρέθηκαν σειριακοί.</td></tr>'; ?>
             <?php foreach ($rows as $r) : ?>
-                <tr><th class="check-column"><input type="checkbox" class="tw-batch-cb" name="ids[]" value="<?php echo (int) $r->id; ?>" form="tw-batch-form"></th><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
+                <tr><th class="check-column"><input type="checkbox" class="tw-batch-cb" name="ids[]" value="<?php echo (int) $r->id; ?>" form="tw-batch-form"<?php echo $r->wid || $r->status === 'registered' ? ' data-registered="1"' : ''; ?>></th><td><code><?php echo esc_html($r->serial); ?></code></td><td><?php echo esc_html($r->product_code); ?></td><td><?php echo esc_html($r->product_name); ?></td>
                     <td><?php echo self::status_badge($r->status, $labels); ?></td>
                     <td><?php echo $r->wid ? self::warranty_link($r->wid, $r->warranty_code) : '—'; ?></td>
                     <td><a href="<?php echo esc_url(self::url('serials', ['batch' => $r->import_batch])); ?>"><?php echo esc_html($r->import_batch); ?></a></td>
@@ -1447,9 +1478,9 @@ final class TW_Admin {
     }
 
     /** Nonce + team access + the right to manage settings/team (operators get 403). */
-    private static function admin_guard($action) {
+    private static function admin_guard($action, $message = 'Δεν έχετε δικαίωμα πρόσβασης στις ρυθμίσεις.') {
         self::guard($action);
-        if (!self::can_admin()) wp_die('Δεν έχετε δικαίωμα πρόσβασης στις ρυθμίσεις.', 403);
+        if (!self::can_admin()) wp_die(esc_html($message), 403);
     }
 
     private static function backup_guard($action) {
@@ -2060,6 +2091,40 @@ final class TW_Admin {
         TW_DB::log_event('serials_batch', ($old !== '' ? $old . ' → ' : '→ ') . $new . ' (' . $n . ')');
         self::flash('Η παρτίδα άλλαξε σε «' . $new . '» για ' . $n . ' σειριακούς (' . $what . ').');
         self::back('tw-serials', ['batch' => $new]);
+    }
+
+    /**
+     * Bulk delete of serials ticked in the list. Only serials never activated (available or void, with no warranty
+     * – not even an anonymised one) are deleted; the rest are skipped and named in the message. Team managers only.
+     */
+    public static function handle_serial_delete() {
+        global $wpdb;
+        self::admin_guard('tw_serial_delete', 'Τη διαγραφή σειριακών την κάνουν μόνο οι διαχειριστές και όσοι διαχειρίζονται την ομάδα.');
+        $back = array_filter(array_map('sanitize_text_field', (array) wp_unslash($_POST['back'] ?? [])), 'strlen');
+        $back = array_intersect_key($back, array_flip(['s', 'status', 'batch', 'paged']));
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['ids'] ?? [])))));
+        if (!$ids) { self::flash('Δεν επιλέξατε σειριακούς. Τικάρετε τα κουτάκια στη λίστα.', 'error'); self::back('tw-serials', $back); }
+        $t = TW_DB::table('serials');
+        $w = TW_DB::table('warranties');
+        $deleted = []; $kept = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $in = implode(',', array_fill(0, count($chunk), '%d'));
+            $rows = $wpdb->get_results($wpdb->prepare("SELECT s.id, s.serial_no, s.status, (SELECT COUNT(*) FROM $w w WHERE w.serial_id = s.id) AS wn FROM $t s WHERE s.id IN ($in)", $chunk));
+            $ok = [];
+            foreach ($rows as $r) {
+                if ((int) $r->wn === 0 && in_array($r->status, ['available', 'void'], true)) { $ok[] = (int) $r->id; $deleted[] = $r->serial_no; }
+                else $kept[] = $r->serial_no;
+            }
+            if ($ok) $wpdb->query($wpdb->prepare("DELETE FROM $t WHERE id IN (" . implode(',', array_fill(0, count($ok), '%d')) . ") AND status IN ('available','void')", $ok));
+        }
+        if ($deleted) {
+            TW_DB::log_event('serials_deleted', ['count' => count($deleted), 'serials' => implode(', ', array_slice($deleted, 0, 200)) . (count($deleted) > 200 ? ' …' : ''), 'skipped' => count($kept)]);
+        }
+        $msg = $deleted ? sprintf('Διαγράφηκαν %d σειριακοί.', count($deleted)) : 'Δεν διαγράφηκε κανένας σειριακός.';
+        if ($kept) $msg .= ' ' . sprintf('Παραλείφθηκαν %d με ενεργοποιημένη εγγύηση (μπορείτε να αλλάξετε την κατάσταση της εγγύησης από την καρτέλα της): %s.', count($kept), esc_html(implode(', ', array_slice($kept, 0, 20)) . (count($kept) > 20 ? ' …' : '')));
+        self::flash($msg, $deleted ? 'success' : 'warning');
+        unset($back['paged']);
+        self::back('tw-serials', $back);
     }
 
     public static function page_claims() { TW_Claims::page(); }
