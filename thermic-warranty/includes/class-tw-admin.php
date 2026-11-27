@@ -37,8 +37,9 @@ final class TW_Admin {
             $screens['team'] = ['Ομάδα', 'users', 'page_team'];
             $screens['backups'] = ['Αντίγραφα ασφαλείας', 'database', 'page_backups'];
             $screens['log'] = ['Ημερολόγιο', 'scroll', 'page_log'];
+            // Settings are for those who manage the team (WordPress administrators or «Μπορεί να διαχειρίζεται και την ομάδα»).
+            $screens['settings'] = ['Ρυθμίσεις', 'settings', 'page_settings'];
         }
-        $screens['settings'] = ['Ρυθμίσεις', 'settings', 'page_settings'];
         $screens['help'] = ['Οδηγός χρήσης', 'book', 'page_help'];
         $screens['changelog'] = ['Ιστορικό εκδόσεων', 'history', 'page_changelog'];
         return $screens;
@@ -909,6 +910,7 @@ final class TW_Admin {
     // ------------------------------------------------------------------ settings
 
     public static function page_settings() {
+        if (!self::can_admin()) { echo '<div class="wrap tw-wrap"><h1>Ρυθμίσεις</h1><p>Δεν έχετε πρόσβαση σε αυτή τη σελίδα. Τις ρυθμίσεις τις αλλάζουν οι διαχειριστές της ιστοσελίδας και τα μέλη με «Μπορεί να διαχειρίζεται και την ομάδα».</p></div>'; return; }
         $s = TW_Settings::all();
         // Messages and terms are edited per customer language (?tl=en for English).
         $tl = self::q('tl') === 'en' ? 'en' : 'el';
@@ -1444,6 +1446,12 @@ final class TW_Admin {
         <?php
     }
 
+    /** Nonce + team access + the right to manage settings/team (operators get 403). */
+    private static function admin_guard($action) {
+        self::guard($action);
+        if (!self::can_admin()) wp_die('Δεν έχετε δικαίωμα πρόσβασης στις ρυθμίσεις.', 403);
+    }
+
     private static function backup_guard($action) {
         self::guard($action);
         if (!self::can_admin()) wp_die('Δεν έχετε πρόσβαση.', 403);
@@ -1614,7 +1622,7 @@ final class TW_Admin {
     }
 
     public static function handle_brevo_tool() {
-        self::guard('tw_brevo_tool');
+        self::admin_guard('tw_brevo_tool');
         if (self::post('tool') === 'webhook') {
             $r = TW_Brevo::ensure_email_webhook();
             self::flash($r === true ? 'Οι αναφορές παράδοσης email ρυθμίστηκαν στο Brevo.' : 'Αποτυχία: ' . esc_html($r), $r === true ? 'success' : 'error');
@@ -1787,7 +1795,7 @@ final class TW_Admin {
     }
 
     public static function handle_process_erasure() {
-        self::guard('tw_process_erasure');
+        self::admin_guard('tw_process_erasure');
         $r = get_post((int) self::post('request_id'));
         if (!$r || $r->post_type !== 'user_request' || $r->post_status !== 'request-confirmed') {
             self::flash('Το αίτημα δεν βρέθηκε ή δεν έχει επιβεβαιωθεί.', 'error');
@@ -1804,7 +1812,7 @@ final class TW_Admin {
     // ------------------------------------------------------------------ handlers
 
     public static function handle_save_settings() {
-        self::guard('tw_save_settings');
+        self::admin_guard('tw_save_settings');
         $tab = sanitize_key(self::post('tab'));
         $in = isset($_POST['s']) && is_array($_POST['s']) ? wp_unslash($_POST['s']) : [];
         $defaults = TW_Settings::defaults();
@@ -2281,7 +2289,7 @@ final class TW_Admin {
     }
 
     public static function handle_test_message() {
-        self::guard('tw_test_message');
+        self::admin_guard('tw_test_message');
         $key = sanitize_key(self::post('template'));
         $tab = sanitize_key(self::post('tab'));
         $fake = (object) [
